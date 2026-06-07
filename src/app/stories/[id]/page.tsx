@@ -1,8 +1,9 @@
+import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { after } from 'next/server'
 import { BookViewerClient } from '@/components/book/BookViewerClient'
 import { getStory, getStoryNode, incrementStoryViews } from '@/lib/firestore-helpers'
-import type { Metadata } from 'next'
+import { APP_CONFIG } from '@/lib/config'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -11,11 +12,25 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
   const story = await getStory(id).catch(() => null)
-  if (!story) return { title: 'Story not found — Chronicle' }
+  if (!story) return { title: 'Story not found' }
+  
+  const title = story.title
+  const description = story.description || `A community CYOA story set in the world of ${story.worldName}.`
+  
   return {
-    title: `${story.title} — Chronicle`,
-    description:
-      story.description || `A community CYOA story set in the world of ${story.worldName}.`,
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: 'article',
+      siteName: APP_CONFIG.site.name,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+    },
   }
 }
 

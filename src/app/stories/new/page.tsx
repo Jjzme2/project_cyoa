@@ -222,80 +222,89 @@ export default function NewStoryPage() {
 
             {resources.length > 0 && (
               <div className="space-y-3 mt-3">
-                {resources.map((res, index) => (
-                  <div key={index} className="flex gap-2.5 items-end bg-white/[0.02] border border-white/[0.04] p-3 rounded-lg">
-                    <div className="flex-1 space-y-1.5">
-                      <Label className="text-[11px] opacity-40">Variable Name</Label>
-                      <Input
-                        placeholder="e.g. Gold"
-                        value={res.name}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^a-zA-Z0-9_]/g, '')
-                          setResources((prev) => {
-                            const next = [...prev]
-                            next[index] = { ...next[index], name: val }
-                            return next
-                          })
-                        }}
-                      />
-                    </div>
-                    <div className="w-28 space-y-1.5">
-                      <Label className="text-[11px] opacity-40">Type</Label>
-                      <select
-                        value={res.type}
-                        onChange={(e) => {
-                          const t = e.target.value as 'number' | 'string'
-                          setResources((prev) => {
-                            const next = [...prev]
-                            next[index] = {
-                              ...next[index],
-                              type: t,
-                              defaultValue: t === 'number' ? '0' : '',
-                            }
-                            return next
-                          })
-                        }}
-                        className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm focus:outline-none"
+                {resources.map((res, index) => {
+                  const nameId = `resource-name-${index}`
+                  const typeId = `resource-type-${index}`
+                  const valId = `resource-val-${index}`
+                  return (
+                    <div key={index} className="flex gap-2.5 items-end bg-white/[0.02] border border-white/[0.04] p-3 rounded-lg">
+                      <div className="flex-1 space-y-1.5">
+                        <Label htmlFor={nameId} className="text-[11px] opacity-40">Variable Name</Label>
+                        <Input
+                          id={nameId}
+                          placeholder="e.g. Gold"
+                          value={res.name}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^a-zA-Z0-9_]/g, '')
+                            setResources((prev) => {
+                              const next = [...prev]
+                              next[index] = { ...next[index], name: val }
+                              return next
+                            })
+                          }}
+                        />
+                      </div>
+                      <div className="w-28 space-y-1.5">
+                        <Label htmlFor={typeId} className="text-[11px] opacity-40">Type</Label>
+                        <select
+                          id={typeId}
+                          value={res.type}
+                          onChange={(e) => {
+                            const t = e.target.value as 'number' | 'string'
+                            setResources((prev) => {
+                              const next = [...prev]
+                              next[index] = {
+                                ...next[index],
+                                type: t,
+                                defaultValue: t === 'number' ? '0' : '',
+                              }
+                              return next
+                            })
+                          }}
+                          className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm focus:outline-none"
+                        >
+                          <option value="number">Number</option>
+                          <option value="string">String</option>
+                        </select>
+                      </div>
+                      <div className="flex-1 space-y-1.5">
+                        <Label htmlFor={valId} className="text-[11px] opacity-40">Starting Value</Label>
+                        <Input
+                          id={valId}
+                          placeholder={res.type === 'number' ? '0' : 'None'}
+                          type={res.type === 'number' ? 'number' : 'text'}
+                          value={res.defaultValue}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            setResources((prev) => {
+                              const next = [...prev]
+                              next[index] = { ...next[index], defaultValue: val }
+                              return next
+                            })
+                          }}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setResources((prev) => prev.filter((_, i) => i !== index))}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-10 px-2.5"
                       >
-                        <option value="number">Number</option>
-                        <option value="string">String</option>
-                      </select>
+                        Delete
+                      </Button>
                     </div>
-                    <div className="flex-1 space-y-1.5">
-                      <Label className="text-[11px] opacity-40">Starting Value</Label>
-                      <Input
-                        placeholder={res.type === 'number' ? '0' : 'None'}
-                        type={res.type === 'number' ? 'number' : 'text'}
-                        value={res.defaultValue}
-                        onChange={(e) => {
-                          const val = e.target.value
-                          setResources((prev) => {
-                            const next = [...prev]
-                            next[index] = { ...next[index], defaultValue: val }
-                            return next
-                          })
-                        }}
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setResources((prev) => prev.filter((_, i) => i !== index))}
-                      className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-10 px-2.5"
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
         </div>
 
         <div className="glass-card rounded-xl p-6 space-y-3">
-          <h2 className="text-sm font-medium text-foreground/65">Opening chapter</h2>
+          <Label htmlFor="opening" className="text-sm font-medium text-foreground/65 block">Opening chapter</Label>
           <Textarea
+            id="opening"
             placeholder="Set the scene. Introduce your world. Hook the reader from the very first sentence…"
             value={opening}
             onChange={(e) => setOpening(e.target.value)}
@@ -317,24 +326,27 @@ export default function NewStoryPage() {
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground/45">Path 1</Label>
+            <Label htmlFor="path1" className="text-xs text-muted-foreground/45">Path 1</Label>
             <Input
+              id="path1"
               placeholder="Where might the first path lead?"
               value={choice1}
               onChange={(e) => setChoice1(e.target.value)}
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground/45">Path 2</Label>
+            <Label htmlFor="path2" className="text-xs text-muted-foreground/45">Path 2</Label>
             <Input
+              id="path2"
               placeholder="Where might the second path lead?"
               value={choice2}
               onChange={(e) => setChoice2(e.target.value)}
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground/45">Path 3</Label>
+            <Label htmlFor="path3" className="text-xs text-muted-foreground/45">Path 3</Label>
             <Input
+              id="path3"
               placeholder="Where might the third path lead?"
               value={choice3}
               onChange={(e) => setChoice3(e.target.value)}

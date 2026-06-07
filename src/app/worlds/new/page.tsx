@@ -130,12 +130,13 @@ export default function NewWorldPage() {
 
         <div className="glass-card rounded-xl p-6 space-y-3">
           <div>
-            <h2 className="text-sm font-medium text-foreground/65">World lore</h2>
+            <Label htmlFor="lore" className="text-sm font-medium text-foreground/65 block">World lore</Label>
             <p className="text-xs text-muted-foreground/45 mt-1">
               History, geography, factions, and the major events that shaped your world.
             </p>
           </div>
           <Textarea
+            id="lore"
             placeholder="Once, the five kingdoms were united under a crystalline sky. When the Sundering occurred three centuries ago, the sky itself fractured into shards of pure magic that drifted like frozen lightning across the land…"
             value={lore}
             onChange={(e) => setLore(e.target.value)}
@@ -146,12 +147,13 @@ export default function NewWorldPage() {
 
         <div className="glass-card rounded-xl p-6 space-y-3">
           <div>
-            <h2 className="text-sm font-medium text-foreground/65">Rules &amp; constraints</h2>
+            <Label htmlFor="rules" className="text-sm font-medium text-foreground/65 block">Rules &amp; constraints</Label>
             <p className="text-xs text-muted-foreground/45 mt-1">
               What the AI must always follow — magic systems, forbidden topics, narrative tone.
             </p>
           </div>
           <Textarea
+            id="rules"
             placeholder={`• Magic requires a physical cost — the caster ages with each spell\n• Technology is medieval — no firearms, no electricity\n• The protagonist must always have agency\n• Keep violence tasteful, not gratuitous`}
             value={rules}
             onChange={(e) => setRules(e.target.value)}
