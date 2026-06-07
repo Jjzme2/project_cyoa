@@ -30,8 +30,34 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+
+# credentials, secrets, and api keys
+*.key
+*.pem
+*service-account*.json
+*serviceAccount*.json
+service-account.json
+serviceAccountKey.json
+credentials.json
+firebase-key.json
+secrets.json
+.secrets
+
+# IDEs and local config
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
 # vercel
 .vercel
@@ -39,3 +65,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/src/generated/prisma
