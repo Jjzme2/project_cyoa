@@ -1,14 +1,18 @@
-export const dynamic = 'force-dynamic'
-
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { Plus, Sparkles, Library } from 'lucide-react'
+import { cacheLife, cacheTag } from 'next/cache'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { LibraryClient } from '@/components/library/LibraryClient'
+import { ContinueReadingSection } from '@/components/library/ContinueReadingSection'
 import { getStories } from '@/lib/firestore-helpers'
 
 async function LibraryContent() {
+  'use cache'
+  cacheLife('minutes')
+  cacheTag('stories')
+
   let stories
   try {
     stories = await getStories(200)
@@ -90,6 +94,9 @@ export default function LibraryPage() {
       </section>
 
       <div className="border-t border-white/[0.07]" />
+
+      {/* Personalised shelves: Continue Reading + Bookmarks (client, auth-gated) */}
+      <ContinueReadingSection />
 
       {/* Interactive library shelves */}
       <section>

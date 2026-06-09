@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { after } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { adminAuth, adminDb } from '@/lib/firebase-admin'
 import {
   getChoiceSlot,
@@ -12,8 +14,10 @@ import {
   releaseChoiceSlot,
   getDecryptedUserApiKey,
   getStoryPath,
+  createNotification,
+  checkAndAwardAchievements,
 } from '@/lib/firestore-helpers'
-import { checkRateLimit, refundRateLimit } from '@/lib/rate-limit'
+import { CreditManager } from '@/lib/credit-manager'
 import { generateStoryNode, generateStoryImage, PromptRejectedError } from '@/lib/ai'
 import { validatePromptLocal } from '@/lib/validate'
 
@@ -68,53 +72,62 @@ export async function POST(
     )
   }
 
-  const { success, remaining, reset } = await checkRateLimit(uid, tier, credits)
-  if (!success) {
-    await releaseChoiceSlot(storyId, nodeId, slotId)
-    const limitMsg = includeImage
-      ? `Not enough daily credits for text+image (need ${credits}). Come back tomorrow!`
-      : 'Daily AI limit reached. Come back tomorrow!'
-    return NextResponse.json(
-      { error: limitMsg, remaining: 0, reset },
-      { status: 429, headers: { 'Retry-After': String(Math.ceil((reset - Date.now()) / 1000)) } },
-    )
-  }
-
-  const [slot, parentNode, story, storyPath] = await Promise.all([
-    getChoiceSlot(storyId, nodeId, slotId),
-    getStoryNode(storyId, nodeId),
-    getStory(storyId),
-    getStoryPath(storyId, nodeId),
-  ])
-
-  if (!slot) {
-    await releaseChoiceSlot(storyId, nodeId, slotId)
-    return NextResponse.json({ error: 'Slot not found' }, { status: 404 })
-  }
-  if (!parentNode) {
-    await releaseChoiceSlot(storyId, nodeId, slotId)
-    return NextResponse.json({ error: 'Parent node not found' }, { status: 404 })
-  }
-  if (!story) {
-    await releaseChoiceSlot(storyId, nodeId, slotId)
-    return NextResponse.json({ error: 'Story not found' }, { status: 404 })
-  }
-
-  const world = story.worldId ? await getWorld(story.worldId) : null
-  if (!world) {
-    await releaseChoiceSlot(storyId, nodeId, slotId)
-    return NextResponse.json({ error: 'World not found' }, { status: 404 })
-  }
-
-  const worldCtx = {
-    name: world.name,
-    description: world.description,
-    lore: world.lore,
-    rules: world.rules,
-    tone: world.tone,
-  }
+  // Everything from here holds the lock. Any unexpected throw must release it.
+  let source: 'daily' | 'purchased' = 'daily'
+  let consumed = false
 
   try {
+    const consumeResult = await CreditManager.consume(uid, tier, credits)
+    if (!consumeResult.success) {
+      await releaseChoiceSlot(storyId, nodeId, slotId)
+      const limitMsg = includeImage
+        ? `Not enough credits for text+image (need ${credits}). Purchase more or try again tomorrow!`
+        : 'Daily AI limit reached. Purchase more credits or try again tomorrow!'
+      return NextResponse.json(
+        { error: limitMsg, remaining: 0, reset: consumeResult.reset },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil((consumeResult.reset - Date.now()) / 1000)) } },
+      )
+    }
+    source = consumeResult.source
+    consumed = true
+    const { remaining, reset } = consumeResult
+
+    // These were previously unprotected — any throw here escaped to Next.js's
+    // error boundary and returned HTML, causing the lock to never be released.
+    const [slot, parentNode, story, storyPath] = await Promise.all([
+      getChoiceSlot(storyId, nodeId, slotId),
+      getStoryNode(storyId, nodeId),
+      getStory(storyId),
+      getStoryPath(storyId, nodeId),
+    ])
+
+    if (!slot) {
+      await Promise.all([releaseChoiceSlot(storyId, nodeId, slotId), CreditManager.refund(uid, tier, credits, source)])
+      return NextResponse.json({ error: 'Slot not found' }, { status: 404 })
+    }
+    if (!parentNode) {
+      await Promise.all([releaseChoiceSlot(storyId, nodeId, slotId), CreditManager.refund(uid, tier, credits, source)])
+      return NextResponse.json({ error: 'Parent node not found' }, { status: 404 })
+    }
+    if (!story) {
+      await Promise.all([releaseChoiceSlot(storyId, nodeId, slotId), CreditManager.refund(uid, tier, credits, source)])
+      return NextResponse.json({ error: 'Story not found' }, { status: 404 })
+    }
+
+    const world = story.worldId ? await getWorld(story.worldId) : null
+    if (!world) {
+      await Promise.all([releaseChoiceSlot(storyId, nodeId, slotId), CreditManager.refund(uid, tier, credits, source)])
+      return NextResponse.json({ error: 'World not found' }, { status: 404 })
+    }
+
+    const worldCtx = {
+      name: world.name,
+      description: world.description,
+      lore: world.lore,
+      rules: world.rules,
+      tone: world.tone,
+    }
+
     const { content, choices, model } = await generateStoryNode(
       worldCtx,
       storyPath,
@@ -141,7 +154,7 @@ export async function POST(
           authorId: uid,
           aiGenerated: true,
           aiModel: model,
-          imageUrl: null, // will be patched below once image URL is known
+          imageUrl: null,
         },
         choices,
       ),
@@ -154,38 +167,55 @@ export async function POST(
       fillChoiceSlot(storyId, nodeId, slotId, newNodeId, uid, displayName ?? 'Anonymous', promptText, requirements, effects),
       incrementStoryNodeCount(storyId),
     ]
-    
+
     let finalRemaining = remaining
-    // Patch image URL if generation succeeded
     if (imageUrl) {
       patchOps.push(
         adminDb.collection('stories').doc(storyId).collection('nodes').doc(newNodeId).update({ imageUrl }),
       )
     } else if (includeImage) {
-      // Refund the 2 extra image credits since image generation failed, leaving them charged only 1 credit for text
       const refundAmount = IMAGE_CREDIT_COST - 1
-      patchOps.push(refundRateLimit(uid, tier, refundAmount))
+      patchOps.push(CreditManager.refund(uid, tier, refundAmount, source))
       finalRemaining = remaining + refundAmount
     }
     await Promise.all(patchOps)
+
+    revalidateTag(`node-${storyId}-${nodeId}`, 'max')
+    revalidateTag(`story-${storyId}`, 'max')
+    revalidateTag('stories', 'max')
+    revalidateTag(`story-tree-${storyId}`, 'max')
+
+    after(async () => {
+      const ops: Promise<unknown>[] = [checkAndAwardAchievements(uid, 'contribution')]
+      if (includeImage && imageUrl) ops.push(checkAndAwardAchievements(uid, 'illustration'))
+      if (story.authorId && story.authorId !== uid) {
+        ops.push(
+          createNotification(story.authorId, 'new_contribution', {
+            storyId,
+            storyTitle: story.title,
+            nodeId: newNodeId,
+            contributorName: displayName ?? 'Anonymous',
+            slotPrompt: promptText,
+          }),
+        )
+      }
+      await Promise.all(ops).catch(() => {})
+    })
 
     return NextResponse.json(
       { nodeId: newNodeId, content, choices, model, imageUrl, remaining: finalRemaining, imageError },
       { status: 201 },
     )
   } catch (error) {
-    if (error instanceof PromptRejectedError) {
-      await Promise.all([
-        releaseChoiceSlot(storyId, nodeId, slotId),
-        refundRateLimit(uid, tier, credits),
-      ])
-      return NextResponse.json({ error: error.reason }, { status: 422 })
-    }
-
+    // Single, unconditional cleanup for all error paths — prevents orphaned locks
     await Promise.all([
       releaseChoiceSlot(storyId, nodeId, slotId),
-      refundRateLimit(uid, tier, credits),
-    ])
+      consumed ? CreditManager.refund(uid, tier, credits, source) : Promise.resolve(),
+    ]).catch(() => {}) // best-effort cleanup; don't mask the original error
+
+    if (error instanceof PromptRejectedError) {
+      return NextResponse.json({ error: error.reason }, { status: 422 })
+    }
     const message = error instanceof Error ? error.message : 'Generation failed'
     return NextResponse.json({ error: message }, { status: 503 })
   }

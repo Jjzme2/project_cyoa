@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { adminAuth } from '@/lib/firebase-admin'
 import { getStory, getStoryNode, createStoryNode } from '@/lib/firestore-helpers'
 import { adminDb } from '@/lib/firebase-admin'
@@ -62,6 +63,8 @@ export async function POST(
 
   if (!parentId) {
     await adminDb.collection('stories').doc(storyId).update({ rootNodeId: nodeId })
+    revalidateTag(`story-${storyId}`, 'max')
+    revalidateTag(`story-tree-${storyId}`, 'max')
   }
 
   return NextResponse.json({ nodeId }, { status: 201 })

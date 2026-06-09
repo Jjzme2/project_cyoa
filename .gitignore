@@ -22,7 +22,6 @@
 
 # misc
 .DS_Store
-*.pem
 
 # debug
 npm-debug.log*
@@ -66,4 +65,8 @@ secrets.json
 *.tsbuildinfo
 next-env.d.ts
 
-/src/generated/prisma
+# firebase local config
+.firebaserc
+
+# claude code local config
+.claude/

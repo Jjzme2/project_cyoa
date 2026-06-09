@@ -1,0 +1,37 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "bookmarks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "readingProgress",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "stories",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "authorId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "slots",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "storyId", "order": "ASCENDING" },
+        { "fieldPath": "slotIndex", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

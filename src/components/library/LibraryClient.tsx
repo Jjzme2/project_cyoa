@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useMemo, useId } from 'react'
+import { useState, useMemo, useId, useEffect } from 'react'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, X, Library, BookOpen } from 'lucide-react'
+import { Search, X, Library, BookOpen, Tag } from 'lucide-react'
 import { StoryCard } from '@/components/StoryCard'
 import type { Story } from '@/types'
 
@@ -12,8 +13,30 @@ interface Props {
 
 export function LibraryClient({ stories }: Props) {
   const searchId = useId()
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+
   const [search, setSearch] = useState('')
-  const [worldFilter, setWorldFilter] = useState<string | null>(null)
+  const [worldFilter, setWorldFilter] = useState<string | null>(() => searchParams.get('world'))
+  const [tagFilter, setTagFilter] = useState<string | null>(null)
+
+  // Sync URL param → worldFilter on mount / back-navigation
+  useEffect(() => {
+    const w = searchParams.get('world')
+    setWorldFilter(w)
+  }, [searchParams])
+
+  function setWorld(world: string | null) {
+    setWorldFilter(world)
+    const params = new URLSearchParams(searchParams.toString())
+    if (world) {
+      params.set('world', world)
+    } else {
+      params.delete('world')
+    }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }
 
   // Unique world names, sorted A→Z
   const worlds = useMemo(() => {
@@ -21,66 +44,64 @@ export function LibraryClient({ stories }: Props) {
     return names.sort((a, b) => a.localeCompare(b))
   }, [stories])
 
-  // Filter and group into alphabetised shelves
+  // Unique tags across all stories
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>()
+    for (const s of stories) {
+      if (s.tags) s.tags.forEach((t) => tagSet.add(t))
+    }
+    return [...tagSet].sort()
+  }, [stories])
+
+  // Filter and group into shelves
   const shelves = useMemo(() => {
     const q = search.trim().toLowerCase()
-
     let pool = stories
     if (q) {
       pool = pool.filter(
         (s) =>
           s.title.toLowerCase().includes(q) ||
-          s.authorName.toLowerCase().includes(q),
+          s.authorName.toLowerCase().includes(q) ||
+          (s.description ?? '').toLowerCase().includes(q),
       )
     }
-    if (worldFilter) {
-      pool = pool.filter((s) => s.worldName === worldFilter)
-    }
+    if (worldFilter) pool = pool.filter((s) => s.worldName === worldFilter)
+    if (tagFilter) pool = pool.filter((s) => s.tags?.includes(tagFilter))
 
-    // Group by world
     const map = new Map<string, Story[]>()
     for (const story of pool) {
       if (!map.has(story.worldName)) map.set(story.worldName, [])
       map.get(story.worldName)!.push(story)
     }
-
-    // Sort stories within each world A→Z, then sort worlds A→Z
     for (const list of map.values()) {
       list.sort((a, b) => a.title.localeCompare(b.title))
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b))
-  }, [stories, search, worldFilter])
+  }, [stories, search, worldFilter, tagFilter])
 
   const totalVisible = shelves.reduce((n, [, books]) => n + books.length, 0)
-  const isFiltered = search.trim() !== '' || worldFilter !== null
+  const isFiltered = search.trim() !== '' || worldFilter !== null || tagFilter !== null
 
   function clearFilters() {
     setSearch('')
-    setWorldFilter(null)
+    setWorld(null)
+    setTagFilter(null)
   }
 
   return (
-    <div className="space-y-10">
-      {/* ── Card-catalog search ── */}
+    <div className="space-y-8">
+      {/* Search */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-lg">
-          <label htmlFor={searchId} className="sr-only">
-            Search stories
-          </label>
+          <label htmlFor={searchId} className="sr-only">Search stories</label>
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-amber-400/35 pointer-events-none" />
           <input
             id={searchId}
             type="search"
-            placeholder="Search by title or author…"
+            placeholder="Search by title, author, or description…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="
-              w-full h-11 pl-10 pr-10 rounded-lg text-sm
-              border border-white/10 bg-white/[0.04]
-              text-foreground placeholder:text-muted-foreground/30
-              focus:outline-none focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500/25
-              transition-colors font-sans
-            "
+            className="w-full h-11 pl-10 pr-10 rounded-lg text-sm border border-white/10 bg-white/[0.04] text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500/25 transition-colors font-sans"
           />
           {search && (
             <button
@@ -92,7 +113,6 @@ export function LibraryClient({ stories }: Props) {
             </button>
           )}
         </div>
-
         {isFiltered && (
           <button
             onClick={clearFilters}
@@ -103,26 +123,47 @@ export function LibraryClient({ stories }: Props) {
         )}
       </div>
 
-      {/* ── World filter pills ── */}
+      {/* World filter pills */}
       {worlds.length > 1 && (
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by world">
-          <WorldPill
-            label="All worlds"
-            active={worldFilter === null}
-            onClick={() => setWorldFilter(null)}
-          />
-          {worlds.map((world) => (
-            <WorldPill
-              key={world}
-              label={world}
-              active={worldFilter === world}
-              onClick={() => setWorldFilter(worldFilter === world ? null : world)}
-            />
-          ))}
+        <div className="space-y-2">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground/25 font-sans font-semibold flex items-center gap-1.5">
+            <Library className="h-3 w-3" /> Worlds
+          </p>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by world">
+            <FilterPill label="All worlds" active={worldFilter === null} onClick={() => setWorld(null)} />
+            {worlds.map((world) => (
+              <FilterPill
+                key={world}
+                label={world}
+                active={worldFilter === world}
+                onClick={() => setWorld(worldFilter === world ? null : world)}
+              />
+            ))}
+          </div>
         </div>
       )}
 
-      {/* ── Shelves ── */}
+      {/* Tag filter pills */}
+      {allTags.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground/25 font-sans font-semibold flex items-center gap-1.5">
+            <Tag className="h-3 w-3" /> Genres
+          </p>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by genre">
+            {allTags.map((tag) => (
+              <FilterPill
+                key={tag}
+                label={tag}
+                active={tagFilter === tag}
+                onClick={() => setTagFilter(tagFilter === tag ? null : tag)}
+                variant="tag"
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Shelves */}
       {shelves.length === 0 ? (
         <EmptyState isFiltered={isFiltered} onClear={clearFilters} />
       ) : (
@@ -143,7 +184,6 @@ export function LibraryClient({ stories }: Props) {
         </div>
       )}
 
-      {/* ── Footer count ── */}
       {totalVisible > 0 && (
         <p className="text-[11px] text-muted-foreground/20 font-sans text-center pb-4">
           {totalVisible} {totalVisible === 1 ? 'story' : 'stories'} across{' '}
@@ -156,27 +196,28 @@ export function LibraryClient({ stories }: Props) {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function WorldPill({
+function FilterPill({
   label,
   active,
   onClick,
+  variant = 'world',
 }: {
   label: string
   active: boolean
   onClick: () => void
+  variant?: 'world' | 'tag'
 }) {
   return (
     <button
       onClick={onClick}
       aria-pressed={active}
-      className={`
-        px-3 py-1 rounded-full text-xs font-sans transition-all border
-        ${
-          active
-            ? 'bg-amber-500/20 border-amber-500/30 text-amber-300'
-            : 'border-white/10 text-muted-foreground/45 hover:border-white/20 hover:text-muted-foreground/70'
-        }
-      `}
+      className={`px-3 py-1 rounded-full text-xs font-sans transition-all border ${
+        active
+          ? variant === 'tag'
+            ? 'bg-violet-500/20 border-violet-500/30 text-violet-300'
+            : 'bg-amber-500/20 border-amber-500/30 text-amber-300'
+          : 'border-white/10 text-muted-foreground/45 hover:border-white/20 hover:text-muted-foreground/70'
+      }`}
     >
       {label}
     </button>
@@ -186,10 +227,8 @@ function WorldPill({
 function WorldShelf({ worldName, books }: { worldName: string; books: Story[] }) {
   return (
     <section aria-label={`${worldName} — ${books.length} ${books.length === 1 ? 'story' : 'stories'}`}>
-      {/* Section label — like a library placard */}
       <div className="flex items-baseline gap-4 mb-7">
         <div className="flex items-center gap-2.5">
-          {/* Decorative placard pin */}
           <span className="text-amber-500/25 text-xs">§</span>
           <h2
             className="text-[17px] font-semibold text-foreground/65 tracking-tight"
@@ -201,20 +240,18 @@ function WorldShelf({ worldName, books }: { worldName: string; books: Story[] })
         <span className="text-[10px] font-sans text-muted-foreground/25 uppercase tracking-widest shrink-0">
           {books.length} {books.length === 1 ? 'story' : 'stories'}
         </span>
-        {/* Rule */}
-        <div className="flex-1 h-px" style={{ background: 'linear-gradient(to right, oklch(1 0 0 / 7%), transparent)' }} />
+        <div
+          className="flex-1 h-px"
+          style={{ background: 'linear-gradient(to right, oklch(1 0 0 / 7%), transparent)' }}
+        />
       </div>
 
-      {/* Books + physical shelf */}
       <div className="relative">
-        {/* Book grid — portrait 2:3 aspect, A→Z left to right */}
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-4 sm:gap-5 pb-6">
           {books.map((story) => (
             <StoryCard key={story.id} story={story} />
           ))}
         </div>
-
-        {/* ── Shelf board ── */}
         <ShelfBoard />
       </div>
     </section>
@@ -224,33 +261,21 @@ function WorldShelf({ worldName, books }: { worldName: string; books: Story[] })
 function ShelfBoard() {
   return (
     <div className="relative h-5 -mx-1">
-      {/* Main plank */}
       <div
         className="absolute inset-0 rounded-[3px]"
         style={{
-          background:
-            'linear-gradient(to bottom, oklch(0.33 0.065 53), oklch(0.27 0.055 51) 45%, oklch(0.23 0.045 49))',
-          boxShadow:
-            '0 5px 14px -2px rgba(0,0,0,0.60), inset 0 1px 0 oklch(1 0 0 / 9%), inset 0 -1px 0 oklch(0 0 0 / 35%)',
+          background: 'linear-gradient(to bottom, oklch(0.33 0.065 53), oklch(0.27 0.055 51) 45%, oklch(0.23 0.045 49))',
+          boxShadow: '0 5px 14px -2px rgba(0,0,0,0.60), inset 0 1px 0 oklch(1 0 0 / 9%), inset 0 -1px 0 oklch(0 0 0 / 35%)',
         }}
       />
-      {/* Grain highlight strip */}
       <div
         className="absolute top-px inset-x-0 h-px rounded opacity-30"
-        style={{
-          background:
-            'linear-gradient(to right, transparent, oklch(1 0 0 / 35%) 30%, oklch(1 0 0 / 20%) 70%, transparent)',
-        }}
+        style={{ background: 'linear-gradient(to right, transparent, oklch(1 0 0 / 35%) 30%, oklch(1 0 0 / 20%) 70%, transparent)' }}
       />
-      {/* Front-edge bevel */}
       <div
         className="absolute bottom-0 inset-x-0 h-1 rounded-b-[3px] opacity-55"
-        style={{
-          background:
-            'linear-gradient(to right, transparent, oklch(0.55 0.10 63 / 55%) 25%, oklch(0.60 0.11 66 / 60%) 50%, oklch(0.55 0.10 63 / 55%) 75%, transparent)',
-        }}
+        style={{ background: 'linear-gradient(to right, transparent, oklch(0.55 0.10 63 / 55%) 25%, oklch(0.60 0.11 66 / 60%) 50%, oklch(0.55 0.10 63 / 55%) 75%, transparent)' }}
       />
-      {/* Cast shadow on floor */}
       <div
         className="absolute top-full inset-x-6 h-7 blur-2xl opacity-45 pointer-events-none"
         style={{ background: 'oklch(0.08 0.03 50)' }}
@@ -259,24 +284,14 @@ function ShelfBoard() {
   )
 }
 
-function EmptyState({
-  isFiltered,
-  onClear,
-}: {
-  isFiltered: boolean
-  onClear: () => void
-}) {
+function EmptyState({ isFiltered, onClear }: { isFiltered: boolean; onClear: () => void }) {
   return (
     <div className="text-center py-24 space-y-3">
       <div className="w-14 h-14 rounded-2xl glass-card border border-amber-500/15 flex items-center justify-center mx-auto">
-        {isFiltered ? (
-          <Search className="h-6 w-6 text-amber-400/30" />
-        ) : (
-          <BookOpen className="h-6 w-6 text-amber-400/30" />
-        )}
+        {isFiltered ? <Search className="h-6 w-6 text-amber-400/30" /> : <BookOpen className="h-6 w-6 text-amber-400/30" />}
       </div>
       <p className="text-muted-foreground/50 text-sm">
-        {isFiltered ? 'No stories match your search.' : 'The library is empty.'}
+        {isFiltered ? 'No stories match your filters.' : 'The library is empty.'}
       </p>
       {isFiltered && (
         <button

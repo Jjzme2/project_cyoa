@@ -1,0 +1,149 @@
+import { adminDb } from './firebase-admin'
+import { checkRateLimit, refundRateLimit } from './rate-limit'
+import { FieldValue } from 'firebase-admin/firestore'
+
+/**
+ * Credit Manager
+ * Integrates daily AI rate limits (Redis) with purchased credit balances (Firestore).
+ * Declares all imports/constants at the absolute top of the file.
+ */
+export class CreditManager {
+  /**
+   * Consumes credits for a user.
+   * First attempts to consume from daily rate limit. If daily limit is exhausted,
+   * consumes from purchased credit balance in user settings Firestore document.
+   */
+  public static async consume(
+    userId: string,
+    tier: 'FREE' | 'PREMIUM',
+    amount: number
+  ): Promise<{ success: boolean; remaining: number; reset: number; source: 'daily' | 'purchased' }> {
+    // 1. Try checking daily rate limit first
+    const dailyResult = await checkRateLimit(userId, tier, amount)
+    if (dailyResult.success) {
+      return {
+        success: true,
+        remaining: dailyResult.remaining,
+        reset: dailyResult.reset,
+        source: 'daily',
+      }
+    }
+
+    // 2. Daily limit exhausted. Check purchased credits in Firestore
+    const userSettingsRef = adminDb.collection('userSettings').doc(userId)
+    
+    try {
+      let success = false
+      let purchasedRemaining = 0
+
+      await adminDb.runTransaction(async (txn) => {
+        const doc = await txn.get(userSettingsRef)
+        const data = doc.exists ? doc.data()! : {}
+        const currentCredits = data.purchasedCredits ?? 0
+
+        if (currentCredits >= amount) {
+          success = true
+          purchasedRemaining = currentCredits - amount
+          txn.set(
+            userSettingsRef,
+            { 
+              purchasedCredits: FieldValue.increment(-amount),
+              updatedAt: new Date().toISOString()
+            },
+            { merge: true }
+          )
+        } else {
+          purchasedRemaining = currentCredits
+        }
+      })
+
+      // Refund the daily rate limit count since we didn't use daily credits
+      await refundRateLimit(userId, tier, amount)
+
+      if (success) {
+        return {
+          success: true,
+          remaining: purchasedRemaining,
+          reset: dailyResult.reset,
+          source: 'purchased',
+        }
+      }
+    } catch (err) {
+      console.error('[CreditManager.consume] Transaction failed:', err)
+    }
+
+    return {
+      success: false,
+      remaining: 0,
+      reset: dailyResult.reset,
+      source: 'daily',
+    }
+  }
+
+  /**
+   * Gets the total credits info for a user (daily + purchased).
+   */
+  public static async getCreditsInfo(
+    userId: string,
+    tier: 'FREE' | 'PREMIUM'
+  ): Promise<{
+    dailyRemaining: number;
+    dailyLimit: number;
+    purchasedCredits: number;
+    totalRemaining: number;
+    reset: number;
+  }> {
+    const userSettingsRef = adminDb.collection('userSettings').doc(userId)
+    
+    // Fetch daily uses and purchased credits in parallel
+    const [dailyInfo, settingsSnap] = await Promise.all([
+      import('./rate-limit').then(m => m.getRemainingUses(userId, tier)),
+      userSettingsRef.get(),
+    ])
+
+    const purchasedCredits = settingsSnap.exists
+      ? (settingsSnap.data()?.purchasedCredits ?? 0)
+      : 0
+
+    return {
+      dailyRemaining: dailyInfo.remaining,
+      dailyLimit: dailyInfo.limit,
+      purchasedCredits,
+      totalRemaining: dailyInfo.remaining + purchasedCredits,
+      reset: dailyInfo.reset,
+    }
+  }
+
+  /**
+   * Adds credits to a user's balance in Firestore.
+   */
+  public static async addCredits(userId: string, amount: number) {
+    const userSettingsRef = adminDb.collection('userSettings').doc(userId)
+    await userSettingsRef.set(
+      {
+        purchasedCredits: FieldValue.increment(amount),
+        lifetimeCreditsPurchased: FieldValue.increment(amount),
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    )
+  }
+
+  /**
+   * Refunds credits to a user.
+   * If source is 'purchased', refunds to their Firestore balance.
+   * Otherwise, refunds to their Redis daily rate limit count.
+   */
+  public static async refund(
+    userId: string,
+    tier: 'FREE' | 'PREMIUM',
+    amount: number,
+    source: 'daily' | 'purchased'
+  ) {
+    if (source === 'purchased') {
+      await this.addCredits(userId, amount)
+    } else {
+      await refundRateLimit(userId, tier, amount)
+    }
+  }
+}

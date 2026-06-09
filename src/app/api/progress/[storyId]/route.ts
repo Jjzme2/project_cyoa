@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminAuth } from '@/lib/firebase-admin'
-import { getReadingProgress, saveReadingProgress } from '@/lib/firestore-helpers'
+import { getReadingProgress, saveReadingProgress, checkAndAwardAchievements } from '@/lib/firestore-helpers'
 
 async function resolveUser(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
@@ -39,5 +39,6 @@ export async function POST(
   }
 
   await saveReadingProgress(uid, storyId, currentNodeId, nodeHistory)
+  checkAndAwardAchievements(uid, 'story_read').catch(() => {})
   return NextResponse.json({ ok: true })
 }

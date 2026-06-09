@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  cacheComponents: true,
   images: {
-    // Allow rendering of illustrated images fetched and stored on Vercel Blob Storage.
     remotePatterns: [
       {
         protocol: 'https',

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/components/Providers'
 import { validatePromptLocal } from '@/lib/validate'
+import { CreatorResourceManager } from '@/lib/creator-resources'
 import type { ChoiceSlot, ResourceDefinition, ChoiceRequirement, ChoiceEffect } from '@/types'
 
 interface Props {
@@ -16,29 +17,12 @@ interface Props {
   slots: ChoiceSlot[]
   onChoiceSelect: (nodeId: string, effects?: ChoiceEffect[]) => void
   onSlotFilled: (slot: ChoiceSlot, nodeId: string) => void
-  currentResources?: Record<string, number | string>
+  currentResources?: Record<string, number | string | string[] | number[]>
   storyResources?: ResourceDefinition[]
 }
 
-function checkRequirements(slot: ChoiceSlot, currentRes: Record<string, number | string>): boolean {
-  if (!slot.requirements || slot.requirements.length === 0) return true
-
-  return slot.requirements.every((req) => {
-    const val = currentRes[req.resourceName]
-    if (val === undefined) return true
-
-    const reqVal = typeof val === 'number' ? Number(req.value) : String(req.value)
-    
-    switch (req.operator) {
-      case '==': return val === reqVal
-      case '!=': return val !== reqVal
-      case '>': return Number(val) > Number(reqVal)
-      case '<': return Number(val) < Number(reqVal)
-      case '>=': return Number(val) >= Number(reqVal)
-      case '<=': return Number(val) <= Number(reqVal)
-      default: return true
-    }
-  })
+function checkRequirements(slot: ChoiceSlot, currentRes: Record<string, number | string | string[] | number[]>): boolean {
+  return CreatorResourceManager.evaluateRequirements(slot.requirements, currentRes)
 }
 
 export function ChoiceSlots({
@@ -294,12 +278,15 @@ export function ChoiceSlots({
                         </div>
                         <div className="space-y-2">
                           {storyResources.map((resDef) => {
-                            const req = slotReqs[slot.id]?.[resDef.name] ?? { enabled: false, op: '==', val: '' }
-                            const eff = slotEffs[slot.id]?.[resDef.name] ?? { enabled: false, op: '=', val: '' }
+                            const defaultReqOp = resDef.type === 'array' ? 'contains' : '=='
+                            const defaultEffOp = resDef.type === 'array' ? 'add' : '='
+                            const req = slotReqs[slot.id]?.[resDef.name] ?? { enabled: false, op: defaultReqOp, val: '' }
+                            const eff = slotEffs[slot.id]?.[resDef.name] ?? { enabled: false, op: defaultEffOp, val: '' }
                             return (
                               <div key={resDef.name} className="border-b border-white/[0.04] pb-2 last:border-0 last:pb-0 space-y-1.5">
-                                <div className="text-[11px] font-sans font-medium text-foreground/75">
-                                  {resDef.name} <span className="opacity-30 text-[9px] font-normal">({resDef.type})</span>
+                                <div className="text-[11px] font-sans font-medium text-foreground/75 flex justify-between">
+                                  <span>{resDef.name} <span className="opacity-30 text-[9px] font-normal">({resDef.type})</span></span>
+                                  {resDef.description && <span className="opacity-40 text-[9px] font-normal max-w-[150px] truncate" title={resDef.description}>{resDef.description}</span>}
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                   {/* Requirement */}
@@ -332,8 +319,17 @@ export function ChoiceSlots({
                                           }}
                                           className="text-[9px] h-6 px-1 rounded border bg-background text-foreground focus:outline-none"
                                         >
-                                          <option value="==">==</option>
-                                          <option value="!=">!=</option>
+                                          {resDef.type === 'array' ? (
+                                            <>
+                                              <option value="contains">contains</option>
+                                              <option value="not_contains">does not contain</option>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <option value="==">==</option>
+                                              <option value="!=">!=</option>
+                                            </>
+                                          )}
                                           {resDef.type === 'number' && (
                                             <>
                                               <option value=">">&gt;</option>
@@ -346,7 +342,7 @@ export function ChoiceSlots({
                                         <input
                                           type={resDef.type === 'number' ? 'number' : 'text'}
                                           value={req.val}
-                                          placeholder="Value"
+                                          placeholder={resDef.type === 'array' ? 'e.g. Iron Key' : 'Value'}
                                           onChange={(e) => {
                                             const nextReqs = { ...slotReqs }
                                             nextReqs[slot.id] = {
@@ -398,11 +394,17 @@ export function ChoiceSlots({
                                               <option value="-=">-=</option>
                                             </>
                                           )}
+                                          {resDef.type === 'array' && (
+                                            <>
+                                              <option value="add">add</option>
+                                              <option value="remove">remove</option>
+                                            </>
+                                          )}
                                         </select>
                                         <input
                                           type={resDef.type === 'number' ? 'number' : 'text'}
                                           value={eff.val}
-                                          placeholder="Value"
+                                          placeholder={resDef.type === 'array' ? 'e.g. Iron Key' : 'Value'}
                                           onChange={(e) => {
                                             const nextEffs = { ...slotEffs }
                                             nextEffs[slot.id] = {

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { after } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { adminAuth } from '@/lib/firebase-admin'
-import { createWorld, getWorldsByAuthor } from '@/lib/firestore-helpers'
+import { createWorld, getWorldsByAuthor, checkAndAwardAchievements } from '@/lib/firestore-helpers'
 
 export async function GET(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
@@ -33,7 +35,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { name, description, lore, rules, tone } = body
+  const { name, description, lore, rules, tone, tags } = body
 
   if (!name || !description || !lore || !rules) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -47,7 +49,11 @@ export async function POST(req: NextRequest) {
     tone: tone ?? 'epic fantasy',
     authorId: uid,
     authorName: displayName ?? 'Anonymous',
+    tags: Array.isArray(tags) ? tags.slice(0, 5) : [],
   })
+
+  revalidateTag('worlds', 'max')
+  after(() => checkAndAwardAchievements(uid, 'world_created').catch(() => {}))
 
   return NextResponse.json({ id }, { status: 201 })
 }
