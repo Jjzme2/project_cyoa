@@ -386,6 +386,19 @@ export async function getPublicWorlds(limit = 100): Promise<World[]> {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as World))
 }
 
+export async function getStoriesByWorld(worldId: string, limit = 100): Promise<Story[]> {
+  'use cache'
+  cacheLife('minutes')
+  cacheTag('stories', `world-stories-${worldId}`)
+
+  // Single-field `where` avoids needing a composite index; sort in memory.
+  const snap = await adminDb.collection('stories').where('worldId', '==', worldId).limit(limit).get()
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() } as Story))
+    .filter((s) => s.published !== false)
+    .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
+}
+
 export async function getStoryCounts(): Promise<Record<string, number>> {
   'use cache'
   cacheLife('minutes')
