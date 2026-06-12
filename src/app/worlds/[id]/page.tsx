@@ -3,7 +3,6 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Feather, BookOpen, Plus, ArrowLeft, ScrollText } from 'lucide-react'
-import { cacheLife, cacheTag } from 'next/cache'
 import { Button } from '@/components/ui/button'
 import { StoryCard } from '@/components/StoryCard'
 import { WorldRatingControl } from '@/components/world/WorldRatingControl'
@@ -43,11 +42,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-async function WorldDetail({ id }: { id: string }) {
-  'use cache'
-  cacheLife('minutes')
-  cacheTag('worlds', 'stories', `world-${id}`, `world-stories-${id}`)
-
+async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
+  // Resolve dynamic params inside the Suspense boundary (Cache Components rule).
+  // The underlying reads are individually cached via their own `use cache`.
+  const { id } = await params
   const world = await getWorld(id).catch(() => null)
   if (!world) notFound()
 
@@ -168,12 +166,11 @@ function WorldDetailSkeleton() {
   )
 }
 
-export default async function WorldPage({ params }: Props) {
-  const { id } = await params
+export default function WorldPage({ params }: Props) {
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-12 space-y-12">
       <Suspense fallback={<WorldDetailSkeleton />}>
-        <WorldDetail id={id} />
+        <WorldDetail params={params} />
       </Suspense>
     </main>
   )
