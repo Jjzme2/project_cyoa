@@ -69,16 +69,19 @@ export default function NewStoryPage() {
 
   useEffect(() => {
     if (!user) return
-    user
-      .getIdToken()
-      .then(async (token) => {
-        const res = await fetch('/api/worlds', {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        if (res.ok) {
-          const data = await res.json()
-          setWorlds(data.worlds)
-          if (data.worlds.length > 0) setWorldId(data.worlds[0].id)
+    // Worlds are shared — any signed-in user can author a story in any public
+    // world, not just worlds they created. Use the public registry here.
+    fetch('/api/worlds/public')
+      .then(async (res) => {
+        if (!res.ok) return
+        const data = await res.json()
+        const list: World[] = data.worlds ?? []
+        setWorlds(list)
+        if (list.length > 0) {
+          // Honour ?world=<id> preselection coming from a world page.
+          const preselect = new URLSearchParams(window.location.search).get('world')
+          const match = preselect ? list.find((w) => w.id === preselect) : undefined
+          setWorldId(match?.id ?? list[0].id)
         }
       })
       .finally(() => setLoadingWorlds(false))
