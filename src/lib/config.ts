@@ -8,6 +8,8 @@ export const APP_CONFIG = {
   site: {
     name: 'Chronicle',
     domain: 'chronicle.cyoa', // Placeholder domain
+    // Absolute base URL used for metadataBase, OG image URLs, sitemap and robots.
+    url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
     titleTemplate: '%s — Chronicle',
     defaultTitle: 'Chronicle — Community CYOA',
     defaultDescription: 'Build worlds, write stories, shape destinies together. A community-built choose-your-own-adventure library.',

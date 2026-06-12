@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
-import { Plus, Sparkles, Library } from 'lucide-react'
+import { Plus, Sparkles, Library, BookOpen, MousePointerClick, PenLine } from 'lucide-react'
 import { cacheLife, cacheTag } from 'next/cache'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -54,6 +54,114 @@ function LibrarySkeleton() {
   )
 }
 
+/**
+ * Reader-first hero actions. The primary call-to-action drops a first-time
+ * visitor straight into a chapter (the most-read story) before asking them to
+ * create anything. Falls back to the creation CTAs if the library is empty.
+ */
+async function HeroActions() {
+  'use cache'
+  cacheLife('minutes')
+  cacheTag('stories')
+
+  let featuredId: string | null = null
+  try {
+    const stories = await getStories(30)
+    if (stories.length > 0) {
+      const featured = stories.reduce(
+        (top, s) => ((s.views ?? 0) > (top.views ?? 0) ? s : top),
+        stories[0],
+      )
+      featuredId = featured.id
+    }
+  } catch {
+    featuredId = null
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      {featuredId && (
+        <Link href={`/stories/${featuredId}`}>
+          <Button className="gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300">
+            <BookOpen className="h-4 w-4" />
+            Read a featured story
+          </Button>
+        </Link>
+      )}
+      <Link href="/stories/new">
+        <Button
+          variant="ghost"
+          className={
+            featuredId
+              ? 'gap-2 border border-white/10 text-muted-foreground/75 hover:text-foreground'
+              : 'gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300'
+          }
+        >
+          <Plus className="h-4 w-4" />
+          Start a story
+        </Button>
+      </Link>
+      <Link href="/worlds/new">
+        <Button variant="ghost" className="gap-2 text-muted-foreground/60 hover:text-foreground">
+          <Sparkles className="h-4 w-4" />
+          Create a world
+        </Button>
+      </Link>
+    </div>
+  )
+}
+
+function HeroActionsFallback() {
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <Link href="/stories/new">
+        <Button className="gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300">
+          <Plus className="h-4 w-4" />
+          Start a story
+        </Button>
+      </Link>
+      <Link href="/worlds/new">
+        <Button variant="ghost" className="gap-2 text-muted-foreground/60 hover:text-foreground">
+          <Sparkles className="h-4 w-4" />
+          Create a world
+        </Button>
+      </Link>
+    </div>
+  )
+}
+
+const HOW_IT_WORKS = [
+  { icon: BookOpen, title: 'Read', body: 'Open any book and read a chapter — no account needed.' },
+  { icon: MousePointerClick, title: 'Choose', body: 'At each turn, pick a path others have written.' },
+  { icon: PenLine, title: 'Write', body: 'Hit an empty branch? Write what happens next for everyone.' },
+]
+
+function HowItWorks() {
+  return (
+    <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {HOW_IT_WORKS.map((step, i) => (
+        <div
+          key={step.title}
+          className="glass-card rounded-xl p-5 border border-white/[0.07] flex items-start gap-3"
+        >
+          <div className="shrink-0 w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-300">
+            <step.icon className="h-4 w-4" />
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground/35">
+                Step {i + 1}
+              </span>
+              <span className="text-sm font-semibold text-foreground/85">{step.title}</span>
+            </div>
+            <p className="text-xs text-muted-foreground/55 leading-relaxed">{step.body}</p>
+          </div>
+        </div>
+      ))}
+    </section>
+  )
+}
+
 export default function LibraryPage() {
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-12 space-y-12">
@@ -74,24 +182,12 @@ export default function LibraryPage() {
             becomes a new chapter for others to discover.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Link href="/stories/new">
-            <Button className="gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300">
-              <Plus className="h-4 w-4" />
-              Start a story
-            </Button>
-          </Link>
-          <Link href="/worlds/new">
-            <Button
-              variant="ghost"
-              className="gap-2 text-muted-foreground/60 hover:text-foreground"
-            >
-              <Sparkles className="h-4 w-4" />
-              Create a world
-            </Button>
-          </Link>
-        </div>
+        <Suspense fallback={<HeroActionsFallback />}>
+          <HeroActions />
+        </Suspense>
       </section>
+
+      <HowItWorks />
 
       <div className="border-t border-white/[0.07]" />
 

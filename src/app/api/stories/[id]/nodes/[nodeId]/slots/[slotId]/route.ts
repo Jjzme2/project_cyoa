@@ -20,6 +20,7 @@ import {
 import { CreditManager } from '@/lib/credit-manager'
 import { generateStoryNode, generateStoryImage, PromptRejectedError } from '@/lib/ai'
 import { validatePromptLocal } from '@/lib/validate'
+import { moderateText, moderationToNodeFields } from '@/lib/moderation'
 
 const IMAGE_CREDIT_COST = 3 // total credits when image is requested
 
@@ -136,6 +137,23 @@ export async function POST(
       includeImage,
     )
 
+    // Moderate the generated prose. Hard-refuse disallowed content (release the
+    // lock + refund); flag borderline content so the route is stored but hidden
+    // from readers until an admin approves it.
+    const verdict = moderateText(content)
+    if (verdict.action === 'refuse') {
+      await Promise.all([
+        releaseChoiceSlot(storyId, nodeId, slotId),
+        CreditManager.refund(uid, tier, credits, source),
+      ])
+      return NextResponse.json(
+        { error: verdict.reason ?? 'This content violates the community guidelines.' },
+        { status: 422 },
+      )
+    }
+    const moderationFields = moderationToNodeFields(verdict)
+    const pendingReview = verdict.action === 'flag'
+
     // Generate image concurrently with Firestore work if requested
     const userApiKey = includeImage ? await getDecryptedUserApiKey(uid) : null
     const imagePlaceholder = `${storyId}-${slotId}-${Date.now()}`
@@ -157,6 +175,7 @@ export async function POST(
           imageUrl: null,
         },
         choices,
+        moderationFields,
       ),
     ])
 
@@ -188,7 +207,8 @@ export async function POST(
     after(async () => {
       const ops: Promise<unknown>[] = [checkAndAwardAchievements(uid, 'contribution')]
       if (includeImage && imageUrl) ops.push(checkAndAwardAchievements(uid, 'illustration'))
-      if (story.authorId && story.authorId !== uid) {
+      // Don't notify the author about a contribution that's hidden pending review.
+      if (!pendingReview && story.authorId && story.authorId !== uid) {
         ops.push(
           createNotification(story.authorId, 'new_contribution', {
             storyId,
@@ -203,7 +223,7 @@ export async function POST(
     })
 
     return NextResponse.json(
-      { nodeId: newNodeId, content, choices, model, imageUrl, remaining: finalRemaining, imageError },
+      { nodeId: newNodeId, content, choices, model, imageUrl, remaining: finalRemaining, imageError, pendingReview },
       { status: 201 },
     )
   } catch (error) {

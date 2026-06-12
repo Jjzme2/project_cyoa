@@ -5,6 +5,47 @@ export const STORY_TAGS = [
 ] as const
 export type StoryTag = typeof STORY_TAGS[number]
 
+// ─── Roles & Access Control ─────────────────────────────────────────────────
+export type Role = 'user' | 'admin'
+
+// ─── Content Ratings (worlds) ───────────────────────────────────────────────
+export const CONTENT_RATINGS = ['Everyone', 'Teen', 'Mature'] as const
+export type ContentRating = typeof CONTENT_RATINGS[number]
+
+export const CONTENT_RATING_META: Record<
+  ContentRating,
+  { abbr: string; description: string; className: string }
+> = {
+  Everyone: {
+    abbr: 'E',
+    description: 'Suitable for all ages. No graphic content.',
+    className: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25',
+  },
+  Teen: {
+    abbr: 'T',
+    description: 'Mild language, violence, or themes. Roughly 13+.',
+    className: 'text-amber-400 bg-amber-500/10 border-amber-500/25',
+  },
+  Mature: {
+    abbr: 'M',
+    description: 'Strong language, violence, or mature themes. 17+.',
+    className: 'text-red-400 bg-red-500/10 border-red-500/25',
+  },
+}
+
+export const DEFAULT_CONTENT_RATING: ContentRating = 'Everyone'
+
+// ─── Moderation ─────────────────────────────────────────────────────────────
+export type ModerationStatus = 'approved' | 'flagged' | 'rejected'
+
+export interface NodeModeration {
+  status: ModerationStatus
+  categories?: string[]
+  reason?: string
+  reviewedBy?: string | null
+  reviewedAt?: string | null
+}
+
 export interface Bookmark {
   id: string
   userId: string
@@ -133,6 +174,10 @@ export interface World {
   authorId: string
   authorName: string
   tags?: string[]
+  /** Content rating set by the creator; admins may override it. */
+  rating?: ContentRating
+  /** uid of the admin who last overrode the rating, if any. */
+  ratingOverriddenBy?: string | null
   createdAt: string
 }
 
@@ -168,6 +213,12 @@ export interface StoryNode {
   aiGenerated: boolean
   aiModel: string | null
   imageUrl: string | null
+  /**
+   * Whether this route is publicly visible. Flagged or admin-rejected routes
+   * are `false` and only surface to admins.
+   */
+  published: boolean
+  moderation?: NodeModeration
   createdAt: string
 }
 
@@ -189,6 +240,14 @@ export interface ChoiceSlot {
    * This is calculated dynamically on fetch or updated upon successful image generation.
    */
   childHasImage?: boolean
+  /**
+   * Set when a filled slot's child route is awaiting moderation and is hidden
+   * from non-admin readers. The child id is withheld so the path can't be
+   * opened, and the slot is not re-writable.
+   */
+  pendingReview?: boolean
+  /** Moderation status of the child route (surfaced to admins for review). */
+  childModeration?: ModerationStatus
   requirements?: ChoiceRequirement[]
   effects?: ChoiceEffect[]
 }

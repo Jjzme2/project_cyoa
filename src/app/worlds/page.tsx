@@ -1,9 +1,33 @@
+import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { Globe, BookOpen, Feather, Sparkles } from 'lucide-react'
 import { cacheLife, cacheTag } from 'next/cache'
 import { getPublicWorlds, getStoryCounts } from '@/lib/firestore-helpers'
+import { truncateAtWord } from '@/lib/utils'
+import { APP_CONFIG } from '@/lib/config'
+import { CONTENT_RATING_META } from '@/types'
 import type { World } from '@/types'
+
+export const metadata: Metadata = {
+  title: 'Worlds',
+  description:
+    'Browse the registry of worlds on Chronicle — each a distinct universe with its own lore, tone, and rules. Pick one and start writing.',
+  alternates: { canonical: '/worlds' },
+  openGraph: {
+    title: `Worlds — ${APP_CONFIG.site.name}`,
+    description:
+      'Browse the registry of worlds on Chronicle — each a distinct universe with its own lore, tone, and rules.',
+    type: 'website',
+    siteName: APP_CONFIG.site.name,
+    url: '/worlds',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: `Worlds — ${APP_CONFIG.site.name}`,
+    description: 'Browse the registry of worlds on Chronicle — distinct universes to read and write in.',
+  },
+}
 
 const TONE_COLORS: Record<string, string> = {
   'Epic Fantasy':        'text-violet-400 bg-violet-500/10 border-violet-500/20',
@@ -27,11 +51,23 @@ function WorldCard({ world, storyCount }: { world: World; storyCount: number }) 
             className="text-xl font-semibold leading-snug text-foreground/90 group-hover:text-amber-200 transition-colors"
             style={{ fontFamily: 'Georgia, serif' }}
           >
-            {world.name}
+            <Link href={`/worlds/${world.id}`} className="hover:underline underline-offset-4 decoration-amber-400/40">
+              {world.name}
+            </Link>
           </h2>
-          <span className={`shrink-0 text-[10px] uppercase tracking-wider font-semibold font-sans px-2 py-0.5 rounded-full border ${toneClass}`}>
-            {world.tone}
-          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {world.rating && (
+              <span
+                className={`text-[10px] font-sans font-semibold px-1.5 py-0.5 rounded-full border ${CONTENT_RATING_META[world.rating].className}`}
+                title={`${world.rating} — ${CONTENT_RATING_META[world.rating].description}`}
+              >
+                {CONTENT_RATING_META[world.rating].abbr}
+              </span>
+            )}
+            <span className={`text-[10px] uppercase tracking-wider font-semibold font-sans px-2 py-0.5 rounded-full border ${toneClass}`}>
+              {world.tone}
+            </span>
+          </div>
         </div>
 
         <p className="text-sm text-muted-foreground/60 leading-relaxed line-clamp-3">
@@ -40,7 +76,7 @@ function WorldCard({ world, storyCount }: { world: World; storyCount: number }) 
 
         {world.lore && (
           <p className="text-xs text-muted-foreground/35 leading-relaxed line-clamp-2 border-l-2 border-white/10 pl-3 italic">
-            {world.lore.slice(0, 160)}…
+            {truncateAtWord(world.lore, 160)}
           </p>
         )}
 
@@ -61,17 +97,19 @@ function WorldCard({ world, storyCount }: { world: World; storyCount: number }) 
             <Feather className="h-3 w-3" />
             <span>{world.authorName}</span>
           </div>
-          <div className="flex items-center gap-1 text-[11px] text-amber-400/60 font-sans">
-            <BookOpen className="h-3 w-3" />
-            <span>{storyCount} {storyCount === 1 ? 'story' : 'stories'}</span>
-          </div>
+          {storyCount > 0 && (
+            <div className="flex items-center gap-1 text-[11px] text-amber-400/60 font-sans">
+              <BookOpen className="h-3 w-3" />
+              <span>{storyCount} {storyCount === 1 ? 'story' : 'stories'}</span>
+            </div>
+          )}
         </div>
 
         <Link
-          href={`/?world=${encodeURIComponent(world.name)}`}
+          href={`/worlds/${world.id}`}
           className="text-xs font-sans font-medium text-amber-300/70 hover:text-amber-300 transition-colors flex items-center gap-1"
         >
-          Browse stories
+          {storyCount > 0 ? 'Browse stories' : 'Enter world'}
           <span className="opacity-50">→</span>
         </Link>
       </div>

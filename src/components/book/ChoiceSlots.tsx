@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { Loader2, Feather, ChevronRight, Scroll, Lock, PenLine, Wand2, ImagePlus } from 'lucide-react'
+import { Loader2, Feather, ChevronRight, Scroll, Lock, PenLine, Wand2, ImagePlus, ShieldAlert, Check, Trash2, Hourglass } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/components/Providers'
@@ -16,7 +16,8 @@ interface Props {
   nodeId: string
   slots: ChoiceSlot[]
   onChoiceSelect: (nodeId: string, effects?: ChoiceEffect[]) => void
-  onSlotFilled: (slot: ChoiceSlot, nodeId: string) => void
+  onSlotFilled: (slot: ChoiceSlot, nodeId: string, pendingReview?: boolean) => void
+  onModerated?: () => void
   currentResources?: Record<string, number | string | string[] | number[]>
   storyResources?: ResourceDefinition[]
 }
@@ -31,14 +32,36 @@ export function ChoiceSlots({
   slots,
   onChoiceSelect,
   onSlotFilled,
+  onModerated,
   currentResources,
   storyResources,
 }: Props) {
-  const { user, tier, openAuthModal, aiUsesRemaining, updateAiUses } = useAuth()
+  const { user, tier, isAdmin, openAuthModal, aiUsesRemaining, updateAiUses } = useAuth()
   const [inputs, setInputs] = useState<Record<string, string>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [imageEnabled, setImageEnabled] = useState<Record<string, boolean>>({})
   const [submitting, setSubmitting] = useState<string | null>(null)
+  const [moderating, setModerating] = useState<string | null>(null)
+
+  async function moderateRoute(slot: ChoiceSlot, action: 'approve' | 'reject') {
+    if (!user || !slot.childNodeId) return
+    setModerating(slot.id)
+    try {
+      const token = await user.getIdToken()
+      const res = await fetch(`/api/stories/${storyId}/nodes/${slot.childNodeId}/moderate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error ?? 'Moderation failed')
+      toast.success(action === 'approve' ? 'Route approved and published.' : 'Route removed.')
+      onModerated?.()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Moderation failed')
+    } finally {
+      setModerating(null)
+    }
+  }
   
   // Outer key: slotId, Inner key: resourceName
   const [slotReqs, setSlotReqs] = useState<Record<string, Record<string, { enabled: boolean; op: string; val: string }>>>({})
@@ -74,7 +97,7 @@ export function ChoiceSlots({
         if (req?.enabled && req.val.trim() !== '') {
           reqsToSend.push({
             resourceName: res.name,
-            operator: req.op as any,
+            operator: req.op as ChoiceRequirement['operator'],
             value: res.type === 'number' ? Number(req.val) : req.val,
           })
         }
@@ -83,7 +106,7 @@ export function ChoiceSlots({
         if (eff?.enabled && eff.val.trim() !== '') {
           effsToSend.push({
             resourceName: res.name,
-            operator: eff.op as any,
+            operator: eff.op as ChoiceEffect['operator'],
             value: res.type === 'number' ? Number(eff.val) : eff.val,
           })
         }
@@ -109,18 +132,21 @@ export function ChoiceSlots({
       }
 
       if (typeof data.remaining === 'number') updateAiUses(data.remaining)
-      
-      if (imageEnabled[slot.id] && !data.imageUrl) {
+
+      if (data.pendingReview) {
+        // Flagged by the guidelines — stored but hidden until an admin reviews.
+        toast.info('Your path was submitted and is awaiting review before it appears.')
+      } else if (imageEnabled[slot.id] && !data.imageUrl) {
         toast.warning(
-          data.imageError 
+          data.imageError
             ? `Your path has been woven, but the illustration failed: ${data.imageError}`
             : 'Your path has been woven, but the illustration failed.'
         )
       } else {
         toast.success('Your path has been woven into the story!')
       }
-      
-      onSlotFilled(slot, data.nodeId)
+
+      onSlotFilled(slot, data.nodeId, data.pendingReview === true)
       setInputs((prev) => {
         const next = { ...prev }
         delete next[slot.id]
@@ -160,10 +186,28 @@ export function ChoiceSlots({
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.08 + 0.18, duration: 0.35 }}
           >
-            {slot.filled ? (
+            {slot.pendingReview ? (
+              <div
+                className="px-4 py-3 rounded-lg border"
+                style={{
+                  background: 'oklch(0.90 0.03 80 / 35%)',
+                  borderColor: 'oklch(0.50 0.06 60 / 20%)',
+                  borderStyle: 'dashed',
+                }}
+              >
+                <div className="flex items-center gap-2.5 opacity-50">
+                  <Hourglass className="h-3.5 w-3.5 shrink-0" />
+                  <span className="text-[12px] font-sans italic">
+                    A path here is awaiting review…
+                  </span>
+                </div>
+              </div>
+            ) : slot.filled ? (
               (() => {
                 const meetsReqs = checkRequirements(slot, currentResources ?? {})
+                const showAdmin = isAdmin && slot.childModeration === 'flagged'
                 return (
+                  <div className="space-y-1.5">
                   <button
                     onClick={() => meetsReqs && slot.childNodeId && onChoiceSelect(slot.childNodeId, slot.effects)}
                     disabled={!meetsReqs}
@@ -209,6 +253,38 @@ export function ChoiceSlots({
                       )}
                     </div>
                   </button>
+                  {showAdmin && (
+                    <div
+                      className="flex items-center gap-2 rounded-lg border px-2.5 py-1.5"
+                      style={{ background: 'oklch(0.92 0.04 25 / 30%)', borderColor: 'oklch(0.55 0.14 25 / 35%)' }}
+                    >
+                      <span
+                        className="flex items-center gap-1 text-[10px] font-sans font-medium uppercase tracking-wider"
+                        style={{ color: 'oklch(0.50 0.16 25)' }}
+                      >
+                        <ShieldAlert className="h-3 w-3" />
+                        Flagged for review
+                      </span>
+                      <div className="flex-1" />
+                      <Button
+                        size="sm"
+                        onClick={() => moderateRoute(slot, 'approve')}
+                        disabled={moderating === slot.id}
+                        className="h-7 px-2 gap-1 text-[11px] bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300"
+                      >
+                        <Check className="h-3 w-3" /> Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => moderateRoute(slot, 'reject')}
+                        disabled={moderating === slot.id}
+                        className="h-7 px-2 gap-1 text-[11px] bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300"
+                      >
+                        <Trash2 className="h-3 w-3" /> Remove
+                      </Button>
+                    </div>
+                  )}
+                  </div>
                 )
               })()
             ) : slot.locked ? (

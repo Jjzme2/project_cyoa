@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { signOut } from 'firebase/auth'
 import { toast } from 'sonner'
-import { BookOpen, Plus, LogOut, Sparkles, Menu, Wand2, KeyRound, Globe, LayoutDashboard } from 'lucide-react'
+import { BookOpen, Plus, LogOut, Sparkles, Menu, Wand2, KeyRound, Globe, LayoutDashboard, ShieldAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -19,7 +19,7 @@ async function getFirebaseAuth() {
 }
 
 export function Header() {
-  const { user, loading, tier, openAuthModal, aiUsesRemaining } = useAuth()
+  const { user, loading, tier, isAdmin, openAuthModal, aiUsesRemaining } = useAuth()
   const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false)
 
   async function handleSignOut() {
@@ -54,6 +54,15 @@ export function Header() {
             Profile
           </Link>
         </>
+      )}
+      {isAdmin && (
+        <Link
+          href="/admin/moderation"
+          className="text-sm text-amber-400/70 hover:text-amber-300 transition-colors flex items-center gap-1"
+        >
+          <ShieldAlert className="h-3.5 w-3.5" />
+          Moderation
+        </Link>
       )}
     </>
   )

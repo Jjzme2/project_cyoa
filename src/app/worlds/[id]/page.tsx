@@ -1,0 +1,177 @@
+import type { Metadata } from 'next'
+import { Suspense } from 'react'
+import Link from 'next/link'
+import { notFound } from 'next/navigation'
+import { Feather, BookOpen, Plus, ArrowLeft, ScrollText } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { StoryCard } from '@/components/StoryCard'
+import { WorldRatingControl } from '@/components/world/WorldRatingControl'
+import { getWorld, getStoriesByWorld } from '@/lib/firestore-helpers'
+import { APP_CONFIG } from '@/lib/config'
+
+interface Props {
+  params: Promise<{ id: string }>
+}
+
+const TONE_COLORS: Record<string, string> = {
+  'Epic Fantasy':        'text-violet-400 bg-violet-500/10 border-violet-500/20',
+  'Dark Horror':         'text-red-400 bg-red-500/10 border-red-500/20',
+  'Sci-Fi Adventure':    'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
+  'Cozy Mystery':        'text-amber-400 bg-amber-500/10 border-amber-500/20',
+  'High Drama':          'text-pink-400 bg-pink-500/10 border-pink-500/20',
+  'Cosmic Horror':       'text-purple-400 bg-purple-500/10 border-purple-500/20',
+  'Whimsical Fairy Tale':'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+  'Gritty Noir':         'text-stone-400 bg-stone-500/10 border-stone-500/20',
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params
+  const world = await getWorld(id).catch(() => null)
+  if (!world) return { title: 'World not found' }
+
+  const title = world.name
+  const description =
+    world.description || `Explore ${world.name} — a community CYOA world on ${APP_CONFIG.site.name}.`
+
+  return {
+    title,
+    description,
+    alternates: { canonical: `/worlds/${id}` },
+    openGraph: { title, description, type: 'website', siteName: APP_CONFIG.site.name, url: `/worlds/${id}` },
+    twitter: { card: 'summary_large_image', title, description },
+  }
+}
+
+async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
+  // Resolve dynamic params inside the Suspense boundary (Cache Components rule).
+  // The underlying reads are individually cached via their own `use cache`.
+  const { id } = await params
+  const world = await getWorld(id).catch(() => null)
+  if (!world) notFound()
+
+  const stories = await getStoriesByWorld(id).catch(() => [])
+  const toneClass = TONE_COLORS[world.tone] ?? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+
+  return (
+    <>
+      <section className="space-y-6">
+        <Link
+          href="/worlds"
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground/50 hover:text-foreground transition-colors font-sans"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          All worlds
+        </Link>
+
+        <div className="space-y-4">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <h1
+              className="text-4xl sm:text-5xl font-bold tracking-tight leading-tight gold-text"
+              style={{ fontFamily: 'Georgia, serif' }}
+            >
+              {world.name}
+            </h1>
+            <span className={`shrink-0 text-[11px] uppercase tracking-wider font-semibold font-sans px-2.5 py-1 rounded-full border ${toneClass}`}>
+              {world.tone}
+            </span>
+          </div>
+
+          {world.description && (
+            <p className="text-muted-foreground/70 max-w-2xl leading-relaxed">{world.description}</p>
+          )}
+
+          <div className="flex items-center gap-4 text-xs text-muted-foreground/45 font-sans">
+            <span className="flex items-center gap-1.5">
+              <Feather className="h-3.5 w-3.5" />
+              {world.authorName}
+            </span>
+            <span className="flex items-center gap-1.5 text-amber-400/60">
+              <BookOpen className="h-3.5 w-3.5" />
+              {stories.length} {stories.length === 1 ? 'story' : 'stories'}
+            </span>
+            <WorldRatingControl worldId={world.id} authorId={world.authorId} rating={world.rating} />
+          </div>
+
+          {world.tags && world.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {world.tags.map((tag) => (
+                <span key={tag} className="text-[10px] font-sans uppercase tracking-wider px-2 py-0.5 rounded border border-white/10 text-muted-foreground/45">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {world.lore && (
+          <div className="glass-card rounded-xl p-5 border border-white/[0.07] space-y-2">
+            <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-amber-400/50 font-sans">
+              <ScrollText className="h-3.5 w-3.5" />
+              Lore
+            </div>
+            <p className="text-sm text-muted-foreground/60 leading-relaxed italic">{world.lore}</p>
+          </div>
+        )}
+
+        <div className="flex gap-3 pt-1">
+          <Link href={`/stories/new?world=${encodeURIComponent(world.id)}`}>
+            <Button className="gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300">
+              <Plus className="h-4 w-4" />
+              Start a story here
+            </Button>
+          </Link>
+        </div>
+      </section>
+
+      <div className="border-t border-white/[0.07]" />
+
+      <section className="space-y-7">
+        <div className="flex items-center gap-4">
+          <h2 className="text-sm uppercase tracking-widest text-muted-foreground/50 font-sans">
+            Stories in this world
+          </h2>
+          <div className="flex-1 h-px bg-white/5" />
+        </div>
+
+        {stories.length === 0 ? (
+          <div className="text-center py-16 space-y-4">
+            <p className="text-muted-foreground/50 text-sm">No stories have been written here yet.</p>
+            <Link
+              href={`/stories/new?world=${encodeURIComponent(world.id)}`}
+              className="text-xs text-amber-400/60 hover:text-amber-400 transition-colors underline underline-offset-2"
+            >
+              Write the first chapter
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-4 sm:gap-5">
+            {stories.map((story) => (
+              <StoryCard key={story.id} story={story} />
+            ))}
+          </div>
+        )}
+      </section>
+    </>
+  )
+}
+
+function WorldDetailSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="h-3 w-24 rounded bg-white/5 shimmer" />
+      <div className="h-12 w-2/3 rounded bg-white/5 shimmer" />
+      <div className="h-4 w-full max-w-2xl rounded bg-white/5 shimmer" />
+      <div className="h-4 w-1/3 rounded bg-white/5 shimmer" />
+    </div>
+  )
+}
+
+export default function WorldPage({ params }: Props) {
+  return (
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-12 space-y-12">
+      <Suspense fallback={<WorldDetailSkeleton />}>
+        <WorldDetail params={params} />
+      </Suspense>
+    </main>
+  )
+}

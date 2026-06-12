@@ -3,6 +3,8 @@ import { after } from 'next/server'
 import { revalidateTag } from 'next/cache'
 import { adminAuth } from '@/lib/firebase-admin'
 import { createWorld, getWorldsByAuthor, checkAndAwardAchievements } from '@/lib/firestore-helpers'
+import { CONTENT_RATINGS, DEFAULT_CONTENT_RATING } from '@/types'
+import type { ContentRating } from '@/types'
 
 export async function GET(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
@@ -35,11 +37,15 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { name, description, lore, rules, tone, tags } = body
+  const { name, description, lore, rules, tone, tags, rating } = body
 
   if (!name || !description || !lore || !rules) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
+
+  const safeRating: ContentRating = CONTENT_RATINGS.includes(rating)
+    ? (rating as ContentRating)
+    : DEFAULT_CONTENT_RATING
 
   const id = await createWorld({
     name,
@@ -50,6 +56,8 @@ export async function POST(req: NextRequest) {
     authorId: uid,
     authorName: displayName ?? 'Anonymous',
     tags: Array.isArray(tags) ? tags.slice(0, 5) : [],
+    rating: safeRating,
+    ratingOverriddenBy: null,
   })
 
   revalidateTag('worlds', 'max')
