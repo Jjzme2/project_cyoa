@@ -6,6 +6,7 @@ import { Feather, BookOpen, Plus, ArrowLeft, ScrollText } from 'lucide-react'
 import { cacheLife, cacheTag } from 'next/cache'
 import { Button } from '@/components/ui/button'
 import { StoryCard } from '@/components/StoryCard'
+import { WorldRatingControl } from '@/components/world/WorldRatingControl'
 import { getWorld, getStoriesByWorld } from '@/lib/firestore-helpers'
 import { APP_CONFIG } from '@/lib/config'
 
@@ -90,6 +91,7 @@ async function WorldDetail({ id }: { id: string }) {
               <BookOpen className="h-3.5 w-3.5" />
               {stories.length} {stories.length === 1 ? 'story' : 'stories'}
             </span>
+            <WorldRatingControl worldId={world.id} authorId={world.authorId} rating={world.rating} />
           </div>
 
           {world.tags && world.tags.length > 0 && (

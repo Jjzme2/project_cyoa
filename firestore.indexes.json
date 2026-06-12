@@ -31,6 +31,14 @@
         { "fieldPath": "storyId", "order": "ASCENDING" },
         { "fieldPath": "slotIndex", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "nodes",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "moderation.status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

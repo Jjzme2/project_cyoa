@@ -6,6 +6,7 @@ import { cacheLife, cacheTag } from 'next/cache'
 import { getPublicWorlds, getStoryCounts } from '@/lib/firestore-helpers'
 import { truncateAtWord } from '@/lib/utils'
 import { APP_CONFIG } from '@/lib/config'
+import { CONTENT_RATING_META } from '@/types'
 import type { World } from '@/types'
 
 export const metadata: Metadata = {
@@ -54,9 +55,19 @@ function WorldCard({ world, storyCount }: { world: World; storyCount: number }) 
               {world.name}
             </Link>
           </h2>
-          <span className={`shrink-0 text-[10px] uppercase tracking-wider font-semibold font-sans px-2 py-0.5 rounded-full border ${toneClass}`}>
-            {world.tone}
-          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {world.rating && (
+              <span
+                className={`text-[10px] font-sans font-semibold px-1.5 py-0.5 rounded-full border ${CONTENT_RATING_META[world.rating].className}`}
+                title={`${world.rating} — ${CONTENT_RATING_META[world.rating].description}`}
+              >
+                {CONTENT_RATING_META[world.rating].abbr}
+              </span>
+            )}
+            <span className={`text-[10px] uppercase tracking-wider font-semibold font-sans px-2 py-0.5 rounded-full border ${toneClass}`}>
+              {world.tone}
+            </span>
+          </div>
         </div>
 
         <p className="text-sm text-muted-foreground/60 leading-relaxed line-clamp-3">

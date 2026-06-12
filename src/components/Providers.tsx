@@ -19,6 +19,7 @@ interface AuthContextValue {
   user: User | null
   loading: boolean
   tier: 'FREE' | 'PREMIUM'
+  isAdmin: boolean
   openAuthModal: () => void
   aiUsesRemaining: number | null
   updateAiUses: (remaining: number) => void
@@ -28,6 +29,7 @@ const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: true,
   tier: 'FREE',
+  isAdmin: false,
   openAuthModal: () => {},
   aiUsesRemaining: null,
   updateAiUses: () => {},
@@ -41,6 +43,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [tier, setTier] = useState<'FREE' | 'PREMIUM'>('FREE')
+  const [isAdmin, setIsAdmin] = useState(false)
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [aiUsesRemaining, setAiUsesRemaining] = useState<number | null>(null)
 
@@ -56,12 +59,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
           const idTokenResult = await firebaseUser.getIdTokenResult()
           setTier((idTokenResult.claims.tier as 'FREE' | 'PREMIUM') ?? 'FREE')
 
-          // Fetch current daily AI uses without consuming a token
+          // Fetch current daily AI uses + resolved role without consuming a token
           firebaseUser.getIdToken().then(async (token) => {
+            const authHeader = { Authorization: `Bearer ${token}` }
             try {
-              const res = await fetch('/api/usage', {
-                headers: { Authorization: `Bearer ${token}` },
-              })
+              const res = await fetch('/api/usage', { headers: authHeader })
               if (res.ok) {
                 const data = await res.json()
                 setAiUsesRemaining(data.remaining)
@@ -69,9 +71,19 @@ export function Providers({ children }: { children: React.ReactNode }) {
             } catch {
               // non-critical
             }
+            try {
+              const meRes = await fetch('/api/me', { headers: authHeader })
+              if (meRes.ok) {
+                const me = await meRes.json()
+                setIsAdmin(!!me.isAdmin)
+              }
+            } catch {
+              // non-critical
+            }
           })
         } else {
           setTier('FREE')
+          setIsAdmin(false)
           setAiUsesRemaining(null)
         }
         setLoading(false)
@@ -81,7 +93,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, loading, tier, openAuthModal, aiUsesRemaining, updateAiUses }}>
+    <AuthContext.Provider value={{ user, loading, tier, isAdmin, openAuthModal, aiUsesRemaining, updateAiUses }}>
       {children}
       <Toaster theme="dark" position="bottom-right" richColors />
       <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />

@@ -154,15 +154,36 @@ export function BookViewer({ story, initialNode }: Props) {
     restore()
   }, [])
 
+  // Fetch a node, attaching the user's token when signed in so admins receive
+  // unpublished/flagged routes that readers don't.
+  async function fetchNode(nodeId: string): Promise<Response> {
+    const headers: Record<string, string> = {}
+    if (user) {
+      try {
+        headers.Authorization = `Bearer ${await user.getIdToken()}`
+      } catch {}
+    }
+    return fetch(`/api/stories/${story.id}/nodes?nodeId=${nodeId}`, { headers })
+  }
+
+  async function refreshCurrentNode() {
+    try {
+      const res = await fetchNode(node.id)
+      if (!res.ok) return
+      const data = await res.json()
+      setNode(data.node)
+    } catch {}
+  }
+
   async function restoreProgress(currentNodeId: string, historyIds: string[]) {
     try {
-      const res = await fetch(`/api/stories/${story.id}/nodes?nodeId=${currentNodeId}`)
+      const res = await fetchNode(currentNodeId)
       if (!res.ok) return
       const data = await res.json()
       const historyNodes: StoryNode[] = historyIds.map((id) => ({
         id, storyId: story.id, content: '', depth: 0, parentId: null,
         choiceText: null, slots: [], authorId: null, aiGenerated: false,
-        aiModel: null, imageUrl: null, createdAt: '',
+        aiModel: null, imageUrl: null, published: true, createdAt: '',
       }))
       setHistory(historyNodes)
       setNode(data.node)
@@ -213,12 +234,12 @@ export function BookViewer({ story, initialNode }: Props) {
     setFetchingNode(true)
     setDirection('forward')
     try {
-      const res = await fetch(`/api/stories/${story.id}/nodes?nodeId=${nodeId}`)
+      const res = await fetchNode(nodeId)
       if (!res.ok) throw new Error()
       const data = await res.json()
 
       let updatedResources = { ...resources }
-      let nextResHistory = [...resourcesHistory, resources]
+      const nextResHistory = [...resourcesHistory, resources]
       if (effects && effects.length > 0) {
         updatedResources = CreatorResourceManager.applyEffects(effects, updatedResources, story.resources)
         setResourcesHistory(nextResHistory)
@@ -268,7 +289,17 @@ export function BookViewer({ story, initialNode }: Props) {
     if (prev.content) setNode(prev)
   }
 
-  function handleSlotFilled(slot: ChoiceSlot, nodeId: string) {
+  function handleSlotFilled(slot: ChoiceSlot, nodeId: string, pendingReview?: boolean) {
+    if (pendingReview) {
+      // Flagged contribution: hidden pending review. Reflect locally, don't navigate.
+      setNode((n) => ({
+        ...n,
+        slots: n.slots.map((s) =>
+          s.id === slot.id ? { ...s, filled: true, childNodeId: null, pendingReview: true } : s,
+        ),
+      }))
+      return
+    }
     setNode((n) => ({
       ...n,
       slots: n.slots.map((s) => (s.id === slot.id ? { ...s, filled: true, childNodeId: nodeId } : s)),
@@ -436,6 +467,7 @@ export function BookViewer({ story, initialNode }: Props) {
                 slots={node.slots}
                 onChoiceSelect={goToNode}
                 onSlotFilled={handleSlotFilled}
+                onModerated={refreshCurrentNode}
                 currentResources={resources}
                 storyResources={story.resources}
               />

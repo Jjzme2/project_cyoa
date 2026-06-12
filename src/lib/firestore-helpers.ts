@@ -4,6 +4,7 @@ import { StoryPathSegment } from '@/types'
 import type {
   Story, StoryNode, ChoiceSlot, World, ChoiceRequirement, ChoiceEffect,
   Bookmark, Notification, NotificationType, UserAchievements, ReactionType, StoryTreeNode,
+  NodeModeration, ModerationStatus, ContentRating,
 } from '@/types'
 import { ACHIEVEMENT_DEFS } from '@/types'
 import { FieldValue } from 'firebase-admin/firestore'
@@ -124,9 +125,26 @@ export async function createWorld(
   return ref.id
 }
 
+export async function updateWorldRating(
+  worldId: string,
+  rating: ContentRating,
+  byUid: string,
+  override: boolean,
+): Promise<void> {
+  await adminDb.collection('worlds').doc(worldId).update({
+    rating,
+    // Track admin overrides so a creator can't silently undo a moderator's call.
+    ratingOverriddenBy: override ? byUid : null,
+  })
+}
+
 // ─── Story Nodes ──────────────────────────────────────────────────────────────
 
-export async function getStoryNode(storyId: string, nodeId: string): Promise<StoryNode | null> {
+export async function getStoryNode(
+  storyId: string,
+  nodeId: string,
+  includeUnpublished = false,
+): Promise<StoryNode | null> {
   'use cache'
   cacheLife('minutes')
   cacheTag(`node-${storyId}-${nodeId}`)
@@ -134,32 +152,136 @@ export async function getStoryNode(storyId: string, nodeId: string): Promise<Sto
   const doc = await nodeRef(storyId, nodeId).get()
   if (!doc.exists) return null
 
+  const nodeData = doc.data()!
+  // Unpublished (flagged / admin-rejected) routes are visible to admins only.
+  const nodePublished = nodeData.published !== false
+  if (!nodePublished && !includeUnpublished) return null
+
   const slotsSnap = await slotsRef(storyId, nodeId).orderBy('slotIndex').get()
   const slotsRaw: ChoiceSlot[] = slotsSnap.docs.map(
     (d) => ({ id: d.id, ...d.data() } as ChoiceSlot),
   )
 
-  // Batch-fetch all filled child nodes in a single round trip to check for illustrations.
+  // Batch-fetch filled child nodes in a single round trip for illustration +
+  // moderation state.
   const filledWithChild = slotsRaw.filter((s) => s.filled && s.childNodeId)
   let slots: ChoiceSlot[] = slotsRaw
   if (filledWithChild.length > 0) {
     try {
       const refs = filledWithChild.map((s) => nodeRef(storyId, s.childNodeId!))
       const childDocs = await adminDb.getAll(...refs)
-      const imageMap = new Map(
-        childDocs.map((doc, i) => [filledWithChild[i].childNodeId!, !!doc.data()?.imageUrl]),
+      const childInfo = new Map(
+        childDocs.map((d, i) => {
+          const data = d.data()
+          return [
+            filledWithChild[i].childNodeId!,
+            {
+              hasImage: !!data?.imageUrl,
+              published: data?.published !== false,
+              status: (data?.moderation?.status ?? 'approved') as ModerationStatus,
+            },
+          ]
+        }),
       )
-      slots = slotsRaw.map((slot) =>
-        slot.filled && slot.childNodeId && imageMap.has(slot.childNodeId)
-          ? { ...slot, childHasImage: imageMap.get(slot.childNodeId) }
-          : slot,
-      )
+      slots = slotsRaw.map((slot) => {
+        if (!slot.filled || !slot.childNodeId) return slot
+        const info = childInfo.get(slot.childNodeId)
+        if (!info) return slot
+        if (!info.published && !includeUnpublished) {
+          // Hide the route's destination from readers; not re-writable either.
+          return { ...slot, childNodeId: null, pendingReview: true, childHasImage: false }
+        }
+        return { ...slot, childHasImage: info.hasImage, childModeration: info.status }
+      })
     } catch (err) {
-      console.error('[getStoryNode] Batch child image check failed:', err)
+      console.error('[getStoryNode] Batch child fetch failed:', err)
     }
   }
 
-  return { id: doc.id, ...doc.data(), slots } as StoryNode
+  return { id: doc.id, ...nodeData, published: nodePublished, slots } as StoryNode
+}
+
+export async function setNodeModeration(
+  storyId: string,
+  nodeId: string,
+  action: 'approve' | 'reject',
+  reviewerUid: string,
+): Promise<void> {
+  const ref = nodeRef(storyId, nodeId)
+  const status: ModerationStatus = action === 'approve' ? 'approved' : 'rejected'
+
+  await ref.update({
+    published: action === 'approve',
+    'moderation.status': status,
+    'moderation.reviewedBy': reviewerUid,
+    'moderation.reviewedAt': new Date().toISOString(),
+  })
+
+  // Rejecting a route frees the parent slot so the community can rewrite it.
+  if (action === 'reject') {
+    const snap = await ref.get()
+    const parentId = snap.data()?.parentId as string | null | undefined
+    if (parentId) {
+      const slotMatches = await slotsRef(storyId, parentId).where('childNodeId', '==', nodeId).get()
+      if (!slotMatches.empty) {
+        const batch = adminDb.batch()
+        slotMatches.docs.forEach((d) =>
+          batch.update(d.ref, {
+            filled: false,
+            childNodeId: null,
+            locked: false,
+            lockedBy: null,
+            lockedAt: null,
+          }),
+        )
+        await batch.commit()
+      }
+    }
+  }
+}
+
+export interface ModerationQueueItem {
+  storyId: string
+  storyTitle: string
+  nodeId: string
+  parentId: string | null
+  content: string
+  choiceText: string | null
+  categories: string[]
+  reason: string | null
+  authorId: string | null
+  createdAt: string
+}
+
+export async function getModerationQueue(limit = 50): Promise<ModerationQueueItem[]> {
+  const snap = await adminDb
+    .collectionGroup('nodes')
+    .where('moderation.status', '==', 'flagged')
+    .orderBy('createdAt', 'desc')
+    .limit(limit)
+    .get()
+
+  if (snap.empty) return []
+
+  const storyIds = [...new Set(snap.docs.map((d) => d.data().storyId as string).filter(Boolean))]
+  const storyDocs = await Promise.all(storyIds.map((sid) => storyRef(sid).get()))
+  const titleMap = new Map(storyDocs.map((d) => [d.id, (d.data()?.title as string) ?? 'Untitled']))
+
+  return snap.docs.map((d) => {
+    const data = d.data()
+    return {
+      storyId: data.storyId,
+      storyTitle: titleMap.get(data.storyId) ?? 'Untitled',
+      nodeId: d.id,
+      parentId: data.parentId ?? null,
+      content: data.content ?? '',
+      choiceText: data.choiceText ?? null,
+      categories: data.moderation?.categories ?? [],
+      reason: data.moderation?.reason ?? null,
+      authorId: data.authorId ?? null,
+      createdAt: data.createdAt ?? '',
+    }
+  })
 }
 
 /**
@@ -201,11 +323,15 @@ export async function getStoryPath(storyId: string, nodeId: string): Promise<Sto
 }
 
 export async function createStoryNode(
-  data: Omit<StoryNode, 'id' | 'createdAt' | 'slots'>,
+  data: Omit<StoryNode, 'id' | 'createdAt' | 'slots' | 'published' | 'moderation'>,
   choiceSuggestions: string[] = [],
+  moderationFields?: { published: boolean; moderation: NodeModeration },
 ): Promise<string> {
   const ref = nodesRef(data.storyId).doc()
-  await ref.set({ ...data, createdAt: new Date().toISOString() })
+  const published = moderationFields?.published ?? true
+  const moderation: NodeModeration =
+    moderationFields?.moderation ?? { status: 'approved', reviewedBy: null, reviewedAt: null }
+  await ref.set({ ...data, published, moderation, createdAt: new Date().toISOString() })
 
   const batch = adminDb.batch()
   for (let i = 0; i < 3; i++) {

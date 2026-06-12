@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/components/Providers'
+import { CONTENT_RATINGS, CONTENT_RATING_META, DEFAULT_CONTENT_RATING } from '@/types'
+import type { ContentRating } from '@/types'
 
 const TONE_OPTIONS = [
   'Epic Fantasy',
@@ -31,6 +33,7 @@ export default function NewWorldPage() {
   const [lore, setLore] = useState('')
   const [rules, setRules] = useState('')
   const [tone, setTone] = useState('Epic Fantasy')
+  const [rating, setRating] = useState<ContentRating>(DEFAULT_CONTENT_RATING)
 
   useEffect(() => {
     if (!loading && !user) router.replace('/')
@@ -52,6 +55,7 @@ export default function NewWorldPage() {
           lore: lore.trim(),
           rules: rules.trim(),
           tone,
+          rating,
         }),
       })
       if (!res.ok) throw new Error((await res.json()).error ?? 'Failed to create world')
@@ -125,6 +129,25 @@ export default function NewWorldPage() {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="rating">Content rating</Label>
+            <select
+              id="rating"
+              value={rating}
+              onChange={(e) => setRating(e.target.value as ContentRating)}
+              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              {CONTENT_RATINGS.map((r) => (
+                <option key={r} value={r} className="bg-background">
+                  {r} ({CONTENT_RATING_META[r].abbr})
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-muted-foreground/45">
+              {CONTENT_RATING_META[rating].description} A moderator may adjust this if needed.
+            </p>
           </div>
         </div>
 

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidateTag } from 'next/cache'
 import { adminAuth } from '@/lib/firebase-admin'
+import { getAuthContext } from '@/lib/auth'
+import { moderateText, moderationToNodeFields } from '@/lib/moderation'
 import { getStory, getStoryNode, createStoryNode } from '@/lib/firestore-helpers'
 import { adminDb } from '@/lib/firebase-admin'
 
@@ -12,7 +14,9 @@ export async function GET(
   const nodeId = req.nextUrl.searchParams.get('nodeId')
   if (!nodeId) return NextResponse.json({ error: 'nodeId required' }, { status: 400 })
 
-  const node = await getStoryNode(storyId, nodeId)
+  // Admins may view unpublished (flagged / rejected) routes; readers may not.
+  const auth = await getAuthContext(req)
+  const node = await getStoryNode(storyId, nodeId, auth?.isAdmin ?? false)
   if (!node || node.storyId !== storyId) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
@@ -46,6 +50,16 @@ export async function POST(
 
   if (!content) return NextResponse.json({ error: 'Content required' }, { status: 400 })
 
+  // Guideline check: hard-refuse disallowed content, flag borderline for review.
+  const verdict = moderateText(content)
+  if (verdict.action === 'refuse') {
+    return NextResponse.json(
+      { error: verdict.reason ?? 'This content violates the community guidelines.' },
+      { status: 422 },
+    )
+  }
+  const moderationFields = moderationToNodeFields(verdict)
+
   const nodeId = await createStoryNode(
     {
       storyId,
@@ -59,6 +73,7 @@ export async function POST(
       imageUrl: null,
     },
     choices ?? [],
+    moderationFields,
   )
 
   if (!parentId) {
