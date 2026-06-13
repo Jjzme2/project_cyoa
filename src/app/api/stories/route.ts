@@ -3,6 +3,8 @@ import { after } from 'next/server'
 import { revalidateTag } from 'next/cache'
 import { adminAuth } from '@/lib/firebase-admin'
 import { getStories, createStory, checkAndAwardAchievements } from '@/lib/firestore-helpers'
+import { CONTENT_RATINGS, DEFAULT_CONTENT_RATING } from '@/types'
+import type { ContentRating } from '@/types'
 
 export async function GET(req: NextRequest) {
   const limit = Number(req.nextUrl.searchParams.get('limit') ?? 20)
@@ -25,11 +27,15 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { title, description, worldId, worldName, coverGradient, resources, tags, coverTheme, readingTheme } = body
+  const { title, description, worldId, worldName, coverGradient, resources, tags, coverTheme, readingTheme, rating } = body
 
   if (!title || !worldId || !worldName) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
+
+  const safeRating: ContentRating = CONTENT_RATINGS.includes(rating)
+    ? (rating as ContentRating)
+    : DEFAULT_CONTENT_RATING
 
   const id = await createStory({
     title,
@@ -41,6 +47,8 @@ export async function POST(req: NextRequest) {
     rootNodeId: null,
     published: true,
     coverGradient: coverGradient ?? 'from-purple-900 to-indigo-900',
+    rating: safeRating,
+    ratingOverriddenBy: null,
     resources: resources ?? [],
     tags: Array.isArray(tags) ? tags.slice(0, 5) : [],
     ...(coverTheme   ? { coverTheme }   : {}),

@@ -1,4 +1,5 @@
 import { adminAuth } from './firebase-admin'
+import { ageFromDob, allowedRankForAge, RATING_RANK } from './ratings'
 import type { Role } from '@/types'
 
 /**
@@ -23,6 +24,11 @@ export interface AuthContext {
   tier: 'FREE' | 'PREMIUM'
   role: Role
   isAdmin: boolean
+  /** Self-reported date of birth (ISO), surfaced from a custom claim. */
+  dob: string | null
+  age: number | null
+  /** Highest content rank this viewer may see (see lib/ratings). */
+  allowedRank: number
 }
 
 export function isAdminEmail(email: string | null | undefined): boolean {
@@ -47,6 +53,8 @@ export async function getAuthContext(req: Request): Promise<AuthContext | null> 
     const email = decoded.email ?? null
     const claimRole = decoded.role as Role | undefined
     const isAdmin = claimRole === 'admin' || isAdminEmail(email)
+    const dob = (decoded.dob as string | undefined) ?? null
+    const age = ageFromDob(dob)
 
     return {
       uid: decoded.uid,
@@ -55,6 +63,10 @@ export async function getAuthContext(req: Request): Promise<AuthContext | null> 
       tier: (decoded.tier as 'FREE' | 'PREMIUM') ?? 'FREE',
       role: isAdmin ? 'admin' : 'user',
       isAdmin,
+      dob,
+      age,
+      // Admins bypass the age gate for moderation purposes.
+      allowedRank: isAdmin ? RATING_RANK.Mature : allowedRankForAge(age),
     }
   } catch {
     return null

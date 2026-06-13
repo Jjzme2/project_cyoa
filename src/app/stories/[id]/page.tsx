@@ -3,8 +3,12 @@ import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import { after } from 'next/server'
 import { BookViewerClient } from '@/components/book/BookViewerClient'
+import { GatedStoryReader } from '@/components/book/GatedStoryReader'
+import { StoryRatingControl } from '@/components/story/StoryRatingControl'
+import { SeededBadge } from '@/components/ContentBadges'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getStory, getStoryNode, incrementStoryViews } from '@/lib/firestore-helpers'
+import { ratingRank } from '@/lib/ratings'
 import { APP_CONFIG } from '@/lib/config'
 
 interface Props {
@@ -33,9 +37,13 @@ async function StoryContent({ params }: { params: Promise<{ id: string }> }) {
   const story = await getStory(id).catch(() => null)
   if (!story) notFound()
 
-  const rootNode = story.rootNodeId
-    ? await getStoryNode(id, story.rootNodeId).catch(() => null)
-    : null
+  // Teen/Mature stories are never rendered on the server; the client gate
+  // resolves the viewer's age first (see GatedStoryReader).
+  const gated = ratingRank(story.rating) > 0
+  const rootNode =
+    !gated && story.rootNodeId
+      ? await getStoryNode(id, story.rootNodeId).catch(() => null)
+      : null
 
   after(() => incrementStoryViews(id).catch(() => {}))
 
@@ -49,10 +57,16 @@ async function StoryContent({ params }: { params: Promise<{ id: string }> }) {
         {story.description && (
           <p className="text-muted-foreground/55 text-sm mt-2">{story.description}</p>
         )}
-        <p className="text-xs text-muted-foreground/35 font-sans">by {story.authorName}</p>
+        <div className="flex items-center gap-2 flex-wrap pt-1">
+          <span className="text-xs text-muted-foreground/35 font-sans">by {story.authorName}</span>
+          {story.seeded && <SeededBadge />}
+          <StoryRatingControl storyId={story.id} authorId={story.authorId} rating={story.rating} />
+        </div>
       </div>
 
-      {rootNode ? (
+      {gated ? (
+        <GatedStoryReader story={story} />
+      ) : rootNode ? (
         <BookViewerClient story={story} initialNode={rootNode} />
       ) : (
         <div className="glass-card rounded-2xl p-14 text-center">

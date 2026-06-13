@@ -3,6 +3,7 @@ import { revalidateTag } from 'next/cache'
 import { adminAuth } from '@/lib/firebase-admin'
 import { getAuthContext } from '@/lib/auth'
 import { moderateText, moderationToNodeFields } from '@/lib/moderation'
+import { ratingRank } from '@/lib/ratings'
 import { getStory, getStoryNode, createStoryNode } from '@/lib/firestore-helpers'
 import { adminDb } from '@/lib/firebase-admin'
 
@@ -14,8 +15,18 @@ export async function GET(
   const nodeId = req.nextUrl.searchParams.get('nodeId')
   if (!nodeId) return NextResponse.json({ error: 'nodeId required' }, { status: 400 })
 
-  // Admins may view unpublished (flagged / rejected) routes; readers may not.
   const auth = await getAuthContext(req)
+
+  // Age gate: don't serve a node from a story rated above the viewer's allowance.
+  const story = await getStory(storyId).catch(() => null)
+  if (story && ratingRank(story.rating) > (auth?.allowedRank ?? 0)) {
+    return NextResponse.json(
+      { error: 'age_restricted', rating: story.rating ?? 'Mature' },
+      { status: 403 },
+    )
+  }
+
+  // Admins may view unpublished (flagged / rejected) routes; readers may not.
   const node = await getStoryNode(storyId, nodeId, auth?.isAdmin ?? false)
   if (!node || node.storyId !== storyId) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })

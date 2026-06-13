@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
-import { ChevronLeft, Sparkles } from 'lucide-react'
+import { ChevronLeft, Sparkles, Volume2, VolumeX } from 'lucide-react'
 import { StoryContent } from './StoryContent'
 import { ChoiceSlots } from './ChoiceSlots'
 import { NodeReactions } from './NodeReactions'
@@ -15,6 +15,7 @@ import { JourneyMap } from './JourneyMap'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/components/Providers'
 import { CreatorResourceManager } from '@/lib/creator-resources'
+import { playPageTurn, isPageSoundMuted, setPageSoundMuted } from '@/lib/page-sound'
 import type { Story, StoryNode, ChoiceSlot, ChoiceEffect, SaveSlot } from '@/types'
 
 // ── Page theme palette ─────────────────────────────────────────────────────────
@@ -96,7 +97,18 @@ export function BookViewer({ story, initialNode }: Props) {
   const [resources, setResources] = useState<Record<string, number | string | string[] | number[]>>({})
   const [resourcesHistory, setResourcesHistory] = useState<Record<string, number | string | string[] | number[]>[]>([])
   const [activeSlotId, setActiveSlotId] = useState<string | null>(null)
+  // Lazy init reads the saved preference once; BookViewer is client-only (ssr:false).
+  const [soundOn, setSoundOn] = useState(() => !isPageSoundMuted())
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function toggleSound() {
+    setSoundOn((on) => {
+      const next = !on
+      setPageSoundMuted(!next)
+      if (next) playPageTurn() // brief preview when enabling
+      return next
+    })
+  }
 
   // ── Progress restore ──────────────────────────────────────────────────────
 
@@ -231,6 +243,7 @@ export function BookViewer({ story, initialNode }: Props) {
   // ── Navigation ────────────────────────────────────────────────────────────
 
   async function goToNode(nodeId: string, effects?: ChoiceEffect[]) {
+    if (soundOn) playPageTurn()
     setFetchingNode(true)
     setDirection('forward')
     try {
@@ -264,6 +277,7 @@ export function BookViewer({ story, initialNode }: Props) {
   function goBack() {
     const prev = history.at(-1)
     if (!prev) return
+    if (soundOn) playPageTurn()
     setDirection('back')
 
     let updatedResources = { ...resources }
@@ -396,6 +410,14 @@ export function BookViewer({ story, initialNode }: Props) {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={toggleSound}
+            title={soundOn ? 'Mute page-turn sound' : 'Unmute page-turn sound'}
+            aria-label={soundOn ? 'Mute page-turn sound' : 'Unmute page-turn sound'}
+            className="flex items-center justify-center h-8 w-8 rounded-full text-amber-400/50 hover:text-amber-300 transition-colors"
+          >
+            {soundOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+          </button>
           <BookmarkButton storyId={story.id} />
           <SharePathButton
             storyId={story.id}

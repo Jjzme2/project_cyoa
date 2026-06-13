@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { adminAuth, adminDb } from '@/lib/firebase-admin'
 import { CreditManager } from '@/lib/credit-manager'
 import { StripeService, isStripeMocked } from '@/lib/stripe'
+import { ageFromDob, MIN_SITE_AGE } from '@/lib/ratings'
 import { UserProfile } from '@/types'
 
 /**
@@ -83,6 +84,33 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const { action } = body
+
+    if (action === 'set_dob') {
+      const { dateOfBirth, attestation } = body
+      if (attestation !== true) {
+        return NextResponse.json(
+          { error: 'Please confirm your date of birth is accurate.' },
+          { status: 400 },
+        )
+      }
+      const age = ageFromDob(dateOfBirth)
+      if (age === null) {
+        return NextResponse.json({ error: 'Enter a valid date of birth.' }, { status: 400 })
+      }
+      if (age < MIN_SITE_AGE) {
+        return NextResponse.json(
+          { error: `You must be at least ${MIN_SITE_AGE} years old to use Chronicle.` },
+          { status: 403 },
+        )
+      }
+
+      await adminDb.collection('userSettings').doc(uid).set({ dateOfBirth }, { merge: true })
+      // Persist as a custom claim so the server can age-gate cheaply from the token.
+      const existing = (await adminAuth.getUser(uid)).customClaims ?? {}
+      await adminAuth.setCustomUserClaims(uid, { ...existing, dob: dateOfBirth })
+
+      return NextResponse.json({ ok: true, age })
+    }
 
     if (action === 'portal') {
       const url = await StripeService.createPortalSession(uid)

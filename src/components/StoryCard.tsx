@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { BookOpen } from 'lucide-react'
+import { RatingBadge, SeededBadge } from '@/components/ContentBadges'
 import type { Story, CoverTheme } from '@/types'
 
 // Fallback cover themes for stories that predate the cover designer
@@ -100,10 +101,14 @@ export function StoryCard({ story }: Props) {
                 }} />
             )}
 
-            {/* Top — world badge */}
-            <div className="relative z-10">
+            {/* Top — world badge + rating/seeded chips */}
+            <div className="relative z-10 flex items-start justify-between gap-1">
               <span className="text-[8px] uppercase tracking-[0.22em] font-sans text-white/30">
                 {story.worldName}
+              </span>
+              <span className="flex items-center gap-1 shrink-0">
+                {story.seeded && <SeededBadge abbr />}
+                <RatingBadge rating={story.rating} abbr />
               </span>
             </div>
 

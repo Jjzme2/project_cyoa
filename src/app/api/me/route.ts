@@ -16,5 +16,8 @@ export async function GET(req: NextRequest) {
     role: auth.role,
     isAdmin: auth.isAdmin,
     tier: auth.tier,
+    age: auth.age,
+    hasDob: auth.dob !== null,
+    allowedRank: auth.allowedRank,
   })
 }

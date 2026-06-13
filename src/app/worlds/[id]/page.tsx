@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Feather, BookOpen, Plus, ArrowLeft, ScrollText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { StoryCard } from '@/components/StoryCard'
+import { AgeFilteredStoryGrid } from '@/components/library/AgeFilteredStoryGrid'
+import { SeededBadge } from '@/components/ContentBadges'
 import { WorldRatingControl } from '@/components/world/WorldRatingControl'
 import { getWorld, getStoriesByWorld } from '@/lib/firestore-helpers'
 import { APP_CONFIG } from '@/lib/config'
@@ -90,6 +91,7 @@ async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
               {stories.length} {stories.length === 1 ? 'story' : 'stories'}
             </span>
             <WorldRatingControl worldId={world.id} authorId={world.authorId} rating={world.rating} />
+            {world.seeded && <SeededBadge />}
           </div>
 
           {world.tags && world.tags.length > 0 && (
@@ -144,11 +146,7 @@ async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-4 sm:gap-5">
-            {stories.map((story) => (
-              <StoryCard key={story.id} story={story} />
-            ))}
-          </div>
+          <AgeFilteredStoryGrid stories={stories} />
         )}
       </section>
     </>
