@@ -9,7 +9,8 @@
     "lint": "eslint",
     "migrate:subcollections": "tsx scripts/migrate-to-subcollections.ts",
     "migrate:subcollections:dry": "tsx scripts/migrate-to-subcollections.ts --dry-run",
-    "set-admin": "tsx scripts/set-admin.ts"
+    "set-admin": "tsx scripts/set-admin.ts",
+    "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.68",

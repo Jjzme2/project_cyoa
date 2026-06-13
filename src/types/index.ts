@@ -178,6 +178,8 @@ export interface World {
   rating?: ContentRating
   /** uid of the admin who last overrode the rating, if any. */
   ratingOverriddenBy?: string | null
+  /** Authored by the Chronicle team as starter content, not the community. */
+  seeded?: boolean
   createdAt: string
 }
 
@@ -196,6 +198,11 @@ export interface Story {
   nodeCount: number
   createdAt: string
   tags?: string[]
+  /** Content rating; defaults to the world's rating, admin-overridable. */
+  rating?: ContentRating
+  ratingOverriddenBy?: string | null
+  /** Authored by the Chronicle team as starter content, not the community. */
+  seeded?: boolean
   resources?: ResourceDefinition[]
   coverTheme?: CoverTheme
   readingTheme?: ReadingTheme
@@ -307,6 +314,7 @@ export class UserProfile {
   public readonly purchasedCredits: number
   public readonly lifetimeCreditsPurchased: number
   public readonly createdAt: string
+  public readonly dateOfBirth: string | null
 
   constructor(
     uid: string,
@@ -320,7 +328,8 @@ export class UserProfile {
     subscriptionPeriodEnd: string | null = null,
     purchasedCredits = 0,
     lifetimeCreditsPurchased = 0,
-    createdAt: string = new Date().toISOString()
+    createdAt: string = new Date().toISOString(),
+    dateOfBirth: string | null = null
   ) {
     this.uid = uid
     this.email = email
@@ -334,6 +343,7 @@ export class UserProfile {
     this.purchasedCredits = purchasedCredits
     this.lifetimeCreditsPurchased = lifetimeCreditsPurchased
     this.createdAt = createdAt
+    this.dateOfBirth = dateOfBirth
   }
 
   public static fromFirestore(uid: string, data: any): UserProfile {
@@ -349,7 +359,8 @@ export class UserProfile {
       data.subscriptionPeriodEnd ?? null,
       data.purchasedCredits ?? 0,
       data.lifetimeCreditsPurchased ?? 0,
-      data.createdAt ?? new Date().toISOString()
+      data.createdAt ?? new Date().toISOString(),
+      data.dateOfBirth ?? null
     )
   }
 
@@ -366,6 +377,7 @@ export class UserProfile {
       purchasedCredits: this.purchasedCredits,
       lifetimeCreditsPurchased: this.lifetimeCreditsPurchased,
       createdAt: this.createdAt,
+      dateOfBirth: this.dateOfBirth,
       updatedAt: new Date().toISOString()
     }
   }

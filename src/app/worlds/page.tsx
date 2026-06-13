@@ -6,6 +6,7 @@ import { cacheLife, cacheTag } from 'next/cache'
 import { getPublicWorlds, getStoryCounts } from '@/lib/firestore-helpers'
 import { truncateAtWord } from '@/lib/utils'
 import { APP_CONFIG } from '@/lib/config'
+import { SeededBadge } from '@/components/ContentBadges'
 import { CONTENT_RATING_META } from '@/types'
 import type { World } from '@/types'
 
@@ -93,9 +94,12 @@ function WorldCard({ world, storyCount }: { world: World; storyCount: number }) 
 
       <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
         <div className="space-y-0.5">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground/45 font-sans">
-            <Feather className="h-3 w-3" />
-            <span>{world.authorName}</span>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground/45 font-sans">
+            <span className="flex items-center gap-1.5">
+              <Feather className="h-3 w-3" />
+              {world.authorName}
+            </span>
+            {world.seeded && <SeededBadge abbr />}
           </div>
           {storyCount > 0 && (
             <div className="flex items-center gap-1 text-[11px] text-amber-400/60 font-sans">

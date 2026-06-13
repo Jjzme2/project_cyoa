@@ -10,9 +10,9 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/components/Providers'
-import { STORY_TAGS } from '@/types'
+import { STORY_TAGS, CONTENT_RATINGS, CONTENT_RATING_META, DEFAULT_CONTENT_RATING } from '@/types'
 import { CoverDesigner, DEFAULT_COVER } from '@/components/book/CoverDesigner'
-import type { World, CoverTheme, ReadingTheme, PageStyle, AmbientEffect } from '@/types'
+import type { World, CoverTheme, ReadingTheme, PageStyle, AmbientEffect, ContentRating } from '@/types'
 
 const PAGE_STYLES: { id: PageStyle; label: string; bg: string; text: string }[] = [
   { id: 'parchment', label: 'Parchment',    bg: '#f0e6d0', text: '#3d2b1f' },
@@ -42,6 +42,7 @@ export default function NewStoryPage() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [worldId, setWorldId] = useState('')
+  const [rating, setRating] = useState<ContentRating>(DEFAULT_CONTENT_RATING)
   const [opening, setOpening] = useState('')
   const [choice1, setChoice1] = useState('')
   const [choice2, setChoice2] = useState('')
@@ -81,7 +82,10 @@ export default function NewStoryPage() {
           // Honour ?world=<id> preselection coming from a world page.
           const preselect = new URLSearchParams(window.location.search).get('world')
           const match = preselect ? list.find((w) => w.id === preselect) : undefined
-          setWorldId(match?.id ?? list[0].id)
+          const chosen = match ?? list[0]
+          setWorldId(chosen.id)
+          // Default the story's rating to its world's rating.
+          if (chosen.rating) setRating(chosen.rating)
         }
       })
       .finally(() => setLoadingWorlds(false))
@@ -127,6 +131,7 @@ export default function NewStoryPage() {
           description: description.trim() || null,
           worldId,
           worldName: selectedWorld.name,
+          rating,
           published: true,
           coverGradient: null,
           resources: formattedResources,
@@ -271,7 +276,11 @@ export default function NewStoryPage() {
               <select
                 id="world"
                 value={worldId}
-                onChange={(e) => setWorldId(e.target.value)}
+                onChange={(e) => {
+                  setWorldId(e.target.value)
+                  const w = worlds.find((x) => x.id === e.target.value)
+                  if (w?.rating) setRating(w.rating)
+                }}
                 required
                 className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               >
@@ -282,6 +291,26 @@ export default function NewStoryPage() {
                 ))}
               </select>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="story-rating">Content rating</Label>
+            <select
+              id="story-rating"
+              value={rating}
+              onChange={(e) => setRating(e.target.value as ContentRating)}
+              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              {CONTENT_RATINGS.map((r) => (
+                <option key={r} value={r} className="bg-background">
+                  {r} ({CONTENT_RATING_META[r].abbr})
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-muted-foreground/45">
+              {CONTENT_RATING_META[rating].description} Defaults to the world&apos;s rating; a
+              moderator may adjust it.
+            </p>
           </div>
 
           <div className="space-y-4 border-t border-white/[0.06] pt-5 mt-5">

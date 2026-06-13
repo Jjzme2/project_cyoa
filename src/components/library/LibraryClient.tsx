@@ -5,6 +5,8 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, X, Library, BookOpen, Tag } from 'lucide-react'
 import { StoryCard } from '@/components/StoryCard'
+import { useAuth } from '@/components/Providers'
+import { ratingRank } from '@/lib/ratings'
 import type { Story } from '@/types'
 
 interface Props {
@@ -17,9 +19,16 @@ export function LibraryClient({ stories }: Props) {
   const router = useRouter()
   const pathname = usePathname()
 
+  const { allowedRank } = useAuth()
   const [search, setSearch] = useState('')
   const [worldFilter, setWorldFilter] = useState<string | null>(() => searchParams.get('world'))
   const [tagFilter, setTagFilter] = useState<string | null>(null)
+
+  // Age gate: never surface stories rated above what this viewer may see.
+  const visibleStories = useMemo(
+    () => stories.filter((s) => ratingRank(s.rating) <= allowedRank),
+    [stories, allowedRank],
+  )
 
   // Sync URL param → worldFilter on mount / back-navigation
   useEffect(() => {
@@ -40,23 +49,23 @@ export function LibraryClient({ stories }: Props) {
 
   // Unique world names, sorted A→Z
   const worlds = useMemo(() => {
-    const names = [...new Set(stories.map((s) => s.worldName))]
+    const names = [...new Set(visibleStories.map((s) => s.worldName))]
     return names.sort((a, b) => a.localeCompare(b))
-  }, [stories])
+  }, [visibleStories])
 
   // Unique tags across all stories
   const allTags = useMemo(() => {
     const tagSet = new Set<string>()
-    for (const s of stories) {
+    for (const s of visibleStories) {
       if (s.tags) s.tags.forEach((t) => tagSet.add(t))
     }
     return [...tagSet].sort()
-  }, [stories])
+  }, [visibleStories])
 
   // Filter and group into shelves
   const shelves = useMemo(() => {
     const q = search.trim().toLowerCase()
-    let pool = stories
+    let pool = visibleStories
     if (q) {
       pool = pool.filter(
         (s) =>
@@ -77,7 +86,7 @@ export function LibraryClient({ stories }: Props) {
       list.sort((a, b) => a.title.localeCompare(b.title))
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b))
-  }, [stories, search, worldFilter, tagFilter])
+  }, [visibleStories, search, worldFilter, tagFilter])
 
   const totalVisible = shelves.reduce((n, [, books]) => n + books.length, 0)
   const isFiltered = search.trim() !== '' || worldFilter !== null || tagFilter !== null

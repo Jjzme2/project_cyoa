@@ -87,6 +87,18 @@ export async function incrementStoryViews(storyId: string) {
   await storyRef(storyId).update({ views: FieldValue.increment(1) })
 }
 
+export async function updateStoryRating(
+  storyId: string,
+  rating: ContentRating,
+  byUid: string,
+  override: boolean,
+): Promise<void> {
+  await storyRef(storyId).update({
+    rating,
+    ratingOverriddenBy: override ? byUid : null,
+  })
+}
+
 export async function incrementStoryNodeCount(storyId: string) {
   await storyRef(storyId).update({ nodeCount: FieldValue.increment(1) })
 }
