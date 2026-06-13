@@ -104,6 +104,75 @@ export async function incrementStoryNodeCount(storyId: string) {
   await storyRef(storyId).update({ nodeCount: FieldValue.increment(1) })
 }
 
+/**
+ * Best-effort popularity counter: a reader took the path `slotId` to its child.
+ * Increments the slot (for "% went here") and the child node (for path reads).
+ */
+export async function incrementTraversal(
+  storyId: string,
+  nodeId: string,
+  slotId: string,
+  childNodeId: string,
+): Promise<void> {
+  const batch = adminDb.batch()
+  batch.update(slotRef(storyId, nodeId, slotId), { traversals: FieldValue.increment(1) })
+  batch.update(nodeRef(storyId, childNodeId), { traversals: FieldValue.increment(1) })
+  await batch.commit()
+}
+
+export interface GalleryImage {
+  nodeId: string
+  imageUrl: string
+  choiceText: string | null
+  excerpt: string
+}
+
+/** All illustrations in a story (published routes only), for the gallery. */
+export async function getStoryGallery(storyId: string): Promise<GalleryImage[]> {
+  'use cache'
+  cacheLife('minutes')
+  cacheTag(`story-tree-${storyId}`, `story-${storyId}`)
+
+  const snap = await nodesRef(storyId).limit(300).get()
+  return snap.docs
+    .map((d) => {
+      const data = d.data()
+      return {
+        nodeId: d.id,
+        imageUrl: (data.imageUrl as string) ?? '',
+        choiceText: (data.choiceText as string) ?? null,
+        excerpt: ((data.content as string) ?? '').slice(0, 120),
+        published: data.published !== false,
+      }
+    })
+    .filter((n) => n.imageUrl && n.published)
+    .map(({ nodeId, imageUrl, choiceText, excerpt }) => ({ nodeId, imageUrl, choiceText, excerpt }))
+}
+
+export interface AuthoredPathStats {
+  pathsWritten: number
+  totalReads: number
+  totalLoves: number
+}
+
+/**
+ * Reputation stats for a writer: how many routes they've authored and the reads
+ * and reactions those routes have accrued. Uses a collection-group query over
+ * `nodes` (requires the nodes/authorId index).
+ */
+export async function getAuthoredPathStats(uid: string): Promise<AuthoredPathStats> {
+  const snap = await adminDb.collectionGroup('nodes').where('authorId', '==', uid).limit(1000).get()
+  let totalReads = 0
+  let totalLoves = 0
+  for (const d of snap.docs) {
+    const data = d.data()
+    totalReads += (data.traversals as number) ?? 0
+    const reactions = (data.reactions as Record<string, number>) ?? {}
+    totalLoves += Object.values(reactions).reduce((sum, n) => sum + (n ?? 0), 0)
+  }
+  return { pathsWritten: snap.size, totalReads, totalLoves }
+}
+
 // ─── Worlds ──────────────────────────────────────────────────────────────────
 
 export async function getWorld(id: string): Promise<World | null> {

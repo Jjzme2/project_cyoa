@@ -43,6 +43,22 @@ export function ChoiceSlots({
   const [submitting, setSubmitting] = useState<string | null>(null)
   const [moderating, setModerating] = useState<string | null>(null)
 
+  // Total reads across the filled paths from this page, for "% went here".
+  const filledTotal = slots.reduce(
+    (sum, s) => sum + (s.filled && !s.pendingReview ? s.traversals ?? 0 : 0),
+    0,
+  )
+
+  // Best-effort popularity counter; never blocks navigation.
+  function recordTraversal(slot: ChoiceSlot) {
+    if (!slot.childNodeId) return
+    fetch(`/api/stories/${storyId}/nodes/${nodeId}/slots/${slot.id}/traverse`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ childNodeId: slot.childNodeId }),
+    }).catch(() => {})
+  }
+
   async function moderateRoute(slot: ChoiceSlot, action: 'approve' | 'reject') {
     if (!user || !slot.childNodeId) return
     setModerating(slot.id)
@@ -206,10 +222,19 @@ export function ChoiceSlots({
               (() => {
                 const meetsReqs = checkRequirements(slot, currentResources ?? {})
                 const showAdmin = isAdmin && slot.childModeration === 'flagged'
+                const pct =
+                  filledTotal >= 5 && slot.traversals
+                    ? Math.round((slot.traversals / filledTotal) * 100)
+                    : null
                 return (
                   <div className="space-y-1.5">
                   <button
-                    onClick={() => meetsReqs && slot.childNodeId && onChoiceSelect(slot.childNodeId, slot.effects)}
+                    onClick={() => {
+                      if (meetsReqs && slot.childNodeId) {
+                        recordTraversal(slot)
+                        onChoiceSelect(slot.childNodeId, slot.effects)
+                      }
+                    }}
                     disabled={!meetsReqs}
                     className={`w-full text-left px-4 py-3 rounded-lg border transition-all ${
                       meetsReqs 
@@ -226,6 +251,13 @@ export function ChoiceSlots({
                         <ChevronRight className="h-3.5 w-3.5 mt-0.5 shrink-0 opacity-45" />
                         <div className="flex flex-col gap-1">
                           <span className="text-[13.5px] leading-snug">{slot.promptText}</span>
+                          {(slot.submitterName || pct !== null) && (
+                            <div className="flex items-center gap-1.5 text-[10px] font-sans opacity-45">
+                              {slot.submitterName && <span>by {slot.submitterName}</span>}
+                              {slot.submitterName && pct !== null && <span>·</span>}
+                              {pct !== null && <span>{pct}% chose this</span>}
+                            </div>
+                          )}
                           {!meetsReqs && slot.requirements && (
                             <div className="flex flex-wrap gap-1 mt-1">
                               {slot.requirements.map((req, rIdx) => (

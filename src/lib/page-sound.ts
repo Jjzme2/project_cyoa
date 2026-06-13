@@ -1,8 +1,11 @@
 /**
- * Synthesized page-turn sound via the Web Audio API — a short band-passed noise
- * "fwip", so there's no audio asset to ship. Always triggered by a user gesture
- * (turning a page), which satisfies browser autoplay policies.
+ * Synthesized audio via the Web Audio API — a page-turn "fwip" and optional
+ * looping ambient soundscapes — so there are no audio assets to ship. Sound is
+ * always started from a user gesture (page turn / toggle), satisfying autoplay
+ * policies. Ambient defaults OFF.
  */
+
+import type { AmbientEffect } from '@/types'
 
 let ctx: AudioContext | null = null
 
@@ -70,4 +73,97 @@ export function playPageTurn(): void {
   src.connect(bp).connect(gain).connect(ac.destination)
   src.start(now)
   src.stop(now + duration)
+}
+
+// ─── Ambient soundscapes (looping, opt-in) ───────────────────────────────────
+
+const AMBIENT_KEY = 'cyoa:ambient-on'
+
+export function isAmbientOn(): boolean {
+  try {
+    return localStorage.getItem(AMBIENT_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+export function setAmbientOn(on: boolean): void {
+  try {
+    localStorage.setItem(AMBIENT_KEY, on ? '1' : '0')
+  } catch {
+    // ignore
+  }
+}
+
+let ambient: { source: AudioBufferSourceNode; gain: GainNode } | null = null
+
+function noiseBuffer(ac: AudioContext, seconds = 2): AudioBuffer {
+  const frames = Math.max(1, Math.floor(ac.sampleRate * seconds))
+  const buffer = ac.createBuffer(1, frames, ac.sampleRate)
+  const data = buffer.getChannelData(0)
+  for (let i = 0; i < frames; i++) data[i] = Math.random() * 2 - 1
+  return buffer
+}
+
+export function stopAmbient(): void {
+  if (!ambient) return
+  try {
+    ambient.source.stop()
+  } catch {
+    // already stopped
+  }
+  try {
+    ambient.source.disconnect()
+  } catch {
+    // ignore
+  }
+  ambient = null
+}
+
+/** Start a low, looping soundscape matching the reading theme's ambient effect. */
+export function startAmbient(effect: AmbientEffect): void {
+  if (effect === 'none') return
+  const ac = getCtx()
+  if (!ac) return
+  if (ac.state === 'suspended') ac.resume().catch(() => {})
+
+  stopAmbient()
+
+  const source = ac.createBufferSource()
+  source.buffer = noiseBuffer(ac, 2)
+  source.loop = true
+
+  const filter = ac.createBiquadFilter()
+  const gain = ac.createGain()
+
+  switch (effect) {
+    case 'rain':
+      filter.type = 'highpass'
+      filter.frequency.value = 1100
+      gain.gain.value = 0.05
+      break
+    case 'embers':
+      filter.type = 'lowpass'
+      filter.frequency.value = 480
+      gain.gain.value = 0.06
+      break
+    case 'snow':
+      filter.type = 'bandpass'
+      filter.frequency.value = 5500
+      filter.Q.value = 0.5
+      gain.gain.value = 0.03
+      break
+    case 'stars':
+      filter.type = 'bandpass'
+      filter.frequency.value = 8000
+      filter.Q.value = 0.7
+      gain.gain.value = 0.025
+      break
+    default:
+      gain.gain.value = 0.03
+  }
+
+  source.connect(filter).connect(gain).connect(ac.destination)
+  source.start()
+  ambient = { source, gain }
 }

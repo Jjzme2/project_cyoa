@@ -13,7 +13,7 @@ import type { Story, StoryNode } from '@/types'
  * the server for gated stories; instead we resolve the viewer's allowance and
  * fetch the root node through the authed (age-enforcing) endpoint.
  */
-export function GatedStoryReader({ story }: { story: Story }) {
+export function GatedStoryReader({ story, endingCount }: { story: Story; endingCount?: number }) {
   const { user, loading, allowedRank, openAuthModal } = useAuth()
   const [node, setNode] = useState<StoryNode | null>(null)
   const [denied, setDenied] = useState(false)
@@ -54,7 +54,7 @@ export function GatedStoryReader({ story }: { story: Story }) {
   }, [loading, blockedByAge, empty, user, story.id, story.rootNodeId])
 
   if (!loading && node && !blockedByAge && !denied) {
-    return <BookViewerClient story={story} initialNode={node} />
+    return <BookViewerClient story={story} initialNode={node} endingCount={endingCount} />
   }
 
   if (blockedByAge || denied) {

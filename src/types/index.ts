@@ -226,6 +226,8 @@ export interface StoryNode {
    */
   published: boolean
   moderation?: NodeModeration
+  /** How many times readers have arrived at this route (for reads/reputation). */
+  traversals?: number
   createdAt: string
 }
 
@@ -247,6 +249,8 @@ export interface ChoiceSlot {
    * This is calculated dynamically on fetch or updated upon successful image generation.
    */
   childHasImage?: boolean
+  /** How many times readers have taken this path (popularity / "% went here"). */
+  traversals?: number
   /**
    * Set when a filled slot's child route is awaiting moderation and is hidden
    * from non-admin readers. The child id is withheld so the path can't be

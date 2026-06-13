@@ -19,8 +19,9 @@ const BookViewer = dynamic(
 interface Props {
   story: Story
   initialNode: StoryNode
+  endingCount?: number
 }
 
-export function BookViewerClient({ story, initialNode }: Props) {
-  return <BookViewer story={story} initialNode={initialNode} />
+export function BookViewerClient({ story, initialNode, endingCount }: Props) {
+  return <BookViewer story={story} initialNode={initialNode} endingCount={endingCount} />
 }
