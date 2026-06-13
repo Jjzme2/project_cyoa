@@ -4,11 +4,13 @@ import { StoryPathSegment } from '@/types'
 import type {
   Story, StoryNode, ChoiceSlot, World, ChoiceRequirement, ChoiceEffect,
   Bookmark, Notification, NotificationType, UserAchievements, ReactionType, StoryTreeNode,
-  NodeModeration, ModerationStatus, ContentRating,
+  NodeModeration, ModerationStatus, ContentRating, StoryCharacter, SlotBounty,
 } from '@/types'
+import { CreditManager } from './credit-manager'
 import { ACHIEVEMENT_DEFS } from '@/types'
 import { FieldValue } from 'firebase-admin/firestore'
 import { decrypt } from './encrypt'
+import { ratingRank } from './ratings'
 
 // ─── Path helpers ─────────────────────────────────────────────────────────────
 
@@ -87,6 +89,26 @@ export async function incrementStoryViews(storyId: string) {
   await storyRef(storyId).update({ views: FieldValue.increment(1) })
 }
 
+/** Append emergent canon characters to a story, deduped by name (case-insensitive). */
+export async function addStoryCharacters(
+  storyId: string,
+  chars: StoryCharacter[],
+): Promise<void> {
+  if (!chars || chars.length === 0) return
+  const ref = storyRef(storyId)
+  await adminDb.runTransaction(async (txn) => {
+    const doc = await txn.get(ref)
+    if (!doc.exists) return
+    const existing: StoryCharacter[] = doc.data()?.characters ?? []
+    const known = new Set(existing.map((c) => c.name.toLowerCase()))
+    const additions = chars.filter((c) => c.name && !known.has(c.name.toLowerCase()))
+    if (additions.length === 0) return
+    // Cap the roster so a runaway story can't bloat the doc.
+    const merged = [...existing, ...additions].slice(0, 40)
+    txn.update(ref, { characters: merged })
+  })
+}
+
 export async function updateStoryRating(
   storyId: string,
   rating: ContentRating,
@@ -101,6 +123,75 @@ export async function updateStoryRating(
 
 export async function incrementStoryNodeCount(storyId: string) {
   await storyRef(storyId).update({ nodeCount: FieldValue.increment(1) })
+}
+
+/**
+ * Best-effort popularity counter: a reader took the path `slotId` to its child.
+ * Increments the slot (for "% went here") and the child node (for path reads).
+ */
+export async function incrementTraversal(
+  storyId: string,
+  nodeId: string,
+  slotId: string,
+  childNodeId: string,
+): Promise<void> {
+  const batch = adminDb.batch()
+  batch.update(slotRef(storyId, nodeId, slotId), { traversals: FieldValue.increment(1) })
+  batch.update(nodeRef(storyId, childNodeId), { traversals: FieldValue.increment(1) })
+  await batch.commit()
+}
+
+export interface GalleryImage {
+  nodeId: string
+  imageUrl: string
+  choiceText: string | null
+  excerpt: string
+}
+
+/** All illustrations in a story (published routes only), for the gallery. */
+export async function getStoryGallery(storyId: string): Promise<GalleryImage[]> {
+  'use cache'
+  cacheLife('minutes')
+  cacheTag(`story-tree-${storyId}`, `story-${storyId}`)
+
+  const snap = await nodesRef(storyId).limit(300).get()
+  return snap.docs
+    .map((d) => {
+      const data = d.data()
+      return {
+        nodeId: d.id,
+        imageUrl: (data.imageUrl as string) ?? '',
+        choiceText: (data.choiceText as string) ?? null,
+        excerpt: ((data.content as string) ?? '').slice(0, 120),
+        published: data.published !== false,
+      }
+    })
+    .filter((n) => n.imageUrl && n.published)
+    .map(({ nodeId, imageUrl, choiceText, excerpt }) => ({ nodeId, imageUrl, choiceText, excerpt }))
+}
+
+export interface AuthoredPathStats {
+  pathsWritten: number
+  totalReads: number
+  totalLoves: number
+}
+
+/**
+ * Reputation stats for a writer: how many routes they've authored and the reads
+ * and reactions those routes have accrued. Uses a collection-group query over
+ * `nodes` (requires the nodes/authorId index).
+ */
+export async function getAuthoredPathStats(uid: string): Promise<AuthoredPathStats> {
+  const snap = await adminDb.collectionGroup('nodes').where('authorId', '==', uid).limit(1000).get()
+  let totalReads = 0
+  let totalLoves = 0
+  for (const d of snap.docs) {
+    const data = d.data()
+    totalReads += (data.traversals as number) ?? 0
+    const reactions = (data.reactions as Record<string, number>) ?? {}
+    totalLoves += Object.values(reactions).reduce((sum, n) => sum + (n ?? 0), 0)
+  }
+  return { pathsWritten: snap.size, totalReads, totalLoves }
 }
 
 // ─── Worlds ──────────────────────────────────────────────────────────────────
@@ -148,6 +239,25 @@ export async function updateWorldRating(
     // Track admin overrides so a creator can't silently undo a moderator's call.
     ratingOverriddenBy: override ? byUid : null,
   })
+}
+
+/**
+ * Clamp every story in a world down to the world's rating (used when a world's
+ * rating is lowered). Returns how many stories were adjusted.
+ */
+export async function clampStoriesToWorldRating(
+  worldId: string,
+  worldRating: ContentRating,
+): Promise<number> {
+  const stories = await getStoriesByWorld(worldId)
+  const ceiling = ratingRank(worldRating)
+  const over = stories.filter((s) => ratingRank(s.rating) > ceiling)
+  if (over.length === 0) return 0
+
+  const batch = adminDb.batch()
+  for (const s of over) batch.update(storyRef(s.id), { rating: worldRating })
+  await batch.commit()
+  return over.length
 }
 
 // ─── Story Nodes ──────────────────────────────────────────────────────────────
@@ -229,27 +339,166 @@ export async function setNodeModeration(
     'moderation.reviewedAt': new Date().toISOString(),
   })
 
-  // Rejecting a route frees the parent slot so the community can rewrite it.
-  if (action === 'reject') {
-    const snap = await ref.get()
-    const parentId = snap.data()?.parentId as string | null | undefined
-    if (parentId) {
-      const slotMatches = await slotsRef(storyId, parentId).where('childNodeId', '==', nodeId).get()
-      if (!slotMatches.empty) {
-        const batch = adminDb.batch()
-        slotMatches.docs.forEach((d) =>
-          batch.update(d.ref, {
-            filled: false,
-            childNodeId: null,
-            locked: false,
-            lockedBy: null,
-            lockedAt: null,
-          }),
-        )
-        await batch.commit()
+  // Settle any bounty on the parent slot that was awaiting this node's review.
+  const snap = await ref.get()
+  const parentId = snap.data()?.parentId as string | null | undefined
+  if (!parentId) return
+  const slotMatches = await slotsRef(storyId, parentId).where('childNodeId', '==', nodeId).get()
+  if (slotMatches.empty) {
+    // On reject the slot was already detached below; nothing to do.
+  }
+
+  if (action === 'approve') {
+    for (const d of slotMatches.docs) {
+      const b = d.data()?.bounty as SlotBounty | undefined
+      if (b && b.status === 'open' && b.pendingNodeId === nodeId && b.pendingClaimBy) {
+        await d.ref.update({ 'bounty.status': 'paid', 'bounty.pendingClaimBy': null, 'bounty.pendingNodeId': null })
+        await CreditManager.grantCredits(b.pendingClaimBy, b.reward)
       }
     }
+    return
   }
+
+  // Rejecting a route frees the parent slot so the community can rewrite it,
+  // and returns any pending bounty to the open pool (escrow stays held).
+  const batch = adminDb.batch()
+  slotMatches.docs.forEach((d) => {
+    const update: Record<string, unknown> = {
+      filled: false,
+      childNodeId: null,
+      locked: false,
+      lockedBy: null,
+      lockedAt: null,
+    }
+    const b = d.data()?.bounty as SlotBounty | undefined
+    if (b && b.pendingNodeId === nodeId) {
+      update['bounty.pendingClaimBy'] = null
+      update['bounty.pendingNodeId'] = null
+    }
+    batch.update(d.ref, update)
+  })
+  if (!slotMatches.empty) await batch.commit()
+}
+
+/**
+ * Escrow a reward on an empty slot. Holds the reward from the poster's
+ * purchased credits; refunds automatically if the slot write fails.
+ */
+export async function postBounty(
+  storyId: string,
+  nodeId: string,
+  slotId: string,
+  poster: { uid: string; name: string },
+  reward: number,
+  promptHint?: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!Number.isInteger(reward) || reward <= 0) {
+    return { ok: false, error: 'Reward must be a positive whole number of credits.' }
+  }
+  const slot = await getChoiceSlot(storyId, nodeId, slotId)
+  if (!slot) return { ok: false, error: 'Slot not found.' }
+  if (slot.filled) return { ok: false, error: 'This path has already been written.' }
+  if (slot.bounty && slot.bounty.status === 'open') {
+    return { ok: false, error: 'This path already has an open bounty.' }
+  }
+
+  const held = await CreditManager.holdPurchased(poster.uid, reward)
+  if (!held) return { ok: false, error: 'Not enough purchased credits to fund this bounty.' }
+
+  const bounty: SlotBounty = {
+    reward,
+    posterId: poster.uid,
+    posterName: poster.name,
+    promptHint: promptHint?.trim().slice(0, 200) || undefined,
+    status: 'open',
+    pendingClaimBy: null,
+    pendingNodeId: null,
+    createdAt: new Date().toISOString(),
+  }
+  try {
+    await slotRef(storyId, nodeId, slotId).update({ bounty })
+  } catch {
+    await CreditManager.grantCredits(poster.uid, reward) // refund the hold
+    return { ok: false, error: 'Could not place the bounty. Your credits were refunded.' }
+  }
+  return { ok: true }
+}
+
+/** Cancel an open, unclaimed bounty and refund the poster (poster only). */
+export async function cancelBounty(
+  storyId: string,
+  nodeId: string,
+  slotId: string,
+  requesterId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const ref = slotRef(storyId, nodeId, slotId)
+  let refundAmount = 0
+  let error: string | undefined
+  await adminDb.runTransaction(async (txn) => {
+    const doc = await txn.get(ref)
+    const b = doc.data()?.bounty as SlotBounty | undefined
+    if (!b || b.status !== 'open') {
+      error = 'No open bounty to cancel.'
+      return
+    }
+    if (b.posterId !== requesterId) {
+      error = 'Only the poster can cancel this bounty.'
+      return
+    }
+    if (b.pendingClaimBy) {
+      error = 'A contribution is awaiting review — the bounty can’t be cancelled yet.'
+      return
+    }
+    refundAmount = b.reward
+    txn.update(ref, { 'bounty.status': 'refunded' })
+  })
+  if (error) return { ok: false, error }
+  if (refundAmount > 0) await CreditManager.grantCredits(requesterId, refundAmount)
+  return { ok: true }
+}
+
+/**
+ * Settle a slot's bounty after it's been filled. Pays the filler when the
+ * contribution is published, defers until approval when it's flagged, and
+ * refunds the poster if they filled their own bounty.
+ */
+export async function settleBountyOnFill(
+  storyId: string,
+  nodeId: string,
+  slotId: string,
+  fillerId: string,
+  childNodeId: string,
+  published: boolean,
+): Promise<void> {
+  const ref = slotRef(storyId, nodeId, slotId)
+  let payTo: string | null = null
+  let refundTo: string | null = null
+  let amount = 0
+
+  await adminDb.runTransaction(async (txn) => {
+    const doc = await txn.get(ref)
+    const b = doc.data()?.bounty as SlotBounty | undefined
+    if (!b || b.status !== 'open') return
+    amount = b.reward
+    if (b.posterId === fillerId) {
+      // Can't claim your own bounty — refund the escrow.
+      txn.update(ref, { 'bounty.status': 'refunded' })
+      refundTo = b.posterId
+    } else if (published) {
+      txn.update(ref, {
+        'bounty.status': 'paid',
+        'bounty.pendingClaimBy': null,
+        'bounty.pendingNodeId': null,
+      })
+      payTo = fillerId
+    } else {
+      // Flagged — hold the reward until an admin approves the route.
+      txn.update(ref, { 'bounty.pendingClaimBy': fillerId, 'bounty.pendingNodeId': childNodeId })
+    }
+  })
+
+  if (payTo) await CreditManager.grantCredits(payTo, amount)
+  else if (refundTo) await CreditManager.grantCredits(refundTo, amount)
 }
 
 export interface ModerationQueueItem {

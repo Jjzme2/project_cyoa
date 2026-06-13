@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidateTag } from 'next/cache'
 import { getAuthContext } from '@/lib/auth'
-import { getWorld, updateWorldRating } from '@/lib/firestore-helpers'
+import { getWorld, updateWorldRating, clampStoriesToWorldRating } from '@/lib/firestore-helpers'
 import { CONTENT_RATINGS } from '@/types'
 import type { ContentRating } from '@/types'
 
@@ -36,8 +36,12 @@ export async function PATCH(
   const override = auth.isAdmin && !isOwner
   await updateWorldRating(id, rating, auth.uid, override)
 
+  // Lowering a world's rating pulls any over-rated stories down to the ceiling.
+  const clampedStories = await clampStoriesToWorldRating(id, rating)
+
   revalidateTag('worlds', 'max')
   revalidateTag(`world-${id}`, 'max')
+  if (clampedStories > 0) revalidateTag('stories', 'max')
 
-  return NextResponse.json({ ok: true, rating, overridden: override })
+  return NextResponse.json({ ok: true, rating, overridden: override, clampedStories })
 }

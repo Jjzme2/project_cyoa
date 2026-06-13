@@ -46,6 +46,36 @@ export interface NodeModeration {
   reviewedAt?: string | null
 }
 
+// ─── Characters ─────────────────────────────────────────────────────────────
+/** A canon character in a story. Author may define some; more emerge as the AI introduces them. */
+export interface StoryCharacter {
+  name: string
+  description?: string
+  /** e.g. 'alive', 'deceased', 'missing' — the AI must respect this for continuity. */
+  status?: string
+}
+
+export interface Protagonist {
+  name: string
+  description?: string
+}
+
+// ─── Bounties ───────────────────────────────────────────────────────────────
+export type BountyStatus = 'open' | 'paid' | 'refunded'
+
+/** A reward escrowed on an empty choice slot, paid to whoever fills it (once approved). */
+export interface SlotBounty {
+  reward: number
+  posterId: string
+  posterName: string
+  promptHint?: string
+  status: BountyStatus
+  /** Set when a flagged contribution is awaiting approval before the reward releases. */
+  pendingClaimBy?: string | null
+  pendingNodeId?: string | null
+  createdAt: string
+}
+
 export interface Bookmark {
   id: string
   userId: string
@@ -204,6 +234,10 @@ export interface Story {
   /** Authored by the Chronicle team as starter content, not the community. */
   seeded?: boolean
   resources?: ResourceDefinition[]
+  /** Author-defined hero the reader plays as; the AI writes them by name. */
+  protagonist?: Protagonist
+  /** Canon cast — author-seeded and grown emergently as the AI introduces characters. */
+  characters?: StoryCharacter[]
   coverTheme?: CoverTheme
   readingTheme?: ReadingTheme
 }
@@ -226,6 +260,8 @@ export interface StoryNode {
    */
   published: boolean
   moderation?: NodeModeration
+  /** How many times readers have arrived at this route (for reads/reputation). */
+  traversals?: number
   createdAt: string
 }
 
@@ -247,6 +283,8 @@ export interface ChoiceSlot {
    * This is calculated dynamically on fetch or updated upon successful image generation.
    */
   childHasImage?: boolean
+  /** How many times readers have taken this path (popularity / "% went here"). */
+  traversals?: number
   /**
    * Set when a filled slot's child route is awaiting moderation and is hidden
    * from non-admin readers. The child id is withheld so the path can't be
@@ -255,6 +293,8 @@ export interface ChoiceSlot {
   pendingReview?: boolean
   /** Moderation status of the child route (surfaced to admins for review). */
   childModeration?: ModerationStatus
+  /** An open reward escrowed on this (empty) slot. */
+  bounty?: SlotBounty | null
   requirements?: ChoiceRequirement[]
   effects?: ChoiceEffect[]
 }

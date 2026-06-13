@@ -3,20 +3,50 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
-import { ChevronLeft, Sparkles, Volume2, VolumeX } from 'lucide-react'
+import { ChevronLeft, Sparkles, Volume2, VolumeX, Waves, Trophy, Users } from 'lucide-react'
 import { StoryContent } from './StoryContent'
 import { ChoiceSlots } from './ChoiceSlots'
 import { NodeReactions } from './NodeReactions'
 import { SaveSlotPicker, loadSaveSlots, getActiveSlotId, upsertSaveSlot } from './SaveSlotPicker'
 import { SharePathButton } from './SharePathButton'
 import { BookmarkButton } from './BookmarkButton'
+import { GalleryButton } from './GalleryButton'
 import { AmbientBackground } from './AmbientBackground'
 import { JourneyMap } from './JourneyMap'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useAuth } from '@/components/Providers'
 import { CreatorResourceManager } from '@/lib/creator-resources'
-import { playPageTurn, isPageSoundMuted, setPageSoundMuted } from '@/lib/page-sound'
+import {
+  playPageTurn,
+  isPageSoundMuted,
+  setPageSoundMuted,
+  startAmbient,
+  stopAmbient,
+  isAmbientOn,
+  setAmbientOn,
+} from '@/lib/page-sound'
 import type { Story, StoryNode, ChoiceSlot, ChoiceEffect, SaveSlot } from '@/types'
+
+interface DiscoveredEnding {
+  id: string
+  excerpt: string
+}
+
+const ENDINGS_KEY = (storyId: string) => `cyoa:endings:${storyId}`
+
+function loadDiscoveredEndings(storyId: string): DiscoveredEnding[] {
+  try {
+    return JSON.parse(localStorage.getItem(ENDINGS_KEY(storyId)) || '[]')
+  } catch {
+    return []
+  }
+}
+
+// A page with no onward navigable path is an ending / story frontier.
+function isEndingNode(n: StoryNode): boolean {
+  return !n.slots.some((s) => s.filled && s.childNodeId)
+}
 
 // ── Page theme palette ─────────────────────────────────────────────────────────
 const PAGE_PALETTES: Record<string, { bg: string; text: string; spine: string }> = {
@@ -31,6 +61,7 @@ const PAGE_PALETTES: Record<string, { bg: string; text: string; spine: string }>
 interface Props {
   story: Story
   initialNode: StoryNode
+  endingCount?: number
 }
 
 type Direction = 'forward' | 'back'
@@ -87,7 +118,7 @@ function saveLocalProgress(
   } catch {}
 }
 
-export function BookViewer({ story, initialNode }: Props) {
+export function BookViewer({ story, initialNode, endingCount }: Props) {
   const { user } = useAuth()
   const [node, setNode] = useState<StoryNode>(initialNode)
   const [history, setHistory] = useState<StoryNode[]>([])
@@ -99,7 +130,44 @@ export function BookViewer({ story, initialNode }: Props) {
   const [activeSlotId, setActiveSlotId] = useState<string | null>(null)
   // Lazy init reads the saved preference once; BookViewer is client-only (ssr:false).
   const [soundOn, setSoundOn] = useState(() => !isPageSoundMuted())
+  const [ambientOn, setAmbientState] = useState(() => isAmbientOn())
+  const [discoveredEndings, setDiscoveredEndings] = useState<DiscoveredEnding[]>(() =>
+    loadDiscoveredEndings(story.id),
+  )
+  const [endingsOpen, setEndingsOpen] = useState(false)
+  const [castOpen, setCastOpen] = useState(false)
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const hasCast = !!story.protagonist?.name || (story.characters?.length ?? 0) > 0
+
+  const ambientEffect = story.readingTheme?.ambientEffect ?? 'none'
+
+  // Start/stop the looping soundscape with the toggle (and clean up on unmount).
+  useEffect(() => {
+    if (ambientOn && ambientEffect !== 'none') startAmbient(ambientEffect)
+    return () => stopAmbient()
+  }, [ambientOn, ambientEffect])
+
+  function toggleAmbient() {
+    setAmbientState((on) => {
+      const next = !on
+      setAmbientOn(next)
+      return next
+    })
+  }
+
+  // Record reaching an ending/frontier (deduped, persisted) and celebrate it.
+  function recordEnding(n: StoryNode) {
+    if (!isEndingNode(n)) return
+    const prev = loadDiscoveredEndings(story.id)
+    if (prev.some((e) => e.id === n.id)) return
+    const next = [...prev, { id: n.id, excerpt: (n.content || '').slice(0, 140) }]
+    try {
+      localStorage.setItem(ENDINGS_KEY(story.id), JSON.stringify(next))
+    } catch {}
+    setDiscoveredEndings(next)
+    toast.success(endingCount ? `Ending discovered! (${next.length}/${endingCount})` : 'Ending discovered!')
+  }
 
   function toggleSound() {
     setSoundOn((on) => {
@@ -199,6 +267,7 @@ export function BookViewer({ story, initialNode }: Props) {
       }))
       setHistory(historyNodes)
       setNode(data.node)
+      recordEnding(data.node)
     } catch {}
   }
 
@@ -267,6 +336,7 @@ export function BookViewer({ story, initialNode }: Props) {
         return next
       })
       setNode(data.node)
+      recordEnding(data.node)
     } catch {
       toast.error('Could not load that path.')
     } finally {
@@ -349,7 +419,6 @@ export function BookViewer({ story, initialNode }: Props) {
 
   const pageNumber = history.length + 1
   const palette = PAGE_PALETTES[story.readingTheme?.pageStyle ?? 'parchment'] ?? PAGE_PALETTES.parchment
-  const ambientEffect = story.readingTheme?.ambientEffect ?? 'none'
 
   return (
     <div className="flex flex-col items-center gap-5 w-full max-w-4xl mx-auto">
@@ -410,6 +479,39 @@ export function BookViewer({ story, initialNode }: Props) {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setEndingsOpen(true)}
+            title="Endings discovered"
+            aria-label="Endings discovered"
+            className="flex items-center gap-1 h-8 px-2 rounded-full text-amber-400/55 hover:text-amber-300 transition-colors text-xs font-sans"
+          >
+            <Trophy className="h-3.5 w-3.5" />
+            {discoveredEndings.length}
+            {endingCount ? `/${endingCount}` : ''}
+          </button>
+          {hasCast && (
+            <button
+              onClick={() => setCastOpen(true)}
+              title="Cast of characters"
+              aria-label="Cast of characters"
+              className="flex items-center justify-center h-8 w-8 rounded-full text-amber-400/50 hover:text-amber-300 transition-colors"
+            >
+              <Users className="h-4 w-4" />
+            </button>
+          )}
+          <GalleryButton storyId={story.id} />
+          {ambientEffect !== 'none' && (
+            <button
+              onClick={toggleAmbient}
+              title={ambientOn ? 'Turn off ambient sound' : 'Turn on ambient sound'}
+              aria-label={ambientOn ? 'Turn off ambient sound' : 'Turn on ambient sound'}
+              className={`flex items-center justify-center h-8 w-8 rounded-full transition-colors ${
+                ambientOn ? 'text-amber-300' : 'text-amber-400/40 hover:text-amber-300'
+              }`}
+            >
+              <Waves className="h-4 w-4" />
+            </button>
+          )}
           <button
             onClick={toggleSound}
             title={soundOn ? 'Mute page-turn sound' : 'Unmute page-turn sound'}
@@ -524,7 +626,93 @@ export function BookViewer({ story, initialNode }: Props) {
       <p className="text-[11px] text-muted-foreground/30 font-sans tracking-wide">
         {story.title} · {story.authorName} · {story.nodeCount}{' '}
         {story.nodeCount === 1 ? 'chapter' : 'chapters'}
+        {story.protagonist?.name ? ` · playing as ${story.protagonist.name}` : ''}
       </p>
+
+      <Dialog open={castOpen} onOpenChange={setCastOpen}>
+        <DialogContent className="glass-strong border-white/15 sm:max-w-[460px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="gold-text text-lg flex items-center gap-2">
+              <Users className="h-4 w-4 text-amber-400" />
+              Cast
+            </DialogTitle>
+          </DialogHeader>
+          {story.protagonist?.name && (
+            <div className="glass-card rounded-lg p-3 border border-amber-500/20">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] uppercase tracking-widest text-amber-400/55 font-sans">
+                  Protagonist
+                </span>
+                <span className="text-sm font-semibold text-foreground/85">
+                  {story.protagonist.name}
+                </span>
+              </div>
+              {story.protagonist.description && (
+                <p className="text-xs text-muted-foreground/55 mt-1">{story.protagonist.description}</p>
+              )}
+            </div>
+          )}
+          {story.characters && story.characters.length > 0 ? (
+            <ul className="space-y-2">
+              {story.characters.map((c) => (
+                <li key={c.name} className="glass-card rounded-lg p-3 border border-white/[0.07]">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium text-foreground/80">{c.name}</span>
+                    {c.status && c.status !== 'alive' && (
+                      <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded border border-white/10 text-muted-foreground/45">
+                        {c.status}
+                      </span>
+                    )}
+                  </div>
+                  {c.description && (
+                    <p className="text-xs text-muted-foreground/55 mt-1">{c.description}</p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground/50 py-2">
+              The cast will grow here as the story introduces new characters.
+            </p>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={endingsOpen} onOpenChange={setEndingsOpen}>
+        <DialogContent className="glass-strong border-white/15 sm:max-w-[480px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="gold-text text-lg flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-amber-400" />
+              Endings discovered
+              {endingCount ? ` — ${discoveredEndings.length}/${endingCount}` : ''}
+            </DialogTitle>
+          </DialogHeader>
+
+          {discoveredEndings.length === 0 ? (
+            <p className="text-sm text-muted-foreground/55 py-4">
+              You haven&apos;t reached an ending yet. Follow the paths to their conclusions — each
+              one you find is recorded here.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {discoveredEndings.map((e, i) => (
+                <li key={e.id} className="glass-card rounded-lg p-3 border border-white/[0.07]">
+                  <span className="text-[10px] uppercase tracking-widest text-amber-400/45 font-sans">
+                    Ending {i + 1}
+                  </span>
+                  <p className="text-sm text-foreground/75 leading-snug mt-1">{e.excerpt}…</p>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {endingCount != null && endingCount > discoveredEndings.length && (
+            <p className="text-[11px] text-muted-foreground/40 font-sans text-center pt-1">
+              {endingCount - discoveredEndings.length} more waiting to be found.
+            </p>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

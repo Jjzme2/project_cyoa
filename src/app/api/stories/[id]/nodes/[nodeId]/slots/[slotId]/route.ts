@@ -16,6 +16,8 @@ import {
   getStoryPath,
   createNotification,
   checkAndAwardAchievements,
+  addStoryCharacters,
+  settleBountyOnFill,
 } from '@/lib/firestore-helpers'
 import { CreditManager } from '@/lib/credit-manager'
 import { generateStoryNode, generateStoryImage, PromptRejectedError } from '@/lib/ai'
@@ -121,15 +123,20 @@ export async function POST(
       return NextResponse.json({ error: 'World not found' }, { status: 404 })
     }
 
+    // The story's rating is the effective ceiling (it's clamped to its world).
+    const effectiveRating = story.rating ?? world.rating ?? 'Mature'
     const worldCtx = {
       name: world.name,
       description: world.description,
       lore: world.lore,
       rules: world.rules,
       tone: world.tone,
+      rating: effectiveRating,
+      protagonist: story.protagonist,
+      characters: story.characters,
     }
 
-    const { content, choices, model } = await generateStoryNode(
+    const { content, choices, model, newCharacters } = await generateStoryNode(
       worldCtx,
       storyPath,
       promptText,
@@ -140,7 +147,7 @@ export async function POST(
     // Moderate the generated prose. Hard-refuse disallowed content (release the
     // lock + refund); flag borderline content so the route is stored but hidden
     // from readers until an admin approves it.
-    const verdict = moderateText(content)
+    const verdict = moderateText(content, effectiveRating)
     if (verdict.action === 'refuse') {
       await Promise.all([
         releaseChoiceSlot(storyId, nodeId, slotId),
@@ -199,6 +206,14 @@ export async function POST(
     }
     await Promise.all(patchOps)
 
+    // Settle any bounty on this slot: pay the filler if published, defer if
+    // flagged, refund if they filled their own. (Money path — kept in-request.)
+    if (slot.bounty && slot.bounty.status === 'open') {
+      await settleBountyOnFill(storyId, nodeId, slotId, uid, newNodeId, !pendingReview).catch((e) =>
+        console.error('[bounty settle] failed:', e),
+      )
+    }
+
     revalidateTag(`node-${storyId}-${nodeId}`, 'max')
     revalidateTag(`story-${storyId}`, 'max')
     revalidateTag('stories', 'max')
@@ -207,6 +222,10 @@ export async function POST(
     after(async () => {
       const ops: Promise<unknown>[] = [checkAndAwardAchievements(uid, 'contribution')]
       if (includeImage && imageUrl) ops.push(checkAndAwardAchievements(uid, 'illustration'))
+      // Record any new canon characters the AI introduced this chapter.
+      if (newCharacters && newCharacters.length > 0) {
+        ops.push(addStoryCharacters(storyId, newCharacters))
+      }
       // Don't notify the author about a contribution that's hidden pending review.
       if (!pendingReview && story.authorId && story.authorId !== uid) {
         ops.push(

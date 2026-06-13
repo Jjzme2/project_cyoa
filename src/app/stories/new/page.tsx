@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/components/Providers'
 import { STORY_TAGS, CONTENT_RATINGS, CONTENT_RATING_META, DEFAULT_CONTENT_RATING } from '@/types'
+import { ratingRank } from '@/lib/ratings'
 import { CoverDesigner, DEFAULT_COVER } from '@/components/book/CoverDesigner'
 import type { World, CoverTheme, ReadingTheme, PageStyle, AmbientEffect, ContentRating } from '@/types'
 
@@ -43,6 +44,8 @@ export default function NewStoryPage() {
   const [description, setDescription] = useState('')
   const [worldId, setWorldId] = useState('')
   const [rating, setRating] = useState<ContentRating>(DEFAULT_CONTENT_RATING)
+  const [protagonistName, setProtagonistName] = useState('')
+  const [protagonistDesc, setProtagonistDesc] = useState('')
   const [opening, setOpening] = useState('')
   const [choice1, setChoice1] = useState('')
   const [choice2, setChoice2] = useState('')
@@ -132,6 +135,9 @@ export default function NewStoryPage() {
           worldId,
           worldName: selectedWorld.name,
           rating,
+          protagonist: protagonistName.trim()
+            ? { name: protagonistName.trim(), description: protagonistDesc.trim() }
+            : undefined,
           published: true,
           coverGradient: null,
           resources: formattedResources,
@@ -196,6 +202,12 @@ export default function NewStoryPage() {
       </main>
     )
   }
+
+  // A story can't be rated more mature than its world.
+  const worldRating = worlds.find((w) => w.id === worldId)?.rating
+  const allowedRatings = worldRating
+    ? CONTENT_RATINGS.filter((r) => ratingRank(r) <= ratingRank(worldRating))
+    : CONTENT_RATINGS
 
   return (
     <main className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
@@ -301,15 +313,41 @@ export default function NewStoryPage() {
               onChange={(e) => setRating(e.target.value as ContentRating)}
               className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             >
-              {CONTENT_RATINGS.map((r) => (
+              {allowedRatings.map((r) => (
                 <option key={r} value={r} className="bg-background">
                   {r} ({CONTENT_RATING_META[r].abbr})
                 </option>
               ))}
             </select>
             <p className="text-[11px] text-muted-foreground/45">
-              {CONTENT_RATING_META[rating].description} Defaults to the world&apos;s rating; a
-              moderator may adjust it.
+              {CONTENT_RATING_META[rating].description}{' '}
+              {worldRating
+                ? `Can't exceed the world's ${worldRating} rating.`
+                : 'Defaults to the world’s rating; a moderator may adjust it.'}
+            </p>
+          </div>
+
+          <div className="space-y-2 border-t border-white/[0.06] pt-5">
+            <Label htmlFor="protagonist">
+              Protagonist{' '}
+              <span className="text-muted-foreground/35 font-normal text-xs">(optional)</span>
+            </Label>
+            <Input
+              id="protagonist"
+              placeholder="Who does the reader play as? e.g. Elara, a cautious thief"
+              value={protagonistName}
+              onChange={(e) => setProtagonistName(e.target.value)}
+            />
+            {protagonistName.trim() && (
+              <Input
+                placeholder="A short description the AI should keep consistent (optional)"
+                value={protagonistDesc}
+                onChange={(e) => setProtagonistDesc(e.target.value)}
+              />
+            )}
+            <p className="text-[11px] text-muted-foreground/45">
+              The AI writes the story around this character by name. The rest of the cast emerges
+              as your story grows.
             </p>
           </div>
 

@@ -130,6 +130,44 @@ export class CreditManager {
   }
 
   /**
+   * Grants purchased credits WITHOUT counting them as a lifetime purchase.
+   * Used for transfers (e.g. bounty payouts), so they don't inflate
+   * purchase-based metrics.
+   */
+  public static async grantCredits(userId: string, amount: number) {
+    if (amount <= 0) return
+    const ref = adminDb.collection('userSettings').doc(userId)
+    await ref.set(
+      { purchasedCredits: FieldValue.increment(amount), updatedAt: new Date().toISOString() },
+      { merge: true },
+    )
+  }
+
+  /**
+   * Escrow hold for a bounty: atomically removes `amount` purchased credits from
+   * the poster if they can afford it. Daily credits are never used (they reset).
+   * Returns false if the balance is insufficient.
+   */
+  public static async holdPurchased(userId: string, amount: number): Promise<boolean> {
+    if (amount <= 0) return false
+    const ref = adminDb.collection('userSettings').doc(userId)
+    let ok = false
+    await adminDb.runTransaction(async (txn) => {
+      const doc = await txn.get(ref)
+      const current = (doc.exists ? doc.data()?.purchasedCredits : 0) ?? 0
+      if (current >= amount) {
+        ok = true
+        txn.set(
+          ref,
+          { purchasedCredits: FieldValue.increment(-amount), updatedAt: new Date().toISOString() },
+          { merge: true },
+        )
+      }
+    })
+    return ok
+  }
+
+  /**
    * Refunds credits to a user.
    * If source is 'purchased', refunds to their Firestore balance.
    * Otherwise, refunds to their Redis daily rate limit count.

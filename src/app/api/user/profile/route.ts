@@ -3,6 +3,7 @@ import { adminAuth, adminDb } from '@/lib/firebase-admin'
 import { CreditManager } from '@/lib/credit-manager'
 import { StripeService, isStripeMocked } from '@/lib/stripe'
 import { ageFromDob, MIN_SITE_AGE } from '@/lib/ratings'
+import { getAuthoredPathStats } from '@/lib/firestore-helpers'
 import { UserProfile } from '@/types'
 
 /**
@@ -32,8 +33,11 @@ export async function GET(req: NextRequest) {
       ...settingsData,
     })
 
-    // Get credits breakdown
-    const credits = await CreditManager.getCreditsInfo(uid, profile.tier)
+    // Get credits breakdown + writer reputation stats (best-effort)
+    const [credits, pathStats] = await Promise.all([
+      CreditManager.getCreditsInfo(uid, profile.tier),
+      getAuthoredPathStats(uid).catch(() => ({ pathsWritten: 0, totalReads: 0, totalLoves: 0 })),
+    ])
 
     // Fetch user's authored stories and worlds from Firestore collections
     const [storiesSnap, worldsSnap] = await Promise.all([
@@ -65,6 +69,7 @@ export async function GET(req: NextRequest) {
       isStripeMocked,
       stories,
       worlds,
+      pathStats,
     })
   } catch (err) {
     console.error('[User Profile GET error]:', err)

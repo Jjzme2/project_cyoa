@@ -7,9 +7,19 @@ import { GatedStoryReader } from '@/components/book/GatedStoryReader'
 import { StoryRatingControl } from '@/components/story/StoryRatingControl'
 import { SeededBadge } from '@/components/ContentBadges'
 import { Skeleton } from '@/components/ui/skeleton'
-import { getStory, getStoryNode, incrementStoryViews } from '@/lib/firestore-helpers'
+import { getStory, getStoryNode, getStoryTree, incrementStoryViews } from '@/lib/firestore-helpers'
 import { ratingRank } from '@/lib/ratings'
 import { APP_CONFIG } from '@/lib/config'
+import type { StoryTreeNode } from '@/types'
+
+function countEndings(nodes: StoryTreeNode[]): number {
+  let count = 0
+  for (const n of nodes) {
+    if (!n.children || n.children.length === 0) count++
+    else count += countEndings(n.children)
+  }
+  return count
+}
 
 interface Props {
   params: Promise<{ id: string }>
@@ -40,10 +50,13 @@ async function StoryContent({ params }: { params: Promise<{ id: string }> }) {
   // Teen/Mature stories are never rendered on the server; the client gate
   // resolves the viewer's age first (see GatedStoryReader).
   const gated = ratingRank(story.rating) > 0
-  const rootNode =
+  const [rootNode, tree] = await Promise.all([
     !gated && story.rootNodeId
-      ? await getStoryNode(id, story.rootNodeId).catch(() => null)
-      : null
+      ? getStoryNode(id, story.rootNodeId).catch(() => null)
+      : Promise.resolve(null),
+    getStoryTree(id).catch(() => []),
+  ])
+  const endingCount = countEndings(tree)
 
   after(() => incrementStoryViews(id).catch(() => {}))
 
@@ -65,9 +78,9 @@ async function StoryContent({ params }: { params: Promise<{ id: string }> }) {
       </div>
 
       {gated ? (
-        <GatedStoryReader story={story} />
+        <GatedStoryReader story={story} endingCount={endingCount} />
       ) : rootNode ? (
-        <BookViewerClient story={story} initialNode={rootNode} />
+        <BookViewerClient story={story} initialNode={rootNode} endingCount={endingCount} />
       ) : (
         <div className="glass-card rounded-2xl p-14 text-center">
           <p className="text-muted-foreground/45 text-sm">

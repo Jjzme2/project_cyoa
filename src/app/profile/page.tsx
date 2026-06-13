@@ -268,7 +268,7 @@ function ProfileContent() {
     )
   }
 
-  const { profile, credits, isStripeMocked, stories = [], worlds = [] } = profileData || {}
+  const { profile, credits, isStripeMocked, stories = [], worlds = [], pathStats } = profileData || {}
   const initials = user.displayName?.split(' ').map(n => n[0]).join('').slice(0, 2) ?? 'U'
 
   return (
@@ -490,6 +490,32 @@ function ProfileContent() {
                 Stripe secret keys are not configured. Click any pricing button above to instantly execute simulated mock checkout credits/membership modifications locally.
               </p>
             </div>
+          </div>
+        </section>
+      )}
+
+      {/* Writer reputation — reads & reactions across paths this user has authored */}
+      {pathStats && (
+        <section className="glass border-white/10 p-6 rounded-xl space-y-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-amber-400/70" />
+            <h2 className="text-sm font-semibold text-amber-200/90">Your storytelling</h2>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { label: 'Paths written', value: pathStats.pathsWritten ?? 0 },
+              { label: 'Total reads', value: pathStats.totalReads ?? 0 },
+              { label: 'Reactions earned', value: pathStats.totalLoves ?? 0 },
+            ].map((stat) => (
+              <div key={stat.label} className="text-center">
+                <div className="text-2xl font-bold gold-text">
+                  {Number(stat.value).toLocaleString()}
+                </div>
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground/45 font-sans mt-0.5">
+                  {stat.label}
+                </div>
+              </div>
+            ))}
           </div>
         </section>
       )}

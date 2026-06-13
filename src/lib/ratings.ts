@@ -52,3 +52,8 @@ export function allowedRankForAge(age: number | null): number {
 export function canView(rating: ContentRating | undefined, allowedRank: number): boolean {
   return ratingRank(rating) <= allowedRank
 }
+
+/** Clamp a requested rating down to a ceiling (e.g. a story to its world). */
+export function clampRating(requested: ContentRating, ceiling: ContentRating): ContentRating {
+  return ratingRank(requested) > ratingRank(ceiling) ? ceiling : requested
+}
