@@ -2,6 +2,7 @@ import { generateText, APICallError } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { put } from '@vercel/blob'
 import { StoryPathSegment } from '@/types'
+import type { ContentRating } from '@/types'
 
 const PRIMARY_MODEL = 'google/gemini-2.5-pro'
 const OPENROUTER_MODEL = 'google/gemma-4-31b-it:free'
@@ -13,6 +14,18 @@ interface WorldContext {
   lore: string
   rules: string
   tone: string
+  rating?: ContentRating
+}
+
+function ratingGuidance(rating: ContentRating | undefined): string {
+  switch (rating) {
+    case 'Everyone':
+      return 'CONTENT RATING: EVERYONE — Keep it wholesome and suitable for all ages. No violence, gore, weapons used to harm, profanity, sexual or suggestive content, or frightening/horror themes. Resolve conflict through cleverness and kindness.'
+    case 'Teen':
+      return 'CONTENT RATING: TEEN — Mild action, peril, and mild language are acceptable. No graphic gore, explicit or suggestive sexual content, or strong profanity.'
+    default:
+      return 'CONTENT RATING: MATURE — Mature themes are acceptable. Never write sexual content involving minors, hateful slurs, or real-world instructions for serious harm.'
+  }
 }
 
 function buildPrompt(
@@ -49,6 +62,8 @@ WORLD RULES: ${world.rules}
 
 TONE: ${world.tone}
 
+${ratingGuidance(world.rating)}
+
 STORY PATH SO FAR:
 ${pathContent}
 
@@ -56,6 +71,7 @@ THE READER CHOSE: "${choiceText}"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 1 — VALIDATE the reader's choice against ALL of these criteria:
+• Respects the CONTENT RATING above — does not introduce content too mature for it
 • No profanity, slurs, or explicit sexual/graphic content
 • Fits the world's established tone, lore, and rules — does not contradict them
 • Makes narrative sense given the preceding story path so far — maintains continuity of character identities, locations, inventory/stats, and past events
@@ -68,6 +84,7 @@ REJECTED: [one sentence explaining why it was rejected]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 2 — If the choice passes validation, write the next chapter. It MUST follow these rules strictly:
 - Flow naturally from the preceding story path and the reader's choice
+- Stay strictly within the CONTENT RATING above
 - Match the world's tone and rules exactly
 - Maintain complete continuity of characters, setting, and plot points established in the path
 - End at a moment of decision or tension

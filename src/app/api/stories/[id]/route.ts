@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidateTag } from 'next/cache'
 import { getAuthContext } from '@/lib/auth'
-import { ratingRank } from '@/lib/ratings'
-import { getStory, getStoryNode, incrementStoryViews, updateStoryRating } from '@/lib/firestore-helpers'
+import { ratingRank, clampRating } from '@/lib/ratings'
+import { getStory, getStoryNode, getWorld, incrementStoryViews, updateStoryRating } from '@/lib/firestore-helpers'
 import { CONTENT_RATINGS } from '@/types'
 import type { ContentRating } from '@/types'
 
@@ -50,11 +50,20 @@ export async function PATCH(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  // A story can't be rated more mature than its world.
+  const world = await getWorld(story.worldId).catch(() => null)
+  const finalRating = world?.rating ? clampRating(rating, world.rating) : rating
+
   const override = auth.isAdmin && !isOwner
-  await updateStoryRating(id, rating, auth.uid, override)
+  await updateStoryRating(id, finalRating, auth.uid, override)
 
   revalidateTag('stories', 'max')
   revalidateTag(`story-${id}`, 'max')
 
-  return NextResponse.json({ ok: true, rating, overridden: override })
+  return NextResponse.json({
+    ok: true,
+    rating: finalRating,
+    overridden: override,
+    clamped: finalRating !== rating,
+  })
 }

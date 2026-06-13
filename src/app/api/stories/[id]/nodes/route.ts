@@ -61,8 +61,9 @@ export async function POST(
 
   if (!content) return NextResponse.json({ error: 'Content required' }, { status: 400 })
 
-  // Guideline check: hard-refuse disallowed content, flag borderline for review.
-  const verdict = moderateText(content)
+  // Guideline check: rating-aware — hard-refuse disallowed content, flag
+  // content that exceeds the story's rating, otherwise approve.
+  const verdict = moderateText(content, story.rating ?? 'Mature')
   if (verdict.action === 'refuse') {
     return NextResponse.json(
       { error: verdict.reason ?? 'This content violates the community guidelines.' },

@@ -1,14 +1,15 @@
-import type { NodeModeration } from '@/types'
+import type { ContentRating, NodeModeration } from '@/types'
+import { ratingRank } from './ratings'
 
 /**
- * Rules-based content moderation for community-submitted routes.
+ * Rules-based, rating-aware content moderation for community-submitted routes.
  *
- * Deterministic and dependency-free: clearly-disallowed content is hard
- * `refuse`d (never stored), borderline content is `flag`ged for admin review
- * (stored but hidden from readers), and everything else is `allow`ed.
- *
- * This complements `validate.ts`, which handles length and 4th-wall checks on
- * the raw user prompt; this module classifies the resulting prose content.
+ * Deterministic and dependency-free. Some content is always refused (slurs,
+ * sexual content involving minors, mass-harm instructions). Everything else is
+ * judged against the story's content rating: violence, profanity, sexual or
+ * frightening themes that are fine in a Mature story are flagged for review —
+ * or refused outright — in an Everyone-rated one. So an Everyone world stays
+ * wholesome, while a Mature world allows mature themes.
  */
 
 export type ModerationAction = 'allow' | 'flag' | 'refuse'
@@ -19,96 +20,154 @@ export interface ModerationResult {
   reason?: string
 }
 
-export interface Guideline {
+interface Guideline {
   category: string
-  severity: 'refuse' | 'flag'
   pattern: RegExp
+  /** Lowest content rating at which this content is allowed without review. */
+  minRating: ContentRating
+  /** Absolute prohibition — refused at every rating. */
+  hardRefuse?: boolean
+  /** Flag for review even when within an allowed-rating context. */
+  reviewWhenAllowed?: boolean
   reason: string
 }
 
-// Hard-refused: never stored, submission is rejected outright.
-const REFUSE_GUIDELINES: Guideline[] = [
+const GUIDELINES: Guideline[] = [
+  // ── Absolute prohibitions (refused at any rating) ──────────────────────────
   {
     category: 'hate',
-    severity: 'refuse',
     pattern: /\b(nigger|nigga|faggot|chink|spic|kike|tranny|wetback)\b/i,
-    reason: 'Hate speech and slurs are not permitted.',
+    minRating: 'Mature',
+    hardRefuse: true,
+    reason: 'Hate speech and slurs are not permitted',
   },
   {
     category: 'csae',
-    severity: 'refuse',
-    // Sexual context within close proximity of a minor reference, in either order.
     pattern:
       /\b(child|children|minor|underage|preteen|pre-teen|kid|kids|toddler|little (?:boy|girl))\b[^.?!]{0,48}\b(sex|sexual|naked|nude|porn|fondl\w*|molest\w*|rape|raping)\b|\b(sex|sexual|naked|nude|porn|fondl\w*|molest\w*|rape|raping)\b[^.?!]{0,48}\b(child|children|minor|underage|preteen|pre-teen|kid|kids|toddler|little (?:boy|girl))\b/i,
-    reason: 'Sexual content involving minors is strictly prohibited.',
+    minRating: 'Mature',
+    hardRefuse: true,
+    reason: 'Sexual content involving minors is strictly prohibited',
   },
   {
     category: 'mass-harm',
-    severity: 'refuse',
     pattern:
       /\b(how to|step[- ]by[- ]step|instructions? (?:to|for))\b[^.?!]{0,40}\b(bomb|explosive|nerve agent|bioweapon|biological weapon|chemical weapon|sarin|anthrax)\b/i,
-    reason: 'Instructions for weapons of mass harm are not permitted.',
+    minRating: 'Mature',
+    hardRefuse: true,
+    reason: 'Instructions for weapons of mass harm are not permitted',
   },
-]
 
-// Flagged for review: stored but hidden from readers until an admin approves.
-const FLAG_GUIDELINES: Guideline[] = [
-  {
-    category: 'sexual',
-    severity: 'flag',
-    pattern: /\b(explicit sex|hardcore|cumming|blowjob|pornographic|genitals?|erotica?|orgasm)\b/i,
-    reason: 'Possible explicit sexual content — needs review.',
-  },
+  // ── Rating-graded content ──────────────────────────────────────────────────
   {
     category: 'graphic-violence',
-    severity: 'flag',
     pattern: /\b(gore|disembowel\w*|decapitat\w*|mutilat\w*|torture|dismember\w*|eviscerat\w*)\b/i,
-    reason: 'Graphic violence — needs review.',
+    minRating: 'Mature',
+    reviewWhenAllowed: true,
+    reason: 'Graphic violence',
+  },
+  {
+    category: 'violence',
+    pattern:
+      /\b(kill|killed|killing|stab|stabbed|murder\w*|slay|slain|behead\w*|assault|gunshot|gun|shoot|shot|wound\w*|bleeding|sword|dagger|blade|fight|battle|corpse)\b/i,
+    minRating: 'Teen',
+    reason: 'Violence',
+  },
+  {
+    category: 'explicit-sexual',
+    pattern: /\b(explicit sex|hardcore|cumming|blowjob|pornographic|genitals?|erotica?|orgasm)\b/i,
+    minRating: 'Mature',
+    reviewWhenAllowed: true,
+    reason: 'Explicit sexual content',
+  },
+  {
+    category: 'suggestive',
+    pattern: /\b(seduce\w*|naked|nude|lust\w*|aroused|undress\w*|making out|in bed together)\b/i,
+    minRating: 'Teen',
+    reason: 'Suggestive content',
+  },
+  {
+    category: 'strong-profanity',
+    pattern: /\b(fuck\w*|cunt|motherfucker|fuckface)\b/i,
+    minRating: 'Mature',
+    reason: 'Strong profanity',
+  },
+  {
+    category: 'mild-profanity',
+    pattern: /\b(damn|hell|crap|arse|ass|bastard|bloody|bitch)\b/i,
+    minRating: 'Teen',
+    reason: 'Mild profanity',
   },
   {
     category: 'self-harm',
-    severity: 'flag',
     pattern: /\b(suicide|kill (?:myself|yourself)|self[- ]harm|cut myself|hang myself)\b/i,
-    reason: 'Self-harm theme — needs review.',
+    minRating: 'Mature',
+    reviewWhenAllowed: true,
+    reason: 'Self-harm theme',
   },
   {
-    category: 'profanity',
-    severity: 'flag',
-    pattern: /\b(motherfucker|cunt|fuckface)\b/i,
-    reason: 'Strong profanity — needs review.',
+    category: 'frightening',
+    pattern: /\b(terror|terrifying|nightmare|haunt\w*|demon\w*|horror|gruesome|monstrous|gory)\b/i,
+    minRating: 'Teen',
+    reason: 'Frightening themes',
   },
 ]
 
-export const CONTENT_GUIDELINES: Guideline[] = [...REFUSE_GUIDELINES, ...FLAG_GUIDELINES]
+export const CONTENT_GUIDELINES: Guideline[] = GUIDELINES
 
-export function moderateText(text: string): ModerationResult {
+function dedupe(list: Guideline[]): string[] {
+  return [...new Set(list.map((g) => g.category))]
+}
+
+/**
+ * Moderate text within a content-rating context. Defaults to `Mature` (most
+ * permissive) when no rating is supplied.
+ */
+export function moderateText(text: string, contextRating: ContentRating = 'Mature'): ModerationResult {
   const input = text ?? ''
+  const matches = GUIDELINES.filter((g) => g.pattern.test(input))
+  if (matches.length === 0) return { action: 'allow', categories: [] }
 
-  const refuseHits = REFUSE_GUIDELINES.filter((g) => g.pattern.test(input))
-  if (refuseHits.length > 0) {
+  // Absolute prohibitions always refuse.
+  const hard = matches.filter((m) => m.hardRefuse)
+  if (hard.length > 0) {
+    return { action: 'refuse', categories: dedupe(hard), reason: `${hard[0].reason}.` }
+  }
+
+  const ctx = ratingRank(contextRating)
+
+  // Content more mature than the story's rating allows.
+  const exceeding = matches.filter((m) => ratingRank(m.minRating) > ctx)
+  if (exceeding.length > 0) {
+    const gap = Math.max(...exceeding.map((m) => ratingRank(m.minRating) - ctx))
+    const cats = dedupe(exceeding)
+    if (gap >= 2) {
+      // e.g. graphic violence / explicit content in an Everyone-rated story.
+      return {
+        action: 'refuse',
+        categories: cats,
+        reason: `${exceeding[0].reason} is not allowed in a ${contextRating}-rated story.`,
+      }
+    }
     return {
-      action: 'refuse',
-      categories: [...new Set(refuseHits.map((g) => g.category))],
-      reason: refuseHits[0].reason,
+      action: 'flag',
+      categories: cats,
+      reason: `${exceeding[0].reason} exceeds this story's ${contextRating} rating — held for review.`,
     }
   }
 
-  const flagHits = FLAG_GUIDELINES.filter((g) => g.pattern.test(input))
-  if (flagHits.length > 0) {
-    return {
-      action: 'flag',
-      categories: [...new Set(flagHits.map((g) => g.category))],
-      reason: flagHits[0].reason,
-    }
+  // Within the allowed rating, but some categories always warrant review.
+  const review = matches.filter((m) => m.reviewWhenAllowed)
+  if (review.length > 0) {
+    return { action: 'flag', categories: dedupe(review), reason: `${review[0].reason} — held for review.` }
   }
 
   return { action: 'allow', categories: [] }
 }
 
 /**
- * Translate a moderation result into the persisted node fields. `refuse` is
- * handled by the caller (the node is never created), so this only maps
- * `flag` → hidden+flagged and `allow` → published+approved.
+ * Translate a moderation result into persisted node fields. `refuse` is handled
+ * by the caller (the node is never created).
  */
 export function moderationToNodeFields(
   result: ModerationResult,

@@ -121,12 +121,15 @@ export async function POST(
       return NextResponse.json({ error: 'World not found' }, { status: 404 })
     }
 
+    // The story's rating is the effective ceiling (it's clamped to its world).
+    const effectiveRating = story.rating ?? world.rating ?? 'Mature'
     const worldCtx = {
       name: world.name,
       description: world.description,
       lore: world.lore,
       rules: world.rules,
       tone: world.tone,
+      rating: effectiveRating,
     }
 
     const { content, choices, model } = await generateStoryNode(
@@ -140,7 +143,7 @@ export async function POST(
     // Moderate the generated prose. Hard-refuse disallowed content (release the
     // lock + refund); flag borderline content so the route is stored but hidden
     // from readers until an admin approves it.
-    const verdict = moderateText(content)
+    const verdict = moderateText(content, effectiveRating)
     if (verdict.action === 'refuse') {
       await Promise.all([
         releaseChoiceSlot(storyId, nodeId, slotId),

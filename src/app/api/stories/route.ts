@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { after } from 'next/server'
 import { revalidateTag } from 'next/cache'
 import { adminAuth } from '@/lib/firebase-admin'
-import { getStories, createStory, checkAndAwardAchievements } from '@/lib/firestore-helpers'
+import { getStories, createStory, getWorld, checkAndAwardAchievements } from '@/lib/firestore-helpers'
+import { clampRating } from '@/lib/ratings'
 import { CONTENT_RATINGS, DEFAULT_CONTENT_RATING } from '@/types'
 import type { ContentRating } from '@/types'
 
@@ -33,9 +34,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  const safeRating: ContentRating = CONTENT_RATINGS.includes(rating)
+  const requestedRating: ContentRating = CONTENT_RATINGS.includes(rating)
     ? (rating as ContentRating)
     : DEFAULT_CONTENT_RATING
+
+  // A story can never be rated more mature than the world that contains it.
+  const world = await getWorld(worldId).catch(() => null)
+  const safeRating = world?.rating ? clampRating(requestedRating, world.rating) : requestedRating
 
   const id = await createStory({
     title,

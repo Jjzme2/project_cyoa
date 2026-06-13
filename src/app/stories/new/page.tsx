@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/components/Providers'
 import { STORY_TAGS, CONTENT_RATINGS, CONTENT_RATING_META, DEFAULT_CONTENT_RATING } from '@/types'
+import { ratingRank } from '@/lib/ratings'
 import { CoverDesigner, DEFAULT_COVER } from '@/components/book/CoverDesigner'
 import type { World, CoverTheme, ReadingTheme, PageStyle, AmbientEffect, ContentRating } from '@/types'
 
@@ -197,6 +198,12 @@ export default function NewStoryPage() {
     )
   }
 
+  // A story can't be rated more mature than its world.
+  const worldRating = worlds.find((w) => w.id === worldId)?.rating
+  const allowedRatings = worldRating
+    ? CONTENT_RATINGS.filter((r) => ratingRank(r) <= ratingRank(worldRating))
+    : CONTENT_RATINGS
+
   return (
     <main className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
       <div className="mb-8 space-y-1">
@@ -301,15 +308,17 @@ export default function NewStoryPage() {
               onChange={(e) => setRating(e.target.value as ContentRating)}
               className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             >
-              {CONTENT_RATINGS.map((r) => (
+              {allowedRatings.map((r) => (
                 <option key={r} value={r} className="bg-background">
                   {r} ({CONTENT_RATING_META[r].abbr})
                 </option>
               ))}
             </select>
             <p className="text-[11px] text-muted-foreground/45">
-              {CONTENT_RATING_META[rating].description} Defaults to the world&apos;s rating; a
-              moderator may adjust it.
+              {CONTENT_RATING_META[rating].description}{' '}
+              {worldRating
+                ? `Can't exceed the world's ${worldRating} rating.`
+                : 'Defaults to the world’s rating; a moderator may adjust it.'}
             </p>
           </div>
 

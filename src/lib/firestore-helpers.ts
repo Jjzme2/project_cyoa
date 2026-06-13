@@ -9,6 +9,7 @@ import type {
 import { ACHIEVEMENT_DEFS } from '@/types'
 import { FieldValue } from 'firebase-admin/firestore'
 import { decrypt } from './encrypt'
+import { ratingRank } from './ratings'
 
 // ─── Path helpers ─────────────────────────────────────────────────────────────
 
@@ -148,6 +149,25 @@ export async function updateWorldRating(
     // Track admin overrides so a creator can't silently undo a moderator's call.
     ratingOverriddenBy: override ? byUid : null,
   })
+}
+
+/**
+ * Clamp every story in a world down to the world's rating (used when a world's
+ * rating is lowered). Returns how many stories were adjusted.
+ */
+export async function clampStoriesToWorldRating(
+  worldId: string,
+  worldRating: ContentRating,
+): Promise<number> {
+  const stories = await getStoriesByWorld(worldId)
+  const ceiling = ratingRank(worldRating)
+  const over = stories.filter((s) => ratingRank(s.rating) > ceiling)
+  if (over.length === 0) return 0
+
+  const batch = adminDb.batch()
+  for (const s of over) batch.update(storyRef(s.id), { rating: worldRating })
+  await batch.commit()
+  return over.length
 }
 
 // ─── Story Nodes ──────────────────────────────────────────────────────────────
