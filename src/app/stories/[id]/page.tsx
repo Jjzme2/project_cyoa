@@ -5,6 +5,7 @@ import { after } from 'next/server'
 import { BookViewerClient } from '@/components/book/BookViewerClient'
 import { GatedStoryReader } from '@/components/book/GatedStoryReader'
 import { StoryRatingControl } from '@/components/story/StoryRatingControl'
+import { ReadTogetherButton } from '@/components/story/ReadTogetherButton'
 import { SeededBadge } from '@/components/ContentBadges'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getStory, getStoryNode, getStoryTree, incrementStoryViews } from '@/lib/firestore-helpers'
@@ -74,6 +75,7 @@ async function StoryContent({ params }: { params: Promise<{ id: string }> }) {
           <span className="text-xs text-muted-foreground/35 font-sans">by {story.authorName}</span>
           {story.seeded && <SeededBadge />}
           <StoryRatingControl storyId={story.id} authorId={story.authorId} rating={story.rating} />
+          <ReadTogetherButton storyId={story.id} />
         </div>
       </div>
 

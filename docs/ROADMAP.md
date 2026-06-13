@@ -54,7 +54,9 @@ GitHub trackers:
 ## 🔮 Planned
 
 ### Co-op live reading rooms — [#5](https://github.com/Jjzme2/project_cyoa/issues/5)
-Group reads a story together and votes on each choice; everyone advances in sync; pause-to-write at frontiers. Realtime via Firestore `onSnapshot` (reads) + Admin-SDK API (writes); read-only client rules. Decisions locked. To build as PR 1 (core) + PR 2 (polish). Needs 2-browser smoke testing.
+Group reads a story together and votes on each choice; everyone advances in sync; pause-to-write at frontiers. Realtime via Firestore `onSnapshot` (reads) + Admin-SDK API (writes); read-only client rules.
+- **PR 1 (core) — built**, pending: deploy `firestore.rules` (`firebase deploy --only firestore:rules`) and **2-browser smoke test** (create/join by link, vote, countdown resolve + sync advance, age-ineligible join). Create/join/vote/resolve/heartbeat/leave, live voting + countdown + presence, "Read together" entry.
+- **PR 2 (polish) — planned:** frontier write-pause, host kick, ended summary, stale-room cleanup.
 
 ### Global leaderboards
 Most-loved / most-traveled paths and top writers. Needs denormalized aggregate counters (beyond the per-node traversal/reaction counts already in place).
