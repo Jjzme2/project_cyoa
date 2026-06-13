@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
-import { ChevronLeft, Sparkles, Volume2, VolumeX, Waves, Trophy } from 'lucide-react'
+import { ChevronLeft, Sparkles, Volume2, VolumeX, Waves, Trophy, Users } from 'lucide-react'
 import { StoryContent } from './StoryContent'
 import { ChoiceSlots } from './ChoiceSlots'
 import { NodeReactions } from './NodeReactions'
@@ -135,7 +135,10 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
     loadDiscoveredEndings(story.id),
   )
   const [endingsOpen, setEndingsOpen] = useState(false)
+  const [castOpen, setCastOpen] = useState(false)
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const hasCast = !!story.protagonist?.name || (story.characters?.length ?? 0) > 0
 
   const ambientEffect = story.readingTheme?.ambientEffect ?? 'none'
 
@@ -486,6 +489,16 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
             {discoveredEndings.length}
             {endingCount ? `/${endingCount}` : ''}
           </button>
+          {hasCast && (
+            <button
+              onClick={() => setCastOpen(true)}
+              title="Cast of characters"
+              aria-label="Cast of characters"
+              className="flex items-center justify-center h-8 w-8 rounded-full text-amber-400/50 hover:text-amber-300 transition-colors"
+            >
+              <Users className="h-4 w-4" />
+            </button>
+          )}
           <GalleryButton storyId={story.id} />
           {ambientEffect !== 'none' && (
             <button
@@ -613,7 +626,57 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
       <p className="text-[11px] text-muted-foreground/30 font-sans tracking-wide">
         {story.title} · {story.authorName} · {story.nodeCount}{' '}
         {story.nodeCount === 1 ? 'chapter' : 'chapters'}
+        {story.protagonist?.name ? ` · playing as ${story.protagonist.name}` : ''}
       </p>
+
+      <Dialog open={castOpen} onOpenChange={setCastOpen}>
+        <DialogContent className="glass-strong border-white/15 sm:max-w-[460px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="gold-text text-lg flex items-center gap-2">
+              <Users className="h-4 w-4 text-amber-400" />
+              Cast
+            </DialogTitle>
+          </DialogHeader>
+          {story.protagonist?.name && (
+            <div className="glass-card rounded-lg p-3 border border-amber-500/20">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] uppercase tracking-widest text-amber-400/55 font-sans">
+                  Protagonist
+                </span>
+                <span className="text-sm font-semibold text-foreground/85">
+                  {story.protagonist.name}
+                </span>
+              </div>
+              {story.protagonist.description && (
+                <p className="text-xs text-muted-foreground/55 mt-1">{story.protagonist.description}</p>
+              )}
+            </div>
+          )}
+          {story.characters && story.characters.length > 0 ? (
+            <ul className="space-y-2">
+              {story.characters.map((c) => (
+                <li key={c.name} className="glass-card rounded-lg p-3 border border-white/[0.07]">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium text-foreground/80">{c.name}</span>
+                    {c.status && c.status !== 'alive' && (
+                      <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded border border-white/10 text-muted-foreground/45">
+                        {c.status}
+                      </span>
+                    )}
+                  </div>
+                  {c.description && (
+                    <p className="text-xs text-muted-foreground/55 mt-1">{c.description}</p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground/50 py-2">
+              The cast will grow here as the story introduces new characters.
+            </p>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={endingsOpen} onOpenChange={setEndingsOpen}>
         <DialogContent className="glass-strong border-white/15 sm:max-w-[480px] max-h-[80vh] overflow-y-auto">

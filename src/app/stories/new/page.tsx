@@ -44,6 +44,8 @@ export default function NewStoryPage() {
   const [description, setDescription] = useState('')
   const [worldId, setWorldId] = useState('')
   const [rating, setRating] = useState<ContentRating>(DEFAULT_CONTENT_RATING)
+  const [protagonistName, setProtagonistName] = useState('')
+  const [protagonistDesc, setProtagonistDesc] = useState('')
   const [opening, setOpening] = useState('')
   const [choice1, setChoice1] = useState('')
   const [choice2, setChoice2] = useState('')
@@ -133,6 +135,9 @@ export default function NewStoryPage() {
           worldId,
           worldName: selectedWorld.name,
           rating,
+          protagonist: protagonistName.trim()
+            ? { name: protagonistName.trim(), description: protagonistDesc.trim() }
+            : undefined,
           published: true,
           coverGradient: null,
           resources: formattedResources,
@@ -319,6 +324,30 @@ export default function NewStoryPage() {
               {worldRating
                 ? `Can't exceed the world's ${worldRating} rating.`
                 : 'Defaults to the world’s rating; a moderator may adjust it.'}
+            </p>
+          </div>
+
+          <div className="space-y-2 border-t border-white/[0.06] pt-5">
+            <Label htmlFor="protagonist">
+              Protagonist{' '}
+              <span className="text-muted-foreground/35 font-normal text-xs">(optional)</span>
+            </Label>
+            <Input
+              id="protagonist"
+              placeholder="Who does the reader play as? e.g. Elara, a cautious thief"
+              value={protagonistName}
+              onChange={(e) => setProtagonistName(e.target.value)}
+            />
+            {protagonistName.trim() && (
+              <Input
+                placeholder="A short description the AI should keep consistent (optional)"
+                value={protagonistDesc}
+                onChange={(e) => setProtagonistDesc(e.target.value)}
+              />
+            )}
+            <p className="text-[11px] text-muted-foreground/45">
+              The AI writes the story around this character by name. The rest of the cast emerges
+              as your story grows.
             </p>
           </div>
 

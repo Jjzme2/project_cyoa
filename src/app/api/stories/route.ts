@@ -28,11 +28,21 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { title, description, worldId, worldName, coverGradient, resources, tags, coverTheme, readingTheme, rating } = body
+  const { title, description, worldId, worldName, coverGradient, resources, tags, coverTheme, readingTheme, rating, protagonist } = body
 
   if (!title || !worldId || !worldName) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
+
+  // Author-defined protagonist (optional); the canon cast grows emergently.
+  const protagonistName = typeof protagonist?.name === 'string' ? protagonist.name.trim().slice(0, 60) : ''
+  const safeProtagonist = protagonistName
+    ? {
+        name: protagonistName,
+        description:
+          typeof protagonist?.description === 'string' ? protagonist.description.trim().slice(0, 300) : '',
+      }
+    : null
 
   const requestedRating: ContentRating = CONTENT_RATINGS.includes(rating)
     ? (rating as ContentRating)
@@ -55,6 +65,8 @@ export async function POST(req: NextRequest) {
     rating: safeRating,
     ratingOverriddenBy: null,
     resources: resources ?? [],
+    characters: [],
+    ...(safeProtagonist ? { protagonist: safeProtagonist } : {}),
     tags: Array.isArray(tags) ? tags.slice(0, 5) : [],
     ...(coverTheme   ? { coverTheme }   : {}),
     ...(readingTheme ? { readingTheme } : {}),

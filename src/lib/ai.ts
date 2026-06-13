@@ -2,7 +2,7 @@ import { generateText, APICallError } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { put } from '@vercel/blob'
 import { StoryPathSegment } from '@/types'
-import type { ContentRating } from '@/types'
+import type { ContentRating, Protagonist, StoryCharacter } from '@/types'
 
 const PRIMARY_MODEL = 'google/gemini-2.5-pro'
 const OPENROUTER_MODEL = 'google/gemma-4-31b-it:free'
@@ -15,6 +15,24 @@ interface WorldContext {
   rules: string
   tone: string
   rating?: ContentRating
+  protagonist?: Protagonist
+  characters?: StoryCharacter[]
+}
+
+function castBlock(world: WorldContext): string {
+  const lines: string[] = []
+  if (world.protagonist?.name) {
+    lines.push(
+      `PROTAGONIST (the character the reader plays as — refer to them by name, not "you"): ${world.protagonist.name}${world.protagonist.description ? ` — ${world.protagonist.description}` : ''}`,
+    )
+  }
+  if (world.characters && world.characters.length > 0) {
+    const cast = world.characters
+      .map((c) => `- ${c.name}${c.status ? ` [${c.status}]` : ''}${c.description ? `: ${c.description}` : ''}`)
+      .join('\n')
+    lines.push(`ESTABLISHED CHARACTERS (canon — keep them perfectly consistent):\n${cast}`)
+  }
+  return lines.length > 0 ? `\n${lines.join('\n\n')}\n` : ''
 }
 
 function ratingGuidance(rating: ContentRating | undefined): string {
@@ -63,7 +81,7 @@ WORLD RULES: ${world.rules}
 TONE: ${world.tone}
 
 ${ratingGuidance(world.rating)}
-
+${castBlock(world)}
 STORY PATH SO FAR:
 ${pathContent}
 
@@ -72,6 +90,7 @@ THE READER CHOSE: "${choiceText}"
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 1 — VALIDATE the reader's choice against ALL of these criteria:
 • Respects the CONTENT RATING above — does not introduce content too mature for it
+• Does NOT contradict any ESTABLISHED CHARACTER above — their identity, personality, relationships, or status (e.g. never bring back a character marked deceased, never rename or repurpose someone)
 • No profanity, slurs, or explicit sexual/graphic content
 • Fits the world's established tone, lore, and rules — does not contradict them
 • Makes narrative sense given the preceding story path so far — maintains continuity of character identities, locations, inventory/stats, and past events
@@ -85,6 +104,7 @@ REJECTED: [one sentence explaining why it was rejected]
 STEP 2 — If the choice passes validation, write the next chapter. It MUST follow these rules strictly:
 - Flow naturally from the preceding story path and the reader's choice
 - Stay strictly within the CONTENT RATING above
+- Refer to the protagonist by name; keep every established character perfectly consistent with the facts above
 - Match the world's tone and rules exactly
 - Maintain complete continuity of characters, setting, and plot points established in the path
 - End at a moment of decision or tension
@@ -97,7 +117,10 @@ CHOICE_1: [choice text]
 CHOICE_2: [choice text]
 CHOICE_3: [choice text]
 
-Write only the chapter and the three choices. No meta-commentary.`
+Then, ONLY if this chapter introduces a brand-new named character not already listed above, add one line per new character (omit entirely if none):
+NEW_CHARACTER: [name] — [one-line description]
+
+Write only the chapter, the three choices, and any NEW_CHARACTER lines. No meta-commentary.`
 }
 
 export class PromptRejectedError extends Error {
@@ -107,7 +130,11 @@ export class PromptRejectedError extends Error {
   }
 }
 
-function parseAIResponse(text: string): { content: string; choices: string[] } {
+function parseAIResponse(text: string): {
+  content: string
+  choices: string[]
+  newCharacters: StoryCharacter[]
+} {
   const rejectionMatch = text.match(/^REJECTED:\s*(.+)/im)
   if (rejectionMatch) {
     throw new PromptRejectedError(rejectionMatch[1].trim())
@@ -121,12 +148,29 @@ function parseAIResponse(text: string): { content: string; choices: string[] } {
     choices.push(match[2].trim())
   }
 
+  // Emergent characters the model flagged as newly introduced this chapter.
+  const newCharacters: StoryCharacter[] = []
+  const charPattern = /NEW_CHARACTER:\s*(.+)/gi
+  let cMatch
+  while ((cMatch = charPattern.exec(text)) !== null) {
+    const raw = cMatch[1].trim()
+    const [name, ...rest] = raw.split(/\s+[—-]\s+/)
+    if (name) {
+      newCharacters.push({
+        name: name.trim().slice(0, 60),
+        description: rest.join(' — ').trim().slice(0, 200) || undefined,
+        status: 'alive',
+      })
+    }
+  }
+
   const content = text
     .replace(/CHOICE_\d:.+/g, '')
+    .replace(/NEW_CHARACTER:.+/gi, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 
-  return { content, choices: choices.slice(0, 3) }
+  return { content, choices: choices.slice(0, 3), newCharacters }
 }
 
 function buildImagePrompt(world: WorldContext, storyContent: string, choiceText: string): string {
@@ -192,7 +236,7 @@ export async function generateStoryNode(
   choiceText: string,
   userId: string,
   includeImage: boolean,
-): Promise<{ content: string; choices: string[]; model: string }> {
+): Promise<{ content: string; choices: string[]; model: string; newCharacters: StoryCharacter[] }> {
   const prompt = buildPrompt(world, storyPath, choiceText, includeImage)
 
   try {

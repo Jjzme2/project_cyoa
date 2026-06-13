@@ -46,6 +46,20 @@ export interface NodeModeration {
   reviewedAt?: string | null
 }
 
+// ─── Characters ─────────────────────────────────────────────────────────────
+/** A canon character in a story. Author may define some; more emerge as the AI introduces them. */
+export interface StoryCharacter {
+  name: string
+  description?: string
+  /** e.g. 'alive', 'deceased', 'missing' — the AI must respect this for continuity. */
+  status?: string
+}
+
+export interface Protagonist {
+  name: string
+  description?: string
+}
+
 export interface Bookmark {
   id: string
   userId: string
@@ -204,6 +218,10 @@ export interface Story {
   /** Authored by the Chronicle team as starter content, not the community. */
   seeded?: boolean
   resources?: ResourceDefinition[]
+  /** Author-defined hero the reader plays as; the AI writes them by name. */
+  protagonist?: Protagonist
+  /** Canon cast — author-seeded and grown emergently as the AI introduces characters. */
+  characters?: StoryCharacter[]
   coverTheme?: CoverTheme
   readingTheme?: ReadingTheme
 }

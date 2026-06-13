@@ -4,7 +4,7 @@ import { StoryPathSegment } from '@/types'
 import type {
   Story, StoryNode, ChoiceSlot, World, ChoiceRequirement, ChoiceEffect,
   Bookmark, Notification, NotificationType, UserAchievements, ReactionType, StoryTreeNode,
-  NodeModeration, ModerationStatus, ContentRating,
+  NodeModeration, ModerationStatus, ContentRating, StoryCharacter,
 } from '@/types'
 import { ACHIEVEMENT_DEFS } from '@/types'
 import { FieldValue } from 'firebase-admin/firestore'
@@ -86,6 +86,26 @@ export async function createStory(
 
 export async function incrementStoryViews(storyId: string) {
   await storyRef(storyId).update({ views: FieldValue.increment(1) })
+}
+
+/** Append emergent canon characters to a story, deduped by name (case-insensitive). */
+export async function addStoryCharacters(
+  storyId: string,
+  chars: StoryCharacter[],
+): Promise<void> {
+  if (!chars || chars.length === 0) return
+  const ref = storyRef(storyId)
+  await adminDb.runTransaction(async (txn) => {
+    const doc = await txn.get(ref)
+    if (!doc.exists) return
+    const existing: StoryCharacter[] = doc.data()?.characters ?? []
+    const known = new Set(existing.map((c) => c.name.toLowerCase()))
+    const additions = chars.filter((c) => c.name && !known.has(c.name.toLowerCase()))
+    if (additions.length === 0) return
+    // Cap the roster so a runaway story can't bloat the doc.
+    const merged = [...existing, ...additions].slice(0, 40)
+    txn.update(ref, { characters: merged })
+  })
 }
 
 export async function updateStoryRating(

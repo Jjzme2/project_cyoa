@@ -16,6 +16,7 @@ import {
   getStoryPath,
   createNotification,
   checkAndAwardAchievements,
+  addStoryCharacters,
 } from '@/lib/firestore-helpers'
 import { CreditManager } from '@/lib/credit-manager'
 import { generateStoryNode, generateStoryImage, PromptRejectedError } from '@/lib/ai'
@@ -130,9 +131,11 @@ export async function POST(
       rules: world.rules,
       tone: world.tone,
       rating: effectiveRating,
+      protagonist: story.protagonist,
+      characters: story.characters,
     }
 
-    const { content, choices, model } = await generateStoryNode(
+    const { content, choices, model, newCharacters } = await generateStoryNode(
       worldCtx,
       storyPath,
       promptText,
@@ -210,6 +213,10 @@ export async function POST(
     after(async () => {
       const ops: Promise<unknown>[] = [checkAndAwardAchievements(uid, 'contribution')]
       if (includeImage && imageUrl) ops.push(checkAndAwardAchievements(uid, 'illustration'))
+      // Record any new canon characters the AI introduced this chapter.
+      if (newCharacters && newCharacters.length > 0) {
+        ops.push(addStoryCharacters(storyId, newCharacters))
+      }
       // Don't notify the author about a contribution that's hidden pending review.
       if (!pendingReview && story.authorId && story.authorId !== uid) {
         ops.push(
