@@ -17,6 +17,7 @@ import {
   createNotification,
   checkAndAwardAchievements,
   addStoryCharacters,
+  settleBountyOnFill,
 } from '@/lib/firestore-helpers'
 import { CreditManager } from '@/lib/credit-manager'
 import { generateStoryNode, generateStoryImage, PromptRejectedError } from '@/lib/ai'
@@ -204,6 +205,14 @@ export async function POST(
       finalRemaining = remaining + refundAmount
     }
     await Promise.all(patchOps)
+
+    // Settle any bounty on this slot: pay the filler if published, defer if
+    // flagged, refund if they filled their own. (Money path — kept in-request.)
+    if (slot.bounty && slot.bounty.status === 'open') {
+      await settleBountyOnFill(storyId, nodeId, slotId, uid, newNodeId, !pendingReview).catch((e) =>
+        console.error('[bounty settle] failed:', e),
+      )
+    }
 
     revalidateTag(`node-${storyId}-${nodeId}`, 'max')
     revalidateTag(`story-${storyId}`, 'max')

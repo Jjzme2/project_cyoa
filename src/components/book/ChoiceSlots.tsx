@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Loader2, Feather, ChevronRight, Scroll, Lock, PenLine, Wand2, ImagePlus, ShieldAlert, Check, Trash2, Hourglass } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { BountyControl } from '@/components/book/BountyControl'
 import { useAuth } from '@/components/Providers'
 import { validatePromptLocal } from '@/lib/validate'
 import { CreatorResourceManager } from '@/lib/creator-resources'
@@ -335,6 +336,9 @@ export function ChoiceSlots({
                     A storyteller is weaving path {i + 1}…
                   </span>
                 </div>
+                <div className="mt-2">
+                  <BountyControl storyId={storyId} nodeId={nodeId} slot={slot} readOnly />
+                </div>
               </div>
             ) : user ? (
               /* Logged-in: write the path */
@@ -590,9 +594,11 @@ export function ChoiceSlots({
                     </Button>
                   </>
                 )}
+                <BountyControl storyId={storyId} nodeId={nodeId} slot={slot} onChange={onModerated} />
               </div>
             ) : (
               /* Logged-out: sign-in prompt */
+              <div className="space-y-1.5">
               <button
                 onClick={openAuthModal}
                 className="w-full text-left px-4 py-3 rounded-lg border transition-all hover:brightness-95 active:scale-[0.98] group"
@@ -609,6 +615,8 @@ export function ChoiceSlots({
                   </span>
                 </div>
               </button>
+              <BountyControl storyId={storyId} nodeId={nodeId} slot={slot} readOnly />
+              </div>
             )}
           </motion.div>
         ))}

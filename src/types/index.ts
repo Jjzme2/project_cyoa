@@ -60,6 +60,22 @@ export interface Protagonist {
   description?: string
 }
 
+// ─── Bounties ───────────────────────────────────────────────────────────────
+export type BountyStatus = 'open' | 'paid' | 'refunded'
+
+/** A reward escrowed on an empty choice slot, paid to whoever fills it (once approved). */
+export interface SlotBounty {
+  reward: number
+  posterId: string
+  posterName: string
+  promptHint?: string
+  status: BountyStatus
+  /** Set when a flagged contribution is awaiting approval before the reward releases. */
+  pendingClaimBy?: string | null
+  pendingNodeId?: string | null
+  createdAt: string
+}
+
 export interface Bookmark {
   id: string
   userId: string
@@ -277,6 +293,8 @@ export interface ChoiceSlot {
   pendingReview?: boolean
   /** Moderation status of the child route (surfaced to admins for review). */
   childModeration?: ModerationStatus
+  /** An open reward escrowed on this (empty) slot. */
+  bounty?: SlotBounty | null
   requirements?: ChoiceRequirement[]
   effects?: ChoiceEffect[]
 }
