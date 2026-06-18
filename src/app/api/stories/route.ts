@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { title, description, worldId, worldName, coverGradient, resources, tags, coverTheme, readingTheme, rating, protagonist } = body
+  const { title, description, worldId, worldName, coverGradient, resources, tags, coverTheme, readingTheme, rating, protagonist, goapEnabled, implementQuests } = body
 
   if (!title || !worldId || !worldName) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -70,6 +70,8 @@ export async function POST(req: NextRequest) {
     tags: Array.isArray(tags) ? tags.slice(0, 5) : [],
     ...(coverTheme   ? { coverTheme }   : {}),
     ...(readingTheme ? { readingTheme } : {}),
+    goapEnabled: !!goapEnabled,
+    implementQuests: !!implementQuests,
   })
 
   revalidateTag('stories', 'max')

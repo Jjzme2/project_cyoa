@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { Loader2, Feather, ChevronRight, Scroll, Lock, PenLine, Wand2, ImagePlus, ShieldAlert, Check, Trash2, Hourglass } from 'lucide-react'
+import { Loader2, Feather, ChevronRight, Scroll, Lock, PenLine, Wand2, ImagePlus, ShieldAlert, Check, Trash2, Hourglass, Flag } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { BountyControl } from '@/components/book/BountyControl'
@@ -43,6 +43,11 @@ export function ChoiceSlots({
   const [imageEnabled, setImageEnabled] = useState<Record<string, boolean>>({})
   const [submitting, setSubmitting] = useState<string | null>(null)
   const [moderating, setModerating] = useState<string | null>(null)
+  const [flagging, setFlagging] = useState<string | null>(null)
+  const [flagCounts, setFlagCounts] = useState<Record<string, number>>(() =>
+    Object.fromEntries(slots.filter((s) => s.flagVoteCount).map((s) => [s.id, s.flagVoteCount!])),
+  )
+  const [userFlagVotes, setUserFlagVotes] = useState<Record<string, boolean>>({})
 
   // Total reads across the filled paths from this page, for "% went here".
   const filledTotal = slots.reduce(
@@ -141,6 +146,7 @@ export function ChoiceSlots({
           includeImage: imageEnabled[slot.id] ?? false,
           requirements: reqsToSend,
           effects: effsToSend,
+          worldState: currentResources ?? {},
         }),
       })
       const data = await res.json()
@@ -176,6 +182,34 @@ export function ChoiceSlots({
     }
   }
 
+  async function handleFlag(slot: ChoiceSlot) {
+    if (!user) { openAuthModal(); return }
+    setFlagging(slot.id)
+    try {
+      const token = await user.getIdToken()
+      const res = await fetch(`/api/stories/${storyId}/nodes/${nodeId}/slots/${slot.id}/flag`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error ?? 'Could not register vote'); return }
+      setFlagCounts((prev) => ({ ...prev, [slot.id]: data.flagVoteCount }))
+      setUserFlagVotes((prev) => ({ ...prev, [slot.id]: data.userHasFlagged }))
+      if (data.autoRemoved) {
+        toast.info('This path has been removed by community vote.')
+        onModerated?.()
+      } else if (data.userHasFlagged) {
+        toast.success('Your vote has been counted.')
+      } else {
+        toast('Vote retracted.')
+      }
+    } catch {
+      toast.error('Something went wrong.')
+    } finally {
+      setFlagging(null)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-3 h-full">
       <div className="flex items-center justify-between mb-1">
@@ -207,8 +241,8 @@ export function ChoiceSlots({
               <div
                 className="px-4 py-3 rounded-lg border"
                 style={{
-                  background: 'oklch(0.90 0.03 80 / 35%)',
-                  borderColor: 'oklch(0.50 0.06 60 / 20%)',
+                  background: 'color-mix(in oklch, var(--page-text) 5%, transparent)',
+                  borderColor: 'color-mix(in oklch, var(--page-text) 15%, transparent)',
                   borderStyle: 'dashed',
                 }}
               >
@@ -238,18 +272,26 @@ export function ChoiceSlots({
                     }}
                     disabled={!meetsReqs}
                     className={`w-full text-left px-4 py-3 rounded-lg border transition-all ${
-                      meetsReqs 
-                        ? 'hover:brightness-95 active:scale-[0.98]' 
-                        : 'opacity-65 cursor-not-allowed'
+                      meetsReqs
+                        ? 'hover:brightness-90 active:scale-[0.98] shadow-md hover:shadow-lg'
+                        : 'opacity-50 cursor-not-allowed'
                     }`}
                     style={{
-                      background: meetsReqs ? 'oklch(0.88 0.04 80 / 65%)' : 'oklch(0.90 0.02 80 / 30%)',
-                      borderColor: meetsReqs ? 'oklch(0.55 0.08 60 / 35%)' : 'oklch(0.50 0.03 60 / 15%)',
+                      background: meetsReqs
+                        ? 'color-mix(in oklch, var(--page-text) 22%, transparent)'
+                        : 'color-mix(in oklch, var(--page-text) 5%, transparent)',
+                      borderColor: meetsReqs
+                        ? 'color-mix(in oklch, var(--page-text) 45%, transparent)'
+                        : 'color-mix(in oklch, var(--page-text) 10%, transparent)',
+                      color: 'var(--page-text)',
+                      boxShadow: meetsReqs
+                        ? 'inset 3px 0 0 color-mix(in oklch, var(--page-text) 55%, transparent)'
+                        : undefined,
                     }}
                   >
                     <div className="flex items-start justify-between gap-3 w-full">
                       <div className="flex items-start gap-2.5">
-                        <ChevronRight className="h-3.5 w-3.5 mt-0.5 shrink-0 opacity-45" />
+                        <ChevronRight className="h-3.5 w-3.5 mt-0.5 shrink-0 opacity-60" />
                         <div className="flex flex-col gap-1">
                           <span className="text-[13.5px] leading-snug">{slot.promptText}</span>
                           {(slot.submitterName || pct !== null) && (
@@ -317,6 +359,42 @@ export function ChoiceSlots({
                       </Button>
                     </div>
                   )}
+                  {/* Community flag-to-remove row — hidden from path's own submitter */}
+                  {meetsReqs && user && user.uid !== slot.submittedBy && (
+                    (() => {
+                      const count = flagCounts[slot.id] ?? 0
+                      const hasFlagged = userFlagVotes[slot.id] ?? false
+                      return (
+                        <div className="flex items-center justify-end gap-1.5">
+                          {count > 0 && (
+                            <span className="text-[9px] font-sans opacity-40">
+                              {count} {count === 1 ? 'reader' : 'readers'} flagged
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleFlag(slot)}
+                            disabled={flagging === slot.id}
+                            title={hasFlagged ? 'Retract your flag' : 'Flag this path as inappropriate'}
+                            className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-sans transition-all hover:opacity-80 border"
+                            style={{
+                              color: hasFlagged
+                                ? 'oklch(0.55 0.18 25)'
+                                : 'color-mix(in oklch, var(--page-text) 55%, transparent)',
+                              borderColor: hasFlagged
+                                ? 'oklch(0.55 0.18 25 / 35%)'
+                                : 'color-mix(in oklch, var(--page-text) 22%, transparent)',
+                              background: hasFlagged ? 'oklch(0.55 0.18 25 / 8%)' : 'transparent',
+                              opacity: flagging === slot.id ? 0.5 : 1,
+                            }}
+                          >
+                            <Flag className="h-3 w-3" />
+                            {hasFlagged ? 'Flagged' : 'Flag'}
+                          </button>
+                        </div>
+                      )
+                    })()
+                  )}
                   </div>
                 )
               })()
@@ -325,8 +403,8 @@ export function ChoiceSlots({
               <div
                 className="px-4 py-3 rounded-lg border"
                 style={{
-                  background: 'oklch(0.90 0.03 80 / 35%)',
-                  borderColor: 'oklch(0.50 0.06 60 / 20%)',
+                  background: 'color-mix(in oklch, var(--page-text) 5%, transparent)',
+                  borderColor: 'color-mix(in oklch, var(--page-text) 15%, transparent)',
                   borderStyle: 'dashed',
                 }}
               >
@@ -370,10 +448,12 @@ export function ChoiceSlots({
                       disabled={submitting === slot.id}
                       className="text-[13px] min-h-[68px] resize-none focus-visible:ring-1 placeholder:opacity-25"
                       style={{
-                        background: 'oklch(0.92 0.02 80 / 55%)',
-                        borderColor: errors[slot.id] ? 'oklch(0.55 0.18 25 / 60%)' : 'oklch(0.50 0.06 60 / 25%)',
+                        background: 'color-mix(in oklch, var(--page-text) 8%, transparent)',
+                        borderColor: errors[slot.id]
+                          ? 'oklch(0.55 0.18 25 / 60%)'
+                          : 'color-mix(in oklch, var(--page-text) 20%, transparent)',
                         fontFamily: 'Georgia, serif',
-                        color: 'oklch(0.18 0.04 30)',
+                        color: 'var(--page-text)',
                       }}
                     />
                     {errors[slot.id] && (
@@ -390,81 +470,140 @@ export function ChoiceSlots({
                         </div>
                         <div className="space-y-2">
                           {storyResources.map((resDef) => {
-                            const defaultReqOp = resDef.type === 'array' ? 'contains' : '=='
-                            const defaultEffOp = resDef.type === 'array' ? 'add' : '='
-                            const req = slotReqs[slot.id]?.[resDef.name] ?? { enabled: false, op: defaultReqOp, val: '' }
-                            const eff = slotEffs[slot.id]?.[resDef.name] ?? { enabled: false, op: defaultEffOp, val: '' }
+                            const isBool   = resDef.type === 'boolean'
+                            const isArr    = resDef.type === 'array'
+                            const hasChoices = resDef.isInitialChoice && resDef.choices && resDef.choices.length > 0
+                            const defaultReqOp  = isArr ? 'contains' : '=='
+                            const defaultEffOp  = isArr ? 'add' : '='
+                            const defaultReqVal = isBool ? 'true' : ''
+                            const defaultEffVal = isBool ? 'true' : ''
+                            const req = slotReqs[slot.id]?.[resDef.name] ?? { enabled: false, op: defaultReqOp, val: defaultReqVal }
+                            const eff = slotEffs[slot.id]?.[resDef.name] ?? { enabled: false, op: defaultEffOp, val: defaultEffVal }
+
+                            function setReq(patch: Partial<typeof req>) {
+                              setSlotReqs((prev) => ({
+                                ...prev,
+                                [slot.id]: { ...(prev[slot.id] ?? {}), [resDef.name]: { ...req, ...patch } },
+                              }))
+                            }
+                            function setEff(patch: Partial<typeof eff>) {
+                              setSlotEffs((prev) => ({
+                                ...prev,
+                                [slot.id]: { ...(prev[slot.id] ?? {}), [resDef.name]: { ...eff, ...patch } },
+                              }))
+                            }
+
                             return (
                               <div key={resDef.name} className="border-b border-white/[0.04] pb-2 last:border-0 last:pb-0 space-y-1.5">
                                 <div className="text-[11px] font-sans font-medium text-foreground/75 flex justify-between">
-                                  <span>{resDef.name} <span className="opacity-30 text-[9px] font-normal">({resDef.type})</span></span>
-                                  {resDef.description && <span className="opacity-40 text-[9px] font-normal max-w-[150px] truncate" title={resDef.description}>{resDef.description}</span>}
+                                  <span>
+                                    {resDef.icon && <span className="mr-1">{resDef.icon}</span>}
+                                    {resDef.name}
+                                    <span className="opacity-30 text-[9px] font-normal ml-1">({resDef.type})</span>
+                                  </span>
+                                  {resDef.description && (
+                                    <span className="opacity-40 text-[9px] font-normal max-w-[150px] truncate" title={resDef.description}>
+                                      {resDef.description}
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+
                                   {/* Requirement */}
                                   <div className="flex items-center gap-1.5 bg-white/[0.01] p-1.5 rounded border border-white/[0.03]">
                                     <input
                                       type="checkbox"
+                                      title={`Enable requirement for ${resDef.name}`}
                                       checked={req.enabled}
-                                      onChange={(e) => {
-                                        const nextReqs = { ...slotReqs }
-                                        nextReqs[slot.id] = {
-                                          ...(nextReqs[slot.id] ?? {}),
-                                          [resDef.name]: { ...req, enabled: e.target.checked }
-                                        }
-                                        setSlotReqs(nextReqs)
-                                      }}
+                                      onChange={(e) => setReq({ enabled: e.target.checked })}
                                       className="rounded bg-background border-input h-3 w-3"
                                     />
                                     <span className="text-[10px] font-sans opacity-50 shrink-0">Req:</span>
                                     {req.enabled && (
                                       <div className="flex gap-1 items-center w-full">
-                                        <select
-                                          value={req.op}
-                                          onChange={(e) => {
-                                            const nextReqs = { ...slotReqs }
-                                            nextReqs[slot.id] = {
-                                              ...(nextReqs[slot.id] ?? {}),
-                                              [resDef.name]: { ...req, op: e.target.value }
-                                            }
-                                            setSlotReqs(nextReqs)
-                                          }}
-                                          className="text-[9px] h-6 px-1 rounded border bg-background text-foreground focus:outline-none"
-                                        >
-                                          {resDef.type === 'array' ? (
-                                            <>
-                                              <option value="contains">contains</option>
-                                              <option value="not_contains">does not contain</option>
-                                            </>
-                                          ) : (
-                                            <>
+                                        {/* Boolean: just a single is/is-not + true/false */}
+                                        {isBool ? (
+                                          <>
+                                            <select
+                                              value={req.op}
+                                              title="Requirement operator"
+                                              onChange={(e) => setReq({ op: e.target.value })}
+                                              className="text-[9px] h-6 px-1 rounded border bg-background text-foreground focus:outline-none"
+                                            >
+                                              <option value="==">is</option>
+                                              <option value="!=">is not</option>
+                                            </select>
+                                            <select
+                                              value={req.val}
+                                              title="Requirement value"
+                                              onChange={(e) => setReq({ val: e.target.value })}
+                                              className="text-[9px] h-6 px-1 rounded border bg-background text-foreground focus:outline-none flex-1"
+                                            >
+                                              <option value="true">true</option>
+                                              <option value="false">false</option>
+                                            </select>
+                                          </>
+                                        ) : hasChoices ? (
+                                          /* isInitialChoice string: dropdown of choices */
+                                          <>
+                                            <select
+                                              value={req.op}
+                                              title="Requirement operator"
+                                              onChange={(e) => setReq({ op: e.target.value })}
+                                              className="text-[9px] h-6 px-1 rounded border bg-background text-foreground focus:outline-none"
+                                            >
                                               <option value="==">==</option>
                                               <option value="!=">!=</option>
-                                            </>
-                                          )}
-                                          {resDef.type === 'number' && (
-                                            <>
-                                              <option value=">">&gt;</option>
-                                              <option value="&lt;">&lt;</option>
-                                              <option value=">=">&gt;=</option>
-                                              <option value="&lt;=">&lt;=</option>
-                                            </>
-                                          )}
-                                        </select>
-                                        <input
-                                          type={resDef.type === 'number' ? 'number' : 'text'}
-                                          value={req.val}
-                                          placeholder={resDef.type === 'array' ? 'e.g. Iron Key' : 'Value'}
-                                          onChange={(e) => {
-                                            const nextReqs = { ...slotReqs }
-                                            nextReqs[slot.id] = {
-                                              ...(nextReqs[slot.id] ?? {}),
-                                              [resDef.name]: { ...req, val: e.target.value }
-                                            }
-                                            setSlotReqs(nextReqs)
-                                          }}
-                                          className="text-[9px] h-6 px-1.5 rounded border bg-background text-foreground w-full focus:outline-none"
-                                        />
+                                            </select>
+                                            <select
+                                              value={req.val}
+                                              title="Requirement value"
+                                              onChange={(e) => setReq({ val: e.target.value })}
+                                              className="text-[9px] h-6 px-1 rounded border bg-background text-foreground focus:outline-none flex-1"
+                                            >
+                                              {resDef.choices!.map((c) => (
+                                                <option key={c} value={c}>{c}</option>
+                                              ))}
+                                            </select>
+                                          </>
+                                        ) : (
+                                          /* Standard operator + value input */
+                                          <>
+                                            <select
+                                              value={req.op}
+                                              title={`Requirement operator for ${resDef.name}`}
+                                              onChange={(e) => setReq({ op: e.target.value })}
+                                              className="text-[9px] h-6 px-1 rounded border bg-background text-foreground focus:outline-none"
+                                            >
+                                              {isArr ? (
+                                                <>
+                                                  <option value="contains">contains</option>
+                                                  <option value="not_contains">does not contain</option>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <option value="==">==</option>
+                                                  <option value="!=">!=</option>
+                                                </>
+                                              )}
+                                              {resDef.type === 'number' && (
+                                                <>
+                                                  <option value=">">&gt;</option>
+                                                  <option value="<">&lt;</option>
+                                                  <option value=">=">&gt;=</option>
+                                                  <option value="<=">&lt;=</option>
+                                                </>
+                                              )}
+                                            </select>
+                                            <input
+                                              type={resDef.type === 'number' ? 'number' : 'text'}
+                                              value={req.val}
+                                              placeholder={isArr ? 'e.g. Iron Key' : 'Value'}
+                                              onChange={(e) => setReq({ val: e.target.value })}
+                                              className="text-[9px] h-6 px-1.5 rounded border bg-background text-foreground w-full focus:outline-none"
+                                            />
+                                          </>
+                                        )}
                                       </div>
                                     )}
                                   </div>
@@ -473,60 +612,75 @@ export function ChoiceSlots({
                                   <div className="flex items-center gap-1.5 bg-white/[0.01] p-1.5 rounded border border-white/[0.03]">
                                     <input
                                       type="checkbox"
+                                      title={`Enable modifier for ${resDef.name}`}
                                       checked={eff.enabled}
-                                      onChange={(e) => {
-                                        const nextEffs = { ...slotEffs }
-                                        nextEffs[slot.id] = {
-                                          ...(nextEffs[slot.id] ?? {}),
-                                          [resDef.name]: { ...eff, enabled: e.target.checked }
-                                        }
-                                        setSlotEffs(nextEffs)
-                                      }}
+                                      onChange={(e) => setEff({ enabled: e.target.checked })}
                                       className="rounded bg-background border-input h-3 w-3"
                                     />
                                     <span className="text-[10px] font-sans opacity-50 shrink-0">Mod:</span>
                                     {eff.enabled && (
                                       <div className="flex gap-1 items-center w-full">
-                                        <select
-                                          value={eff.op}
-                                          onChange={(e) => {
-                                            const nextEffs = { ...slotEffs }
-                                            nextEffs[slot.id] = {
-                                              ...(nextEffs[slot.id] ?? {}),
-                                              [resDef.name]: { ...eff, op: e.target.value }
-                                            }
-                                            setSlotEffs(nextEffs)
-                                          }}
-                                          className="text-[9px] h-6 px-1 rounded border bg-background text-foreground focus:outline-none"
-                                        >
-                                          <option value="=">=</option>
-                                          {resDef.type === 'number' && (
-                                            <>
-                                              <option value="+=">+=</option>
-                                              <option value="-=">-=</option>
-                                            </>
-                                          )}
-                                          {resDef.type === 'array' && (
-                                            <>
-                                              <option value="add">add</option>
-                                              <option value="remove">remove</option>
-                                            </>
-                                          )}
-                                        </select>
-                                        <input
-                                          type={resDef.type === 'number' ? 'number' : 'text'}
-                                          value={eff.val}
-                                          placeholder={resDef.type === 'array' ? 'e.g. Iron Key' : 'Value'}
-                                          onChange={(e) => {
-                                            const nextEffs = { ...slotEffs }
-                                            nextEffs[slot.id] = {
-                                              ...(nextEffs[slot.id] ?? {}),
-                                              [resDef.name]: { ...eff, val: e.target.value }
-                                            }
-                                            setSlotEffs(nextEffs)
-                                          }}
-                                          className="text-[9px] h-6 px-1.5 rounded border bg-background text-foreground w-full focus:outline-none"
-                                        />
+                                        {isBool ? (
+                                          /* Boolean: set to true/false only */
+                                          <>
+                                            <span className="text-[9px] opacity-40 shrink-0">set to</span>
+                                            <select
+                                              value={eff.val}
+                                              title="Effect value"
+                                              onChange={(e) => setEff({ val: e.target.value })}
+                                              className="text-[9px] h-6 px-1 rounded border bg-background text-foreground focus:outline-none flex-1"
+                                            >
+                                              <option value="true">true</option>
+                                              <option value="false">false</option>
+                                            </select>
+                                          </>
+                                        ) : hasChoices ? (
+                                          /* isInitialChoice string: dropdown */
+                                          <>
+                                            <span className="text-[9px] opacity-40 shrink-0">=</span>
+                                            <select
+                                              value={eff.val}
+                                              title="Effect value"
+                                              onChange={(e) => setEff({ val: e.target.value })}
+                                              className="text-[9px] h-6 px-1 rounded border bg-background text-foreground focus:outline-none flex-1"
+                                            >
+                                              {resDef.choices!.map((c) => (
+                                                <option key={c} value={c}>{c}</option>
+                                              ))}
+                                            </select>
+                                          </>
+                                        ) : (
+                                          /* Standard operator + value input */
+                                          <>
+                                            <select
+                                              value={eff.op}
+                                              title={`Modifier operator for ${resDef.name}`}
+                                              onChange={(e) => setEff({ op: e.target.value })}
+                                              className="text-[9px] h-6 px-1 rounded border bg-background text-foreground focus:outline-none"
+                                            >
+                                              <option value="=">=</option>
+                                              {resDef.type === 'number' && (
+                                                <>
+                                                  <option value="+=">+=</option>
+                                                  <option value="-=">-=</option>
+                                                </>
+                                              )}
+                                              {isArr && (
+                                                <>
+                                                  <option value="add">add</option>
+                                                  <option value="remove">remove</option>
+                                                </>
+                                              )}
+                                            </select>
+                                            <input
+                                              type={resDef.type === 'number' ? 'number' : 'text'}
+                                              value={eff.val}
+                                              placeholder={isArr ? 'e.g. Iron Key' : 'Value'}
+                                              onChange={(e) => setEff({ val: e.target.value })}
+                                              className="text-[9px] h-6 px-1.5 rounded border bg-background text-foreground w-full focus:outline-none"
+                                            />
+                                          </>
+                                        )}
                                       </div>
                                     )}
                                   </div>
@@ -603,8 +757,8 @@ export function ChoiceSlots({
                 onClick={openAuthModal}
                 className="w-full text-left px-4 py-3 rounded-lg border transition-all hover:brightness-95 active:scale-[0.98] group"
                 style={{
-                  background: 'oklch(0.90 0.02 80 / 40%)',
-                  borderColor: 'oklch(0.50 0.05 60 / 18%)',
+                  background: 'color-mix(in oklch, var(--page-text) 5%, transparent)',
+                  borderColor: 'color-mix(in oklch, var(--page-text) 15%, transparent)',
                   borderStyle: 'dashed',
                 }}
               >

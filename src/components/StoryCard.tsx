@@ -1,9 +1,8 @@
 import Link from 'next/link'
-import { BookOpen } from 'lucide-react'
-import { RatingBadge, SeededBadge } from '@/components/ContentBadges'
+import { coverFontFamily, patternStyle } from '@/components/book/CoverDesigner'
 import type { Story, CoverTheme } from '@/types'
 
-// Fallback cover themes for stories that predate the cover designer
+// Fallback covers for stories that predate the cover designer
 const LEGACY_COVERS = [
   { fromColor: '#1e0840', toColor: '#0a0322' },
   { fromColor: '#3d1200', toColor: '#180700' },
@@ -23,145 +22,179 @@ function legacyTheme(storyId: string): CoverTheme {
   }
 }
 
+// Mini cover face — shown in the hover popup above the spine
+function CoverPopup({
+  theme,
+  title,
+  authorName,
+}: {
+  theme: CoverTheme
+  title: string
+  authorName: string
+}) {
+  const accent = theme.accentColor ?? '#fbbf24'
+  return (
+    <div
+      className="relative w-full overflow-hidden rounded-sm border border-white/10"
+      style={{ aspectRatio: '2/3' }}
+    >
+      {theme.coverImageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={theme.coverImageUrl}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+      ) : (
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `linear-gradient(to bottom right, ${theme.fromColor}, ${theme.toColor})`,
+          }}
+        />
+      )}
+
+      {!theme.coverImageUrl && theme.pattern !== 'none' && (
+        <div className="absolute inset-0 pointer-events-none" style={patternStyle(theme.pattern)} />
+      )}
+
+      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/5 to-black/20 pointer-events-none" />
+
+      <div className="absolute inset-x-2 bottom-2 space-y-0.5">
+        <h3
+          className="text-[10px] leading-snug line-clamp-3"
+          style={{
+            fontFamily: coverFontFamily(theme.fontStyle),
+            color: accent,
+            textShadow: '0 1px 3px rgba(0,0,0,0.9)',
+          }}
+        >
+          {title}
+        </h3>
+        <p className="text-[7px] font-sans" style={{ color: 'rgba(255,255,255,0.35)' }}>
+          {authorName}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 interface Props {
   story: Story
 }
 
 export function StoryCard({ story }: Props) {
   const theme: CoverTheme = story.coverTheme ?? legacyTheme(story.id)
+  const accent = theme.accentColor ?? '#fbbf24'
 
   return (
-    <Link href={`/stories/${story.id}`} className="group block">
-      {/*
-        Outer wrapper keeps the shelf-shadow anchored in place
-        while the book itself lifts on hover.
-      */}
-      <div className="relative pb-3">
-        {/* The book */}
+    <Link
+      href={`/stories/${story.id}`}
+      className="group relative block shrink-0"
+      style={{ width: 38 }}
+    >
+      <div className="relative pb-2">
+        {/* ── Spine ── */}
         <div
-          className={`
-            relative flex rounded-sm overflow-hidden cursor-pointer
+          className="relative w-full overflow-hidden rounded-[2px] cursor-pointer
             transition-all duration-300 ease-out
             group-hover:-translate-y-5
-            shadow-[0_6px_18px_-4px_rgba(0,0,0,0.65),0_2px_5px_-1px_rgba(0,0,0,0.45)]
-            group-hover:shadow-[0_32px_56px_-10px_rgba(0,0,0,0.90),0_14px_28px_-6px_rgba(0,0,0,0.65)]
-          `}
-          style={{ aspectRatio: '2/3' }}
+            shadow-[2px_3px_12px_-2px_rgba(0,0,0,0.65)]
+            group-hover:shadow-[4px_20px_36px_-6px_rgba(0,0,0,0.9)]"
+          style={{ height: 180 }}
         >
-          {/* Spine */}
+          {/* Gradient fill */}
           <div
-            className="w-3 shrink-0 relative"
+            className="absolute inset-0"
             style={{
               background: `linear-gradient(to bottom, ${theme.fromColor}, ${theme.toColor})`,
-              filter: 'brightness(1.35)',
-              boxShadow: 'inset -3px 0 6px rgba(0,0,0,0.40), inset 1px 0 2px rgba(255,255,255,0.10)',
+              filter: 'brightness(1.3)',
             }}
-          >
+          />
+
+          {/* Pattern overlay */}
+          {theme.pattern !== 'none' && (
+            <div
+              className="absolute inset-0 pointer-events-none opacity-50"
+              style={patternStyle(theme.pattern)}
+            />
+          )}
+
+          {/* Left edge highlight */}
+          <div className="absolute left-0 top-0 bottom-0 w-px bg-white/20" />
+          {/* Right edge shadow */}
+          <div className="absolute right-0 top-0 bottom-0 w-2 bg-gradient-to-l from-black/35 to-transparent" />
+
+          {/* Emblem at top */}
+          {theme.icon && (
+            <div className="absolute top-2.5 inset-x-0 flex justify-center">
+              <span
+                className="text-[11px] leading-none"
+                style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.8))' }}
+              >
+                {theme.icon}
+              </span>
+            </div>
+          )}
+
+          {/* Title — vertical, reads top to bottom */}
+          <div className="absolute inset-x-0 top-8 bottom-5 flex items-center justify-center overflow-hidden">
             <span
-              className="absolute inset-0 flex items-center justify-center text-[7px] font-sans tracking-widest text-white/20 overflow-hidden"
-              style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+              className="text-[10.5px] leading-none tracking-wide"
+              style={{
+                writingMode: 'vertical-rl',
+                color: accent,
+                fontFamily: coverFontFamily(theme.fontStyle),
+                textShadow: `0 1px 4px rgba(0,0,0,0.7)`,
+                maxHeight: '100%',
+              }}
             >
               {story.title}
             </span>
           </div>
 
-          {/* Cover */}
-          <div
-            className="flex-1 relative flex flex-col justify-between p-3 overflow-hidden"
-            style={{
-              background: `linear-gradient(to bottom right, ${theme.fromColor}, ${theme.toColor})`,
-            }}
-          >
-            {/* Pattern overlay */}
-            {theme.pattern === 'stars' && (
-              <div className="absolute inset-0 pointer-events-none"
-                style={{
-                  backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.18) 1px, transparent 1px)',
-                  backgroundSize: '22px 22px',
-                }} />
-            )}
-            {theme.pattern === 'grid' && (
-              <div className="absolute inset-0 pointer-events-none"
-                style={{
-                  backgroundImage: 'linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)',
-                  backgroundSize: '20px 20px',
-                }} />
-            )}
-            {theme.pattern === 'dots' && (
-              <div className="absolute inset-0 pointer-events-none"
-                style={{
-                  backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.10) 1.5px, transparent 1.5px)',
-                  backgroundSize: '14px 14px',
-                }} />
-            )}
-            {theme.pattern === 'lines' && (
-              <div className="absolute inset-0 pointer-events-none"
-                style={{
-                  backgroundImage: 'repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0px, rgba(255,255,255,0.04) 1px, transparent 1px, transparent 10px)',
-                }} />
-            )}
-
-            {/* Top — world badge + rating/seeded chips */}
-            <div className="relative z-10 flex items-start justify-between gap-1">
-              <span className="text-[8px] uppercase tracking-[0.22em] font-sans text-white/30">
-                {story.worldName}
-              </span>
-              <span className="flex items-center gap-1 shrink-0">
-                {story.seeded && <SeededBadge abbr />}
-                <RatingBadge rating={story.rating} abbr />
-              </span>
-            </div>
-
-            {/* Center — emblem */}
-            <div className="flex items-center justify-center flex-1 py-2 relative z-10">
-              <div
-                className="w-12 h-12 rounded-full flex items-center justify-center text-2xl"
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}
-              >
-                {theme.icon || <BookOpen className="h-5 w-5 text-white/30" />}
-              </div>
-            </div>
-
-            {/* Bottom — title + author */}
-            <div className="space-y-1 relative z-10">
-              <h3
-                className="text-[12px] leading-snug text-white/90 line-clamp-3"
-                style={{
-                  fontFamily: theme.fontStyle === 'gothic'
-                    ? '"Palatino Linotype", Palatino, serif'
-                    : theme.fontStyle === 'script'
-                    ? 'cursive'
-                    : 'Georgia, "Times New Roman", serif',
-                }}
-              >
-                {story.title}
-              </h3>
-              <p className="text-[9px] font-sans text-white/30">by {story.authorName}</p>
-            </div>
-
-            {/* Page edge + hover brightening */}
-            <div className="absolute right-0 top-0 bottom-0 w-px bg-white/8 z-10" />
-            <div className="absolute inset-0 bg-white/0 group-hover:bg-white/6 transition-colors duration-300 pointer-events-none z-10" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent pointer-events-none" />
+          {/* Author — very small at bottom */}
+          <div className="absolute bottom-1.5 inset-x-0 flex justify-center overflow-hidden">
+            <span
+              className="text-[6.5px] font-sans"
+              style={{
+                writingMode: 'vertical-rl',
+                color: 'rgba(255,255,255,0.22)',
+              }}
+            >
+              {story.authorName}
+            </span>
           </div>
+
+          {/* Hover brightening */}
+          <div className="absolute inset-0 bg-white/0 group-hover:bg-white/8 transition-colors duration-300 pointer-events-none" />
         </div>
 
         {/* Shelf shadow */}
         <div
-          className="absolute bottom-0 inset-x-2 h-3 blur-lg transition-opacity duration-300
-            opacity-60 group-hover:opacity-25 pointer-events-none"
-          style={{ background: 'oklch(0.20 0.04 60)' }}
+          className="absolute bottom-0 inset-x-0 h-2 blur-md opacity-50 group-hover:opacity-20 transition-opacity pointer-events-none"
+          style={{ background: '#111' }}
         />
+      </div>
 
-        {/* Stats */}
-        <div
-          className="absolute bottom-0 inset-x-0 flex items-center justify-center gap-2
-            text-[9px] font-sans text-muted-foreground/0 group-hover:text-muted-foreground/40
-            transition-colors duration-300 pt-1"
-        >
-          <span>{story.views.toLocaleString()} reads</span>
-          <span className="opacity-40">·</span>
-          <span>{story.nodeCount} {story.nodeCount === 1 ? 'chapter' : 'chapters'}</span>
+      {/* ── Cover popup on hover ── */}
+      <div
+        className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2
+          opacity-0 group-hover:opacity-100
+          scale-90 group-hover:scale-100
+          transition-all duration-200
+          pointer-events-none z-30 origin-bottom"
+        style={{
+          width: 100,
+          filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.85))',
+        }}
+      >
+        <CoverPopup theme={theme} title={story.title} authorName={story.authorName} />
+        <div className="mt-1 text-center">
+          <p className="text-[8px] font-sans text-muted-foreground/40 leading-relaxed">
+            {story.views.toLocaleString()} reads · {story.nodeCount}{' '}
+            {story.nodeCount === 1 ? 'ch' : 'chs'}
+          </p>
         </div>
       </div>
     </Link>

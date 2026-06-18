@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { BookOpen, Globe, Loader2, ChevronRight, Plus, Palette, Feather } from 'lucide-react'
+import { BookOpen, Globe, Loader2, ChevronRight, Plus, Palette, Feather, Sparkles, RotateCcw } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,6 +14,9 @@ import { STORY_TAGS, CONTENT_RATINGS, CONTENT_RATING_META, DEFAULT_CONTENT_RATIN
 import { ratingRank } from '@/lib/ratings'
 import { CoverDesigner, DEFAULT_COVER } from '@/components/book/CoverDesigner'
 import type { World, CoverTheme, ReadingTheme, PageStyle, AmbientEffect, ContentRating } from '@/types'
+import { AIAssistModal } from '@/components/ai/AIAssistModal'
+import type { StoryAssistResult } from '@/components/ai/AIAssistModal'
+import { useDraft } from '@/hooks/useDraft'
 
 const PAGE_STYLES: { id: PageStyle; label: string; bg: string; text: string }[] = [
   { id: 'parchment', label: 'Parchment',    bg: '#f0e6d0', text: '#3d2b1f' },
@@ -39,6 +42,8 @@ export default function NewStoryPage() {
   const [worlds, setWorlds] = useState<World[]>([])
   const [loadingWorlds, setLoadingWorlds] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [aiModalOpen, setAiModalOpen] = useState(false)
+  const [hasDraft, setHasDraft] = useState(false)
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -56,20 +61,70 @@ export default function NewStoryPage() {
     pageStyle: 'parchment',
     ambientEffect: 'none',
   })
+  const [goapEnabled, setGoapEnabled] = useState(false)
+  const [implementQuests, setImplementQuests] = useState(false)
 
   const [resources, setResources] = useState<{
     name: string
-    type: 'number' | 'string' | 'array'
+    type: 'number' | 'string' | 'array' | 'boolean'
     defaultValue: string
     description?: string
     min?: number
     max?: number
     hidden?: boolean
+    icon?: string
+    displayAs?: 'value' | 'bar' | 'badge' | 'checkbox'
+    color?: string
+    isInitialChoice?: boolean
+    choices?: string
   }[]>([])
+
+  const draft = useDraft<{
+    title: string; description: string; worldId: string; rating: ContentRating
+    protagonistName: string; protagonistDesc: string; opening: string
+    choice1: string; choice2: string; choice3: string; tags: string[]
+    coverTheme: CoverTheme; readingTheme: ReadingTheme
+    resources: typeof resources
+    goapEnabled: boolean; implementQuests: boolean
+  }>('chronicle:draft:story')
 
   useEffect(() => {
     if (!loading && !user) router.replace('/')
   }, [user, loading, router])
+
+  useEffect(() => {
+    const saved = draft.load()
+    if (saved && (saved.data.title || saved.data.opening)) setHasDraft(true)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function restoreDraft() {
+    const saved = draft.load()
+    if (!saved) return
+    const d = saved.data
+    setTitle(d.title)
+    setDescription(d.description)
+    if (d.worldId) setWorldId(d.worldId)
+    setRating(d.rating)
+    setProtagonistName(d.protagonistName)
+    setProtagonistDesc(d.protagonistDesc)
+    setOpening(d.opening)
+    setChoice1(d.choice1)
+    setChoice2(d.choice2)
+    setChoice3(d.choice3)
+    setTags(d.tags)
+    setCoverTheme(d.coverTheme)
+    setReadingTheme(d.readingTheme)
+    setResources(d.resources)
+    setGoapEnabled(d.goapEnabled ?? false)
+    setImplementQuests(d.implementQuests ?? false)
+    setHasDraft(false)
+    toast.success('Draft restored')
+  }
+
+  function discardDraft() {
+    draft.clear()
+    setHasDraft(false)
+  }
 
   useEffect(() => {
     if (!user) return
@@ -113,6 +168,8 @@ export default function NewStoryPage() {
               : []
           } else if (r.type === 'number') {
             defaultValue = Number(r.defaultValue || 0)
+          } else if (r.type === 'boolean') {
+            defaultValue = r.defaultValue === 'true'
           }
 
           return {
@@ -123,6 +180,13 @@ export default function NewStoryPage() {
             min: r.type === 'number' && r.min !== undefined ? Number(r.min) : undefined,
             max: r.type === 'number' && r.max !== undefined ? Number(r.max) : undefined,
             hidden: r.hidden || false,
+            icon: r.icon?.trim() || undefined,
+            displayAs: r.displayAs || undefined,
+            color: r.color || undefined,
+            isInitialChoice: r.isInitialChoice || false,
+            choices: r.isInitialChoice && r.choices
+              ? r.choices.split('\n').map(s => s.trim()).filter(Boolean)
+              : undefined,
           }
         })
 
@@ -144,6 +208,8 @@ export default function NewStoryPage() {
           tags,
           coverTheme,
           readingTheme,
+          goapEnabled,
+          implementQuests,
         }),
       })
       if (!storyRes.ok) {
@@ -159,10 +225,19 @@ export default function NewStoryPage() {
       })
       if (!nodeRes.ok) throw new Error('Failed to create opening chapter')
 
+      draft.clear()
       toast.success('Your story has been born!')
       router.push(`/stories/${storyId}`)
     } catch (err) {
+      draft.save({
+        title, description, worldId, rating,
+        protagonistName, protagonistDesc, opening,
+        choice1, choice2, choice3, tags,
+        coverTheme, readingTheme, resources,
+        goapEnabled, implementQuests,
+      })
       toast.error(err instanceof Error ? err.message : 'Something went wrong')
+      toast.info('Draft saved — your story is preserved for next time.')
     } finally {
       setSubmitting(false)
     }
@@ -217,7 +292,65 @@ export default function NewStoryPage() {
         <p className="text-sm text-muted-foreground/60 max-w-sm">
           Write the opening chapter. The community will weave everything that follows.
         </p>
+        <div className="pt-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setAiModalOpen(true)}
+            className="gap-1.5 border-amber-500/25 text-amber-400/70 hover:bg-amber-500/10 hover:text-amber-300 hover:border-amber-500/40"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Inspire with AI
+          </Button>
+        </div>
       </div>
+
+      <AIAssistModal
+        type="story"
+        open={aiModalOpen}
+        onOpenChange={setAiModalOpen}
+        worldContext={worlds.find((w) => w.id === worldId) ?? null}
+        onGenerated={(result: StoryAssistResult) => {
+          setTitle(result.title)
+          setDescription(result.description)
+          setOpening(result.opening)
+          setChoice1(result.choice1)
+          setChoice2(result.choice2)
+          setChoice3(result.choice3)
+          setProtagonistName(result.protagonistName)
+          setProtagonistDesc(result.protagonistDesc)
+          setTags(result.tags)
+        }}
+      />
+
+      {hasDraft && (
+        <div className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+          <div className="flex items-center gap-2 text-sm text-amber-300/80">
+            <RotateCcw className="h-3.5 w-3.5 shrink-0" />
+            You have an unsaved story draft.
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={discardDraft}
+              className="h-7 px-2.5 text-xs text-muted-foreground/50 hover:text-muted-foreground"
+            >
+              Discard
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={restoreDraft}
+              className="h-7 px-2.5 text-xs bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300"
+            >
+              Restore
+            </Button>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="glass-card rounded-xl p-6 space-y-5">
@@ -358,7 +491,7 @@ export default function NewStoryPage() {
                   Story Resources
                 </h3>
                 <p className="text-[11px] text-muted-foreground/45 mt-0.5">
-                  Define numeric stats (Gold, Health) or item strings (Weapon, CurrentTown) for this book.
+                  Stats, inventory, flags, and reader choices. Locked once the story is published.
                 </p>
               </div>
               <Button
@@ -377,9 +510,18 @@ export default function NewStoryPage() {
                 {resources.map((res, index) => {
                   const nameId = `resource-name-${index}`
                   const typeId = `resource-type-${index}`
-                  const valId = `resource-val-${index}`
+                  const valId  = `resource-val-${index}`
+                  function updateRes(patch: Partial<typeof resources[0]>) {
+                    setResources((prev) => {
+                      const next = [...prev]
+                      next[index] = { ...next[index], ...patch }
+                      return next
+                    })
+                  }
                   return (
                     <div key={index} className="space-y-2.5 bg-white/[0.02] border border-white/[0.04] p-3 rounded-lg">
+
+                      {/* ── Row 1: name / type / default / delete ── */}
                       <div className="flex gap-2.5 items-end">
                         <div className="flex-1 space-y-1.5">
                           <Label htmlFor={nameId} className="text-[11px] opacity-40">Variable Name</Label>
@@ -387,59 +529,63 @@ export default function NewStoryPage() {
                             id={nameId}
                             placeholder="e.g. Gold"
                             value={res.name}
-                            onChange={(e) => {
-                              const val = e.target.value.replace(/[^a-zA-Z0-9_]/g, '')
-                              setResources((prev) => {
-                                const next = [...prev]
-                                next[index] = { ...next[index], name: val }
-                                return next
-                              })
-                            }}
+                            onChange={(e) => updateRes({ name: e.target.value.replace(/[^a-zA-Z0-9_]/g, '') })}
                           />
                         </div>
-                        <div className="w-36 space-y-1.5">
+                        <div className="w-40 space-y-1.5">
                           <Label htmlFor={typeId} className="text-[11px] opacity-40">Type</Label>
                           <select
                             id={typeId}
                             value={res.type}
                             onChange={(e) => {
-                              const t = e.target.value as 'number' | 'string' | 'array'
-                              setResources((prev) => {
-                                const next = [...prev]
-                                next[index] = {
-                                  ...next[index],
-                                  type: t,
-                                  defaultValue: t === 'number' ? '0' : '',
-                                  min: undefined,
-                                  max: undefined,
-                                }
-                                return next
+                              const t = e.target.value as typeof res.type
+                              updateRes({
+                                type: t,
+                                defaultValue: t === 'number' ? '0' : t === 'boolean' ? 'false' : '',
+                                min: undefined,
+                                max: undefined,
+                                displayAs: undefined,
+                                isInitialChoice: false,
+                                choices: '',
                               })
                             }}
                             className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm focus:outline-none"
                           >
-                            <option value="number">Number</option>
-                            <option value="string">String</option>
-                            <option value="array">Array (Inventory)</option>
+                            <option value="number">Number (stat)</option>
+                            <option value="string">String (text)</option>
+                            <option value="array">Array (inventory)</option>
+                            <option value="boolean">Boolean (flag)</option>
                           </select>
                         </div>
-                        <div className="flex-1 space-y-1.5">
-                          <Label htmlFor={valId} className="text-[11px] opacity-40">Starting Value</Label>
-                          <Input
-                            id={valId}
-                            placeholder={res.type === 'number' ? '0' : res.type === 'array' ? 'e.g. key, sword' : 'None'}
-                            type="text"
-                            value={res.defaultValue}
-                            onChange={(e) => {
-                              const val = e.target.value
-                              setResources((prev) => {
-                                const next = [...prev]
-                                next[index] = { ...next[index], defaultValue: val }
-                                return next
-                              })
-                            }}
-                          />
-                        </div>
+
+                        {/* Starting value — hidden for boolean (uses a toggle instead) */}
+                        {res.type !== 'boolean' && (
+                          <div className="flex-1 space-y-1.5">
+                            <Label htmlFor={valId} className="text-[11px] opacity-40">Starting Value</Label>
+                            <Input
+                              id={valId}
+                              placeholder={res.type === 'number' ? '0' : res.type === 'array' ? 'e.g. key, sword' : 'None'}
+                              value={res.defaultValue}
+                              onChange={(e) => updateRes({ defaultValue: e.target.value })}
+                            />
+                          </div>
+                        )}
+
+                        {/* Boolean starting state */}
+                        {res.type === 'boolean' && (
+                          <div className="space-y-1.5">
+                            <Label className="text-[11px] opacity-40">Default</Label>
+                            <select
+                              value={res.defaultValue}
+                              onChange={(e) => updateRes({ defaultValue: e.target.value })}
+                              className="h-10 rounded-md border border-input bg-background px-3 text-sm focus:outline-none"
+                            >
+                              <option value="false">False</option>
+                              <option value="true">True</option>
+                            </select>
+                          </div>
+                        )}
+
                         <Button
                           type="button"
                           variant="ghost"
@@ -450,22 +596,16 @@ export default function NewStoryPage() {
                           Delete
                         </Button>
                       </div>
-                      
-                      {/* Secondary row for description, bounds, and secret visibility */}
+
+                      {/* ── Row 2: description / bounds ── */}
                       <div className="flex flex-wrap gap-3 items-center pt-2.5 border-t border-white/[0.03]">
                         <div className="flex-1 min-w-[200px] space-y-1">
-                          <Label htmlFor={`resource-desc-${index}`} className="text-[9px] opacity-35">Description (optional)</Label>
+                          <Label htmlFor={`resource-desc-${index}`} className="text-[9px] opacity-35">Description (tooltip for readers)</Label>
                           <Input
                             id={`resource-desc-${index}`}
-                            placeholder="e.g. Tracks items carried by the reader"
+                            placeholder="e.g. How much gold you're carrying"
                             value={res.description || ''}
-                            onChange={(e) => {
-                              setResources((prev) => {
-                                const next = [...prev]
-                                next[index] = { ...next[index], description: e.target.value }
-                                return next
-                              })
-                            }}
+                            onChange={(e) => updateRes({ description: e.target.value })}
                             className="h-8 text-xs placeholder:opacity-50"
                           />
                         </div>
@@ -473,63 +613,125 @@ export default function NewStoryPage() {
                         {res.type === 'number' && (
                           <>
                             <div className="w-20 space-y-1">
-                              <Label htmlFor={`resource-min-${index}`} className="text-[9px] opacity-35">Min Value</Label>
+                              <Label htmlFor={`resource-min-${index}`} className="text-[9px] opacity-35">Min</Label>
                               <Input
                                 id={`resource-min-${index}`}
                                 type="number"
                                 placeholder="None"
                                 value={res.min !== undefined ? res.min : ''}
-                                onChange={(e) => {
-                                  const val = e.target.value === '' ? undefined : Number(e.target.value)
-                                  setResources((prev) => {
-                                    const next = [...prev]
-                                    next[index] = { ...next[index], min: val }
-                                    return next
-                                  })
-                                }}
+                                onChange={(e) => updateRes({ min: e.target.value === '' ? undefined : Number(e.target.value) })}
                                 className="h-8 text-xs"
                               />
                             </div>
                             <div className="w-20 space-y-1">
-                              <Label htmlFor={`resource-max-${index}`} className="text-[9px] opacity-35">Max Value</Label>
+                              <Label htmlFor={`resource-max-${index}`} className="text-[9px] opacity-35">Max</Label>
                               <Input
                                 id={`resource-max-${index}`}
                                 type="number"
                                 placeholder="None"
                                 value={res.max !== undefined ? res.max : ''}
-                                onChange={(e) => {
-                                  const val = e.target.value === '' ? undefined : Number(e.target.value)
-                                  setResources((prev) => {
-                                    const next = [...prev]
-                                    next[index] = { ...next[index], max: val }
-                                    return next
-                                  })
-                                }}
+                                onChange={(e) => updateRes({ max: e.target.value === '' ? undefined : Number(e.target.value) })}
                                 className="h-8 text-xs"
                               />
                             </div>
                           </>
                         )}
+                      </div>
+
+                      {/* ── Row 3: display options ── */}
+                      <div className="flex flex-wrap gap-3 items-center pt-2.5 border-t border-white/[0.03]">
+                        <div className="space-y-1">
+                          <Label className="text-[9px] opacity-35">Display As</Label>
+                          <select
+                            value={res.displayAs || ''}
+                            onChange={(e) => updateRes({ displayAs: (e.target.value || undefined) as typeof res.displayAs })}
+                            className="h-8 rounded-md border border-input bg-background px-2 text-xs focus:outline-none"
+                          >
+                            <option value="">Default</option>
+                            {res.type === 'number' && (
+                              <>
+                                <option value="value">Value</option>
+                                <option value="bar">Progress Bar</option>
+                              </>
+                            )}
+                            {res.type === 'array' && (
+                              <>
+                                <option value="value">Comma list</option>
+                                <option value="badge">Badges</option>
+                              </>
+                            )}
+                            {res.type === 'boolean' && (
+                              <option value="checkbox">Checkbox</option>
+                            )}
+                            {res.type === 'string' && (
+                              <option value="value">Value</option>
+                            )}
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-[9px] opacity-35">Icon (emoji)</Label>
+                          <Input
+                            placeholder="⚔️"
+                            value={res.icon || ''}
+                            onChange={(e) => updateRes({ icon: e.target.value })}
+                            className="h-8 w-16 text-center text-sm"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-[9px] opacity-35">Accent Color</Label>
+                          <input
+                            type="color"
+                            value={res.color || '#fbbf24'}
+                            onChange={(e) => updateRes({ color: e.target.value })}
+                            className="h-8 w-10 rounded-md border border-input bg-background cursor-pointer"
+                          />
+                        </div>
 
                         <div className="flex items-center gap-1.5 pt-4">
                           <input
                             type="checkbox"
                             id={`resource-hidden-${index}`}
                             checked={res.hidden || false}
-                            onChange={(e) => {
-                              setResources((prev) => {
-                                const next = [...prev]
-                                next[index] = { ...next[index], hidden: e.target.checked }
-                                return next
-                              })
-                            }}
+                            onChange={(e) => updateRes({ hidden: e.target.checked })}
                             className="rounded bg-background border-input h-3.5 w-3.5"
                           />
                           <Label htmlFor={`resource-hidden-${index}`} className="text-[10px] opacity-50 cursor-pointer">
-                            Hide from readers (secret variable)
+                            Hidden (secret variable)
                           </Label>
                         </div>
                       </div>
+
+                      {/* ── Row 4: Initial choice (string type only) ── */}
+                      {res.type === 'string' && (
+                        <div className="pt-2.5 border-t border-white/[0.03] space-y-2">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id={`resource-initial-${index}`}
+                              checked={res.isInitialChoice || false}
+                              onChange={(e) => updateRes({ isInitialChoice: e.target.checked, choices: '' })}
+                              className="rounded bg-background border-input h-3.5 w-3.5"
+                            />
+                            <Label htmlFor={`resource-initial-${index}`} className="text-[10px] text-amber-400/70 cursor-pointer font-medium">
+                              Reader picks this once at the start (class selection, origin, etc.)
+                            </Label>
+                          </div>
+                          {res.isInitialChoice && (
+                            <div className="space-y-1 pl-5">
+                              <Label className="text-[9px] opacity-35">Options (one per line)</Label>
+                              <textarea
+                                placeholder={"Warrior\nMage\nRogue"}
+                                value={res.choices || ''}
+                                onChange={(e) => updateRes({ choices: e.target.value })}
+                                rows={3}
+                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs text-foreground/70 placeholder:opacity-30 focus:outline-none focus:border-amber-500/30 resize-none"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -544,7 +746,30 @@ export default function NewStoryPage() {
             <Palette className="h-4 w-4 text-amber-400/55" />
             Book Cover Design
           </h2>
-          <CoverDesigner value={coverTheme} onChange={setCoverTheme} title={title} />
+          <CoverDesigner
+            value={coverTheme}
+            onChange={setCoverTheme}
+            title={title}
+            onGenerateImage={async () => {
+              if (!user) return null
+              const token = await user.getIdToken()
+              const world = worlds.find((w) => w.id === worldId)
+              const res = await fetch('/api/ai/cover-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({
+                  title: title.trim(),
+                  description: description.trim(),
+                  tags,
+                  worldName: world?.name ?? '',
+                  worldDescription: world?.description ?? '',
+                }),
+              })
+              if (!res.ok) return null
+              const data = await res.json()
+              return data.url ?? null
+            }}
+          />
         </div>
 
         {/* ── Reading Theme ── */}
@@ -603,6 +828,49 @@ export default function NewStoryPage() {
                   {e.label}
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Advanced Engine Features ── */}
+        <div className="glass-card rounded-xl p-6 space-y-5">
+          <h2 className="text-sm font-medium text-foreground/65 flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-amber-400/55" />
+            Advanced Engine Features
+          </h2>
+
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                id="goapEnabled"
+                checked={goapEnabled}
+                onChange={(e) => setGoapEnabled(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded bg-background border-input text-amber-500 focus:ring-amber-500"
+              />
+              <div className="space-y-1">
+                <Label htmlFor="goapEnabled" className="text-sm cursor-pointer">Enable GOAP AI Characters</Label>
+                <p className="text-[11px] text-muted-foreground/50 leading-relaxed">
+                  Allows characters to autonomously form goals and execute plans behind the scenes based on the story&apos;s world state. 
+                  This creates a dynamic, living world where characters act independently of the reader.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                id="implementQuests"
+                checked={implementQuests}
+                onChange={(e) => setImplementQuests(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded bg-background border-input text-amber-500 focus:ring-amber-500"
+              />
+              <div className="space-y-1">
+                <Label htmlFor="implementQuests" className="text-sm cursor-pointer">Enable Procedural Quests</Label>
+                <p className="text-[11px] text-muted-foreground/50 leading-relaxed">
+                  Dynamically generates side-quests and minor encounters as the reader explores. This uses the world seed to ensure consistent generation.
+                </p>
+              </div>
             </div>
           </div>
         </div>

@@ -3,7 +3,7 @@
 import { useState, useMemo, useId, useEffect } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, X, Library, BookOpen, Tag } from 'lucide-react'
+import { Search, X, Library, BookOpen, Tag, ChevronDown } from 'lucide-react'
 import { StoryCard } from '@/components/StoryCard'
 import { useAuth } from '@/components/Providers'
 import { ratingRank } from '@/lib/ratings'
@@ -47,10 +47,13 @@ export function LibraryClient({ stories }: Props) {
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
-  // Unique world names, sorted A→Z
+  // Worlds with story counts, sorted by count desc then name
   const worlds = useMemo(() => {
-    const names = [...new Set(visibleStories.map((s) => s.worldName))]
-    return names.sort((a, b) => a.localeCompare(b))
+    const counts = new Map<string, number>()
+    for (const s of visibleStories) counts.set(s.worldName, (counts.get(s.worldName) ?? 0) + 1)
+    return [...counts.entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
   }, [visibleStories])
 
   // Unique tags across all stories
@@ -98,10 +101,11 @@ export function LibraryClient({ stories }: Props) {
   }
 
   return (
-    <div className="space-y-8">
-      {/* Search */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 max-w-lg">
+    <div className="space-y-7">
+      {/* ── Filter bar: search + world select ── */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+        {/* Search */}
+        <div className="relative flex-1">
           <label htmlFor={searchId} className="sr-only">Search stories</label>
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-amber-400/35 pointer-events-none" />
           <input
@@ -110,7 +114,7 @@ export function LibraryClient({ stories }: Props) {
             placeholder="Search by title, author, or description…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-11 pl-10 pr-10 rounded-lg text-sm border border-white/10 bg-white/[0.04] text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500/25 transition-colors font-sans"
+            className="w-full h-10 pl-10 pr-10 rounded-lg text-sm border border-white/10 bg-white/[0.04] text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500/25 transition-colors font-sans"
           />
           {search && (
             <button
@@ -122,37 +126,40 @@ export function LibraryClient({ stories }: Props) {
             </button>
           )}
         </div>
+
+        {/* World selector */}
+        {worlds.length > 1 && (
+          <div className="relative shrink-0">
+            <Library className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-amber-400/35 pointer-events-none" />
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/30 pointer-events-none" />
+            <select
+              value={worldFilter ?? ''}
+              onChange={(e) => setWorld(e.target.value || null)}
+              aria-label="Filter by world"
+              className="h-10 pl-8 pr-8 rounded-lg text-sm border border-white/10 bg-white/[0.04] text-foreground/70 focus:outline-none focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500/25 transition-colors font-sans appearance-none cursor-pointer min-w-[180px]"
+            >
+              <option value="">All worlds ({visibleStories.length})</option>
+              {worlds.map(({ name, count }) => (
+                <option key={name} value={name}>
+                  {name} ({count})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {isFiltered && (
           <button
+            type="button"
             onClick={clearFilters}
-            className="text-xs font-sans text-amber-400/50 hover:text-amber-400 transition-colors whitespace-nowrap self-center"
+            className="text-xs font-sans text-amber-400/50 hover:text-amber-400 transition-colors whitespace-nowrap"
           >
             Clear filters
           </button>
         )}
       </div>
 
-      {/* World filter pills */}
-      {worlds.length > 1 && (
-        <div className="space-y-2">
-          <p className="text-[10px] uppercase tracking-widest text-muted-foreground/25 font-sans font-semibold flex items-center gap-1.5">
-            <Library className="h-3 w-3" /> Worlds
-          </p>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by world">
-            <FilterPill label="All worlds" active={worldFilter === null} onClick={() => setWorld(null)} />
-            {worlds.map((world) => (
-              <FilterPill
-                key={world}
-                label={world}
-                active={worldFilter === world}
-                onClick={() => setWorld(worldFilter === world ? null : world)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Tag filter pills */}
+      {/* ── Genre chips (reader favorites) ── */}
       {allTags.length > 0 && (
         <div className="space-y-2">
           <p className="text-[10px] uppercase tracking-widest text-muted-foreground/25 font-sans font-semibold flex items-center gap-1.5">
@@ -256,7 +263,7 @@ function WorldShelf({ worldName, books }: { worldName: string; books: Story[] })
       </div>
 
       <div className="relative">
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-4 sm:gap-5 pb-6">
+        <div className="flex flex-wrap gap-2.5 pb-6">
           {books.map((story) => (
             <StoryCard key={story.id} story={story} />
           ))}

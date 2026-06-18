@@ -48,6 +48,17 @@ export class CreatorResourceManager {
         }
       }
 
+      // Handle boolean type resources (stored as 'true'/'false' strings)
+      if (val === 'true' || val === 'false') {
+        const boolVal = val === 'true'
+        const reqBool = String(req.value) === 'true'
+        switch (req.operator) {
+          case '==': return boolVal === reqBool
+          case '!=': return boolVal !== reqBool
+          default: return true
+        }
+      }
+
       // Handle string type resources
       const valStr = String(val).trim().toLowerCase()
       const reqValStr = String(req.value).trim().toLowerCase()
@@ -121,6 +132,10 @@ export class CreatorResourceManager {
         }
 
         updated[eff.resourceName] = newVal
+      } else if (def?.type === 'boolean' || val === 'true' || val === 'false') {
+        if (eff.operator === '=') {
+          updated[eff.resourceName] = eff.value === 'true' ? 'true' : 'false'
+        }
       } else {
         // String fallback
         if (eff.operator === '=') {

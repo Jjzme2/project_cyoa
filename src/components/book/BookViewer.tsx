@@ -136,6 +136,8 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
   )
   const [endingsOpen, setEndingsOpen] = useState(false)
   const [castOpen, setCastOpen] = useState(false)
+  const [showInitialChoices, setShowInitialChoices] = useState(false)
+  const [pendingChoices, setPendingChoices] = useState<Record<string, string>>({})
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const hasCast = !!story.protagonist?.name || (story.characters?.length ?? 0) > 0
@@ -198,11 +200,23 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
               : []
           } else if (r.type === 'number') {
             initial[r.name] = Number(r.defaultValue || 0)
+          } else if (r.type === 'boolean') {
+            initial[r.name] = r.defaultValue === true || r.defaultValue === 'true' ? 'true' : 'false'
           } else {
             initial[r.name] = String(r.defaultValue || '')
           }
         })
         setResources(initial)
+
+        const initChoiceResources = story.resources.filter(
+          (r) => r.isInitialChoice && r.choices && r.choices.length > 0,
+        )
+        if (initChoiceResources.length > 0) {
+          const defaults: Record<string, string> = {}
+          initChoiceResources.forEach((r) => { defaults[r.name] = r.choices![0] })
+          setPendingChoices(defaults)
+          setShowInitialChoices(true)
+        }
       }
 
       // Restore active slot from localStorage save slots
@@ -311,7 +325,7 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
 
   // ── Navigation ────────────────────────────────────────────────────────────
 
-  async function goToNode(nodeId: string, effects?: ChoiceEffect[]) {
+  async function goToNode(nodeId: string, effects?: ChoiceEffect[], historyNode?: StoryNode) {
     if (soundOn) playPageTurn()
     setFetchingNode(true)
     setDirection('forward')
@@ -330,8 +344,9 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
         setResourcesHistory(nextResHistory)
       }
 
+      const nodeToSave = historyNode ?? node
       setHistory((h) => {
-        const next = [...h, node]
+        const next = [...h, nodeToSave]
         persistProgress(nodeId, next, updatedResources, nextResHistory)
         return next
       })
@@ -350,27 +365,31 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
     if (soundOn) playPageTurn()
     setDirection('back')
 
-    let updatedResources = { ...resources }
-    let nextResHistory = [...resourcesHistory]
+    const newHistory = history.slice(0, -1)
+    const prevRes = resourcesHistory.at(-1)
+    const newResHistory = prevRes ? resourcesHistory.slice(0, -1) : resourcesHistory
+    const newResources = prevRes ?? resources
 
-    setResourcesHistory((rh) => {
-      const prevRes = rh.at(-1)
-      if (prevRes) {
-        updatedResources = prevRes
-        nextResHistory = rh.slice(0, -1)
-        setResources(prevRes)
-        return nextResHistory
-      }
-      return rh
-    })
+    setHistory(newHistory)
+    setResourcesHistory(newResHistory)
+    if (prevRes) setResources(prevRes)
 
-    setHistory((h) => {
-      const next = h.slice(0, -1)
-      if (!prev.content) { goToNode(prev.id); return next }
-      persistProgress(prev.id, next, updatedResources, nextResHistory)
-      return next
-    })
-    if (prev.content) setNode(prev)
+    if (prev.content) {
+      setNode(prev)
+      persistProgress(prev.id, newHistory, newResources, newResHistory)
+    } else {
+      // Node was restored from ID without content — fetch it without touching history
+      setFetchingNode(true)
+      fetchNode(prev.id)
+        .then(async (res) => {
+          if (!res.ok) throw new Error()
+          const data = await res.json()
+          setNode(data.node)
+          persistProgress(data.node.id, newHistory, newResources, newResHistory)
+        })
+        .catch(() => toast.error('Could not load that page.'))
+        .finally(() => setFetchingNode(false))
+    }
   }
 
   function handleSlotFilled(slot: ChoiceSlot, nodeId: string, pendingReview?: boolean) {
@@ -384,11 +403,12 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
       }))
       return
     }
-    setNode((n) => ({
-      ...n,
-      slots: n.slots.map((s) => (s.id === slot.id ? { ...s, filled: true, childNodeId: nodeId } : s)),
-    }))
-    goToNode(nodeId)
+    const updatedNode: StoryNode = {
+      ...node,
+      slots: node.slots.map((s) => (s.id === slot.id ? { ...s, filled: true, childNodeId: nodeId } : s)),
+    }
+    setNode(updatedNode)
+    goToNode(nodeId, undefined, updatedNode)
   }
 
   // ── Save slots ────────────────────────────────────────────────────────────
@@ -420,34 +440,214 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
   const pageNumber = history.length + 1
   const palette = PAGE_PALETTES[story.readingTheme?.pageStyle ?? 'parchment'] ?? PAGE_PALETTES.parchment
 
+  function confirmInitialChoices() {
+    setResources((prev) => ({ ...prev, ...pendingChoices }))
+    setShowInitialChoices(false)
+  }
+
+  const initialChoiceResources = (story.resources ?? []).filter(
+    (r) => r.isInitialChoice && r.choices && r.choices.length > 0,
+  )
+
   return (
     <div className="flex flex-col items-center gap-5 w-full max-w-4xl mx-auto">
       <AmbientBackground effect={ambientEffect} />
 
+      {/* Initial choice overlay — shown once before story begins */}
+      {showInitialChoices && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl border p-8 space-y-7"
+            style={{
+              background: palette.bg,
+              borderColor: `${palette.text}30`,
+              color: palette.text,
+            }}
+          >
+            <div className="text-center space-y-1.5">
+              <p className="text-[10px] uppercase tracking-[0.3em] opacity-40 font-sans">
+                Before you begin
+              </p>
+              <h2
+                className="text-xl font-bold"
+                style={{ fontFamily: 'Georgia, serif' }}
+              >
+                Shape your journey
+              </h2>
+              <p className="text-[13px] opacity-55">
+                These choices will define your path through the story.
+              </p>
+            </div>
+
+            <div className="space-y-6">
+              {initialChoiceResources.map((resDef) => (
+                <div key={resDef.name} className="space-y-3">
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-semibold">
+                      {resDef.icon && <span className="mr-1.5">{resDef.icon}</span>}
+                      {resDef.description || resDef.name}
+                    </p>
+                    <p className="text-[11px] opacity-40 font-sans">Choose one:</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {resDef.choices!.map((choice) => {
+                      const selected = pendingChoices[resDef.name] === choice
+                      const accent = resDef.color ?? '#fbbf24'
+                      return (
+                        <button
+                          key={choice}
+                          type="button"
+                          onClick={() => setPendingChoices((p) => ({ ...p, [resDef.name]: choice }))}
+                          className="px-4 py-3 rounded-xl border text-sm font-medium transition-all text-left"
+                          style={{
+                            background: selected ? `${accent}22` : `${palette.text}08`,
+                            borderColor: selected ? `${accent}80` : `${palette.text}20`,
+                            color: selected ? accent : palette.text,
+                            boxShadow: selected ? `inset 3px 0 0 ${accent}` : undefined,
+                          }}
+                        >
+                          {choice}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={confirmInitialChoices}
+              className="w-full py-3 rounded-xl text-sm font-semibold transition-all"
+              style={{
+                background: palette.text,
+                color: palette.bg,
+              }}
+            >
+              Begin your adventure
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Resources bar */}
       {story.resources && story.resources.length > 0 && (
         <div
-          className="w-full p-4 rounded-xl border flex flex-wrap gap-4 items-center justify-between"
+          className="w-full p-3 rounded-xl border flex flex-wrap gap-3 items-center"
           style={{
             background: 'oklch(0.92 0.02 80 / 55%)',
             borderColor: 'oklch(0.50 0.06 60 / 25%)',
           }}
         >
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-500/80 tracking-wider uppercase font-sans">
-            <Sparkles className="h-3.5 w-3.5" />
-            Resources & Inventory
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold text-amber-500/70 tracking-wider uppercase font-sans shrink-0">
+            <Sparkles className="h-3 w-3" />
+            Resources
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2 flex-1">
             {story.resources.filter((r) => !r.hidden).map((resDef) => {
               const val = resources[resDef.name] ?? resDef.defaultValue
+              const accent = resDef.color ?? '#fbbf24'
+              const displayAs = resDef.displayAs ?? (
+                resDef.type === 'boolean' ? 'checkbox' :
+                resDef.type === 'array'   ? 'badge'    : 'value'
+              )
+
+              if (displayAs === 'bar' && resDef.type === 'number') {
+                const numVal = Number(val)
+                const min = resDef.min ?? 0
+                const max = resDef.max ?? 100
+                const pct = max > min
+                  ? Math.min(100, Math.max(0, ((numVal - min) / (max - min)) * 100))
+                  : 0
+                return (
+                  <div
+                    key={resDef.name}
+                    title={resDef.description}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-sans border bg-white/5"
+                    style={{ borderColor: 'oklch(0.50 0.06 60 / 15%)' }}
+                  >
+                    {resDef.icon && <span className="text-sm leading-none">{resDef.icon}</span>}
+                    <span className="opacity-50 text-[10px]">{resDef.name}</span>
+                    <div className="w-16 h-1.5 rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full transition-all duration-300"
+                        style={{ width: `${pct}%`, background: accent }}
+                      />
+                    </div>
+                    <span className="font-semibold text-[10px]" style={{ color: accent }}>
+                      {numVal}{max ? `/${max}` : ''}
+                    </span>
+                  </div>
+                )
+              }
+
+              if (displayAs === 'checkbox' || resDef.type === 'boolean') {
+                const checked = val === 'true'
+                return (
+                  <div
+                    key={resDef.name}
+                    title={resDef.description}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-sans border bg-white/5"
+                    style={{ borderColor: 'oklch(0.50 0.06 60 / 15%)' }}
+                  >
+                    {resDef.icon && <span className="text-sm leading-none">{resDef.icon}</span>}
+                    <div
+                      className="w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0"
+                      style={{
+                        background: checked ? accent : 'transparent',
+                        borderColor: checked ? accent : 'rgba(255,255,255,0.25)',
+                      }}
+                    >
+                      {checked && <span className="text-[8px] text-black font-bold leading-none">✓</span>}
+                    </div>
+                    <span className={checked ? 'opacity-80' : 'opacity-40'} style={{ color: checked ? accent : undefined }}>
+                      {resDef.name}
+                    </span>
+                  </div>
+                )
+              }
+
+              if (displayAs === 'badge' || resDef.type === 'array') {
+                const items = Array.isArray(val) ? val as string[] : []
+                return (
+                  <div
+                    key={resDef.name}
+                    title={resDef.description}
+                    className="flex items-center gap-1 flex-wrap"
+                  >
+                    {resDef.icon && <span className="text-sm leading-none">{resDef.icon}</span>}
+                    <span className="text-[10px] opacity-40 font-sans">{resDef.name}:</span>
+                    {items.length === 0 ? (
+                      <span className="text-[10px] opacity-25 font-sans italic">empty</span>
+                    ) : items.map((item) => (
+                      <span
+                        key={item}
+                        className="px-1.5 py-0.5 rounded text-[10px] font-sans border"
+                        style={{ borderColor: `${accent}40`, color: accent, background: `${accent}12` }}
+                      >
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                )
+              }
+
+              // default: value display
               return (
                 <div
                   key={resDef.name}
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-sans border bg-white/5"
+                  title={resDef.description}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-sans border bg-white/5"
                   style={{ borderColor: 'oklch(0.50 0.06 60 / 15%)' }}
                 >
+                  {resDef.icon && <span className="text-sm leading-none">{resDef.icon}</span>}
                   <span className="opacity-45">{resDef.name}:</span>
-                  <span className="font-semibold text-amber-300">{Array.isArray(val) ? val.join(', ') || '—' : String(val)}</span>
+                  <span className="font-semibold" style={{ color: accent }}>
+                    {Array.isArray(val) ? val.join(', ') || '—' : String(val)}
+                  </span>
                 </div>
               )
             })}
@@ -480,6 +680,7 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
 
         <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={() => setEndingsOpen(true)}
             title="Endings discovered"
             aria-label="Endings discovered"
@@ -491,6 +692,7 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
           </button>
           {hasCast && (
             <button
+              type="button"
               onClick={() => setCastOpen(true)}
               title="Cast of characters"
               aria-label="Cast of characters"
@@ -502,6 +704,7 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
           <GalleryButton storyId={story.id} />
           {ambientEffect !== 'none' && (
             <button
+              type="button"
               onClick={toggleAmbient}
               title={ambientOn ? 'Turn off ambient sound' : 'Turn on ambient sound'}
               aria-label={ambientOn ? 'Turn off ambient sound' : 'Turn on ambient sound'}
@@ -513,6 +716,7 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
             </button>
           )}
           <button
+            type="button"
             onClick={toggleSound}
             title={soundOn ? 'Mute page-turn sound' : 'Unmute page-turn sound'}
             aria-label={soundOn ? 'Mute page-turn sound' : 'Unmute page-turn sound'}
@@ -528,6 +732,20 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
           />
         </div>
       </div>
+
+      {/* Breadcrumb */}
+      <JourneyMap
+        history={history}
+        currentNode={node}
+        onNavigate={(nodeId) => {
+          setDirection('back')
+          goToNode(nodeId)
+          setHistory((h) => {
+            const idx = h.findIndex((n) => n.id === nodeId)
+            return idx >= 0 ? h.slice(0, idx) : h
+          })
+        }}
+      />
 
       {/* Book */}
       <div className="relative w-full" style={{ perspective: '2400px' }}>
@@ -608,20 +826,6 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
           </div>
         )}
       </div>
-
-      <JourneyMap
-        history={history}
-        currentNode={node}
-        onNavigate={(nodeId) => {
-          setDirection('back')
-          goToNode(nodeId)
-          // Trim history to the point before this node
-          setHistory((h) => {
-            const idx = h.findIndex((n) => n.id === nodeId)
-            return idx >= 0 ? h.slice(0, idx) : h
-          })
-        }}
-      />
 
       <p className="text-[11px] text-muted-foreground/30 font-sans tracking-wide">
         {story.title} · {story.authorName} · {story.nodeCount}{' '}

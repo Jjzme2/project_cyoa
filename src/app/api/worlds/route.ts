@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { name, description, lore, rules, tone, tags, rating } = body
+  const { name, description, lore, rules, tone, tags, rating, seed } = body
 
   if (!name || !description || !lore || !rules) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
     tags: Array.isArray(tags) ? tags.slice(0, 5) : [],
     rating: safeRating,
     ratingOverriddenBy: null,
+    ...(seed !== undefined && seed !== null ? { seed: Number(seed) } : {}),
   })
 
   revalidateTag('worlds', 'max')

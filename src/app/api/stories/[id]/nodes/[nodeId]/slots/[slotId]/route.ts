@@ -23,6 +23,9 @@ import { CreditManager } from '@/lib/credit-manager'
 import { generateStoryNode, generateStoryImage, PromptRejectedError } from '@/lib/ai'
 import { validatePromptLocal } from '@/lib/validate'
 import { moderateText, moderationToNodeFields } from '@/lib/moderation'
+import { NarrativeBuilder } from '@/lib/engine/narrative-builder'
+import type { WorldState } from '@/types/goap'
+import type { AgentMemory } from '@/types/goap'
 
 const IMAGE_CREDIT_COST = 3 // total credits when image is requested
 
@@ -52,6 +55,8 @@ export async function POST(
   const includeImage: boolean = body.includeImage === true
   const requirements = body.requirements ?? []
   const effects = body.effects ?? []
+  const memoryEffects: import('@/types').ChoiceMemoryEffect[] = body.memoryEffects ?? []
+  const worldState: WorldState = body.worldState ?? {}
   const credits = includeImage ? IMAGE_CREDIT_COST : 1
 
   if (!promptText.trim()) {
@@ -136,12 +141,41 @@ export async function POST(
       characters: story.characters,
     }
 
+    let systemNarrativeEvents = ''
+    let updatedEngineState = undefined
+    if (story.goapEnabled || story.implementQuests) {
+      // Restore prior engine state from the parent node (server-side, not client-trusted)
+      const priorEngineState = parentNode.engineState ?? undefined
+      const builder = new NarrativeBuilder(story, world, priorEngineState)
+      const pathString = storyPath.map(p => p.id).join('_')
+      const { context, updatedEngineState: nextState } = builder.buildContext(
+        pathString,
+        parentNode.depth + 1,
+        worldState,
+        priorEngineState,
+      )
+      systemNarrativeEvents = builder.formatForPrompt(context)
+
+      // Apply any memory effects declared on the slot (protagonist ↔ character interactions)
+      if (memoryEffects.length > 0) {
+        for (const effect of memoryEffects) {
+          const existing: AgentMemory[] = nextState.agentMemories[effect.characterName] ?? []
+          for (const m of existing) m.decayWeight = Math.max(0, m.decayWeight - 0.1)
+          existing.push({ event: effect.event, nodeId: nodeId, sentiment: effect.sentiment, decayWeight: 1.0 })
+          nextState.agentMemories[effect.characterName] = existing.filter((m) => m.decayWeight > 0)
+        }
+      }
+
+      updatedEngineState = nextState
+    }
+
     const { content, choices, model, newCharacters } = await generateStoryNode(
       worldCtx,
       storyPath,
       promptText,
       uid,
       includeImage,
+      systemNarrativeEvents
     )
 
     // Moderate the generated prose. Hard-refuse disallowed content (release the
@@ -180,6 +214,7 @@ export async function POST(
           aiGenerated: true,
           aiModel: model,
           imageUrl: null,
+          ...(updatedEngineState ? { engineState: updatedEngineState } : {}),
         },
         choices,
         moderationFields,

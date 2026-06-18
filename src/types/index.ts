@@ -1,9 +1,21 @@
 export const STORY_TAGS = [
-  'Fantasy', 'Horror', 'Sci-Fi', 'Mystery', 'Romance', 'Adventure',
-  'Comedy', 'Thriller', 'Historical', 'Cosmic Horror', 'Fairy Tale',
-  'Noir', 'Post-Apocalyptic', 'Steampunk', 'Western',
+  // Core genres
+  'Fantasy', 'Dark Fantasy', 'Urban Fantasy', 'Fairy Tale', 'Mythology',
+  'Horror', 'Gothic', 'Cosmic Horror', 'Supernatural',
+  'Sci-Fi', 'Space Opera', 'Cyberpunk', 'Biopunk', 'Solarpunk',
+  'Mystery', 'Noir', 'Thriller', 'Psychological',
+  // Adventure & tone
+  'Adventure', 'Survival', 'Action', 'Political',
+  'Romance', 'Comedy', 'Slice of Life', 'Drama',
+  // Setting
+  'Historical', 'Alternate History', 'Post-Apocalyptic', 'Steampunk', 'Western',
+  // Mechanics & style
+  'LitRPG', 'Magical Realism',
 ] as const
 export type StoryTag = typeof STORY_TAGS[number]
+
+import { GOAPGoal, PersonalityWeights } from './goap'
+import type { EngineState } from './engine'
 
 // ─── Roles & Access Control ─────────────────────────────────────────────────
 export type Role = 'user' | 'admin'
@@ -53,6 +65,12 @@ export interface StoryCharacter {
   description?: string
   /** e.g. 'alive', 'deceased', 'missing' — the AI must respect this for continuity. */
   status?: string
+  /** GOAP configuration for this character, if living characters are enabled */
+  goapConfig?: {
+    goals: GOAPGoal[]
+    availableActions: string[]
+    personality: PersonalityWeights
+  }
 }
 
 export interface Protagonist {
@@ -239,6 +257,8 @@ export interface World {
   ratingOverriddenBy?: string | null
   /** Authored by the Chronicle team as starter content, not the community. */
   seeded?: boolean
+  /** Procedural generation seed for this world. */
+  seed?: number
   createdAt: string
 }
 
@@ -269,6 +289,12 @@ export interface Story {
   characters?: StoryCharacter[]
   coverTheme?: CoverTheme
   readingTheme?: ReadingTheme
+  /** Whether Goal-Oriented Action Planning is enabled for characters in this story */
+  goapEnabled?: boolean
+  /** Whether procedural quests should be generated in this story */
+  implementQuests?: boolean
+  /** The initial world state for GOAP at the start of the story */
+  initialWorldState?: Record<string, string | number | boolean>
 }
 
 export interface StoryNode {
@@ -291,6 +317,8 @@ export interface StoryNode {
   moderation?: NodeModeration
   /** How many times readers have arrived at this route (for reads/reputation). */
   traversals?: number
+  /** Serialised simulation state at this node (factions, economy, agent memories). */
+  engineState?: EngineState
   createdAt: string
 }
 
@@ -326,16 +354,44 @@ export interface ChoiceSlot {
   bounty?: SlotBounty | null
   requirements?: ChoiceRequirement[]
   effects?: ChoiceEffect[]
+  /** Community flag-to-remove vote count. The flaggedBy array is Firestore-only. */
+  flagVoteCount?: number
+  /** GOAP world state changes applied when this choice is selected */
+  stateEffects?: Record<string, string | number | boolean>
+  /**
+   * Memory events recorded for named characters when this choice is selected.
+   * Each entry records whether the reader helped or harmed that character.
+   */
+  memoryEffects?: ChoiceMemoryEffect[]
 }
+
+// Re-export for convenience so consumers can import from '@/types'
+export type { EngineState }
+
+export type ResourceDisplayAs = 'value' | 'bar' | 'badge' | 'checkbox'
 
 export interface ResourceDefinition {
   name: string
-  type: 'number' | 'string' | 'array'
-  defaultValue: number | string | string[]
+  type: 'number' | 'string' | 'array' | 'boolean'
+  defaultValue: number | string | string[] | boolean
   description?: string
   min?: number
   max?: number
   hidden?: boolean
+  icon?: string
+  displayAs?: ResourceDisplayAs
+  color?: string
+  isInitialChoice?: boolean
+  choices?: string[]
+}
+
+export interface ChoiceMemoryEffect {
+  /** Name of the character to record the memory for (must match a StoryCharacter.name) */
+  characterName: string
+  /** Whether this choice was kind or hostile towards the character */
+  sentiment: 'positive' | 'negative' | 'neutral'
+  /** Short description stored in the memory record */
+  event: string
 }
 
 export interface ChoiceRequirement {
@@ -352,8 +408,9 @@ export interface ChoiceEffect {
 
 // ─── Cover & Reading Themes ────────────────────────────────────────────────────
 
-export type CoverPattern = 'none' | 'stars' | 'grid' | 'dots' | 'lines'
-export type CoverFontStyle = 'serif' | 'gothic' | 'script'
+export type CoverPattern = 'none' | 'stars' | 'grid' | 'dots' | 'lines' | 'diamonds' | 'waves' | 'crosshatch'
+export type CoverFontStyle = 'serif' | 'gothic' | 'script' | 'mono'
+export type CoverBorderFrame = 'none' | 'single' | 'double' | 'ornate' | 'runic' | 'thorn' | 'celestial' | 'vine'
 export type PageStyle = 'parchment' | 'sepia' | 'night' | 'forest' | 'ocean' | 'rose'
 export type AmbientEffect = 'none' | 'rain' | 'embers' | 'stars' | 'snow'
 
@@ -363,6 +420,9 @@ export interface CoverTheme {
   icon: string
   pattern: CoverPattern
   fontStyle: CoverFontStyle
+  coverImageUrl?: string
+  borderFrame?: CoverBorderFrame
+  accentColor?: string
 }
 
 export interface ReadingTheme {

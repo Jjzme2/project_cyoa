@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Globe, Loader2, ChevronRight } from 'lucide-react'
+import { Globe, Loader2, ChevronRight, Sparkles, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -11,22 +11,51 @@ import { Label } from '@/components/ui/label'
 import { useAuth } from '@/components/Providers'
 import { CONTENT_RATINGS, CONTENT_RATING_META, DEFAULT_CONTENT_RATING } from '@/types'
 import type { ContentRating } from '@/types'
+import { AIAssistModal } from '@/components/ai/AIAssistModal'
+import type { WorldAssistResult } from '@/components/ai/AIAssistModal'
+import { useDraft } from '@/hooks/useDraft'
 
 const TONE_OPTIONS = [
   'Epic Fantasy',
+  'Dark Fantasy',
   'Dark Horror',
-  'Sci-Fi Adventure',
-  'Cozy Mystery',
-  'High Drama',
+  'Gothic Horror',
   'Cosmic Horror',
-  'Whimsical Fairy Tale',
+  'Supernatural Thriller',
+  'Sci-Fi Adventure',
+  'Space Opera',
+  'Cyberpunk Dystopia',
+  'Solarpunk',
+  'Cozy Mystery',
   'Gritty Noir',
+  'Political Intrigue',
+  'High Drama',
+  'Romantic Drama',
+  'Slice of Life',
+  'Whimsical Fairy Tale',
+  'Mythological Epic',
+  'Post-Apocalyptic',
+  'Survival Horror',
+  'LitRPG',
+  'Steampunk Adventure',
 ]
+
+interface WorldDraft {
+  name: string
+  description: string
+  lore: string
+  rules: string
+  tone: string
+  rating: ContentRating
+  seed: string
+}
 
 export default function NewWorldPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const [submitting, setSubmitting] = useState(false)
+  const [aiModalOpen, setAiModalOpen] = useState(false)
+  const [hasDraft, setHasDraft] = useState(false)
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -34,10 +63,38 @@ export default function NewWorldPage() {
   const [rules, setRules] = useState('')
   const [tone, setTone] = useState('Epic Fantasy')
   const [rating, setRating] = useState<ContentRating>(DEFAULT_CONTENT_RATING)
+  const [seed, setSeed] = useState('')
+
+  const draft = useDraft<WorldDraft>('chronicle:draft:world')
 
   useEffect(() => {
     if (!loading && !user) router.replace('/')
   }, [user, loading, router])
+
+  useEffect(() => {
+    const saved = draft.load()
+    if (saved && (saved.data.name || saved.data.lore)) setHasDraft(true)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function restoreDraft() {
+    const saved = draft.load()
+    if (!saved) return
+    const d = saved.data
+    setName(d.name)
+    setDescription(d.description)
+    setLore(d.lore)
+    setRules(d.rules)
+    setTone(d.tone)
+    setRating(d.rating)
+    setSeed(d.seed || '')
+    setHasDraft(false)
+    toast.success('Draft restored')
+  }
+
+  function discardDraft() {
+    draft.clear()
+    setHasDraft(false)
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -56,13 +113,17 @@ export default function NewWorldPage() {
           rules: rules.trim(),
           tone,
           rating,
+          seed: seed.trim() ? parseInt(seed.trim(), 10) : undefined,
         }),
       })
       if (!res.ok) throw new Error((await res.json()).error ?? 'Failed to create world')
+      draft.clear()
       toast.success(`"${name}" has been forged into existence!`)
       router.push('/stories/new')
     } catch (err) {
+      draft.save({ name, description, lore, rules, tone, rating, seed })
       toast.error(err instanceof Error ? err.message : 'Something went wrong')
+      toast.info('Draft saved — your world is preserved for next time.')
     } finally {
       setSubmitting(false)
     }
@@ -84,7 +145,61 @@ export default function NewWorldPage() {
         <p className="text-sm text-muted-foreground/60 max-w-sm">
           Define the rules and lore of your world. The AI uses this to generate consistent, immersive stories.
         </p>
+        <div className="pt-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setAiModalOpen(true)}
+            className="gap-1.5 border-amber-500/25 text-amber-400/70 hover:bg-amber-500/10 hover:text-amber-300 hover:border-amber-500/40"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Inspire with AI
+          </Button>
+        </div>
       </div>
+
+      {hasDraft && (
+        <div className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+          <div className="flex items-center gap-2 text-sm text-amber-300/80">
+            <RotateCcw className="h-3.5 w-3.5 shrink-0" />
+            You have an unsaved world draft.
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={discardDraft}
+              className="h-7 px-2.5 text-xs text-muted-foreground/50 hover:text-muted-foreground"
+            >
+              Discard
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={restoreDraft}
+              className="h-7 px-2.5 text-xs bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300"
+            >
+              Restore
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <AIAssistModal
+        type="world"
+        open={aiModalOpen}
+        onOpenChange={setAiModalOpen}
+        onGenerated={(result: WorldAssistResult) => {
+          setName(result.name)
+          setDescription(result.description)
+          setLore(result.lore)
+          setRules(result.rules)
+          setTone(result.tone)
+          setRating(result.rating)
+        }}
+      />
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="glass-card rounded-xl p-6 space-y-5">
@@ -147,6 +262,20 @@ export default function NewWorldPage() {
             </select>
             <p className="text-[11px] text-muted-foreground/45">
               {CONTENT_RATING_META[rating].description} A moderator may adjust this if needed.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="seed">World Seed (Optional)</Label>
+            <Input
+              id="seed"
+              type="number"
+              placeholder="e.g. 12345"
+              value={seed}
+              onChange={(e) => setSeed(e.target.value)}
+            />
+            <p className="text-[11px] text-muted-foreground/45">
+              Used for deterministic procedural generation. Leave blank to let the system generate one.
             </p>
           </div>
         </div>
