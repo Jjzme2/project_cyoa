@@ -77,7 +77,7 @@ export class AgentManager {
         narrativeOutputs.push(prose);
         agent.currentPlan?.shift();
       } else if (!plan) {
-        narrativeOutputs.push(`The character (${agent.characterId}) looks confused, unable to figure out how to proceed.`);
+        narrativeOutputs.push(`The character (${agent.characterId}) stands still, doing nothing in particular.`);
       }
     }
 

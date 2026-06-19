@@ -1,4 +1,5 @@
-import { EconomyState, MarketState, Commodity } from '@/types/economy';
+import { EconomyState, MarketState, Commodity, EconomyResourceEffect } from '@/types/economy';
+import type { ChoiceEffect } from '@/types';
 
 export const DEFAULT_COMMODITIES: Commodity[] = [
   { id: 'food',       name: 'Food',       category: 'food',          basePrice: 5,  description: 'Essential provisions' },
@@ -68,6 +69,29 @@ export class EconomyManager {
     }
 
     return { significantChanges };
+  }
+
+  /**
+   * Evaluates economy threshold rules against the current market and returns
+   * the ChoiceEffects that should be applied to player resources this turn.
+   * Returned effects are deduplicated per resource (last rule wins for '=').
+   */
+  public static computeEconomyEffects(
+    economy: EconomyState,
+    rules: EconomyResourceEffect[],
+  ): ChoiceEffect[] {
+    const triggered: ChoiceEffect[] = []
+    for (const rule of rules) {
+      const market = economy.markets[rule.commodityId]
+      const commodity = DEFAULT_COMMODITIES.find((c) => c.id === rule.commodityId)
+      if (!market || !commodity) continue
+      const ratio = market.currentPrice / commodity.basePrice
+      const fires = rule.condition === 'scarce' ? ratio > 1.5 : ratio < 0.5
+      if (fires) {
+        triggered.push({ resourceName: rule.resourceName, operator: rule.operator, value: rule.value })
+      }
+    }
+    return triggered
   }
 
   /** Returns a short human-readable summary of notable market conditions. */

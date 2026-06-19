@@ -10,7 +10,7 @@ export const isStripeMocked = !stripeSecretKey || stripeSecretKey.includes('plac
 
 export const stripe = !isStripeMocked
   ? new Stripe(stripeSecretKey, {
-      apiVersion: '2025-01-27.acacia' as any,
+      apiVersion: '2026-05-27.dahlia',
     })
   : null
 

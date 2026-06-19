@@ -64,6 +64,24 @@ export default function NewStoryPage() {
   const [goapEnabled, setGoapEnabled] = useState(false)
   const [implementQuests, setImplementQuests] = useState(false)
 
+  type EconomyEffectRow = {
+    commodityId: string
+    condition: 'scarce' | 'cheap'
+    resourceName: string
+    operator: '=' | '+=' | '-='
+    value: string
+  }
+  const [economyEffects, setEconomyEffects] = useState<EconomyEffectRow[]>([])
+
+  const COMMODITIES = [
+    { id: 'food', name: 'Food' },
+    { id: 'iron', name: 'Iron' },
+    { id: 'lumber', name: 'Lumber' },
+    { id: 'cloth', name: 'Cloth' },
+    { id: 'weapons', name: 'Weapons' },
+    { id: 'magic_dust', name: 'Magic Dust' },
+  ] as const
+
   const [resources, setResources] = useState<{
     name: string
     type: 'number' | 'string' | 'array' | 'boolean'
@@ -210,6 +228,11 @@ export default function NewStoryPage() {
           readingTheme,
           goapEnabled,
           implementQuests,
+          economyEffects: goapEnabled && economyEffects.length > 0
+            ? economyEffects
+                .filter((e) => e.resourceName.trim() !== '' && e.value.trim() !== '')
+                .map((e) => ({ ...e, value: Number(e.value) }))
+            : undefined,
         }),
       })
       if (!storyRes.ok) {
@@ -872,6 +895,108 @@ export default function NewStoryPage() {
                 </p>
               </div>
             </div>
+
+            {/* Economy ↔ Resource rules — only meaningful when GOAP runs the simulation */}
+            {goapEnabled && (
+              <div className="border-t border-white/[0.06] pt-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-emerald-500/80 font-sans">
+                      Market Effects
+                    </h3>
+                    <p className="text-[11px] text-muted-foreground/45 mt-0.5">
+                      When a commodity becomes scarce or cheap, modify reader resources automatically.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEconomyEffects((prev) => [
+                      ...prev,
+                      { commodityId: 'food', condition: 'scarce', resourceName: '', operator: '-=', value: '5' },
+                    ])}
+                    className="text-xs gap-1 border-white/10 hover:bg-white/5 shrink-0"
+                  >
+                    <Plus className="h-3 w-3" /> Add Rule
+                  </Button>
+                </div>
+
+                {economyEffects.length > 0 && (
+                  <div className="space-y-2">
+                    {economyEffects.map((rule, idx) => {
+                      function updateRule(patch: Partial<EconomyEffectRow>) {
+                        setEconomyEffects((prev) => {
+                          const next = [...prev]
+                          next[idx] = { ...next[idx], ...patch }
+                          return next
+                        })
+                      }
+                      return (
+                        <div key={idx} className="flex flex-wrap gap-2 items-center bg-white/[0.02] border border-white/[0.04] p-2.5 rounded-lg text-[11px]">
+                          <span className="text-muted-foreground/50 font-sans shrink-0">When</span>
+                          <select
+                            value={rule.commodityId}
+                            title="Commodity"
+                            onChange={(e) => updateRule({ commodityId: e.target.value })}
+                            className="h-7 px-1.5 rounded border border-input bg-background text-foreground text-[11px] focus:outline-none"
+                          >
+                            {COMMODITIES.map((c) => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
+                          <span className="text-muted-foreground/50 font-sans shrink-0">is</span>
+                          <select
+                            value={rule.condition}
+                            title="Market condition"
+                            onChange={(e) => updateRule({ condition: e.target.value as EconomyEffectRow['condition'] })}
+                            className="h-7 px-1.5 rounded border border-input bg-background text-foreground text-[11px] focus:outline-none"
+                          >
+                            <option value="scarce">scarce (&gt;1.5×)</option>
+                            <option value="cheap">cheap (&lt;0.5×)</option>
+                          </select>
+                          <span className="text-muted-foreground/50 font-sans shrink-0">→</span>
+                          <input
+                            type="text"
+                            value={rule.resourceName}
+                            placeholder="Resource name"
+                            onChange={(e) => updateRule({ resourceName: e.target.value })}
+                            className="h-7 px-1.5 rounded border border-input bg-background text-foreground text-[11px] w-28 focus:outline-none"
+                          />
+                          <select
+                            value={rule.operator}
+                            title="Operator"
+                            onChange={(e) => updateRule({ operator: e.target.value as EconomyEffectRow['operator'] })}
+                            className="h-7 px-1.5 rounded border border-input bg-background text-foreground text-[11px] focus:outline-none"
+                          >
+                            <option value="+=">{'+='}</option>
+                            <option value="-=">{'−='}</option>
+                            <option value="=">{'='}</option>
+                          </select>
+                          <input
+                            type="number"
+                            value={rule.value}
+                            title="Effect value"
+                            placeholder="0"
+                            onChange={(e) => updateRule({ value: e.target.value })}
+                            className="h-7 px-1.5 rounded border border-input bg-background text-foreground text-[11px] w-16 focus:outline-none"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEconomyEffects((prev) => prev.filter((_, i) => i !== idx))}
+                            className="h-7 px-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 ml-auto"
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

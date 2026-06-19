@@ -22,7 +22,7 @@ export const DefaultActionLibrary: Record<string, GOAPAction> = {
     category: 'movement',
     preconditions: { 'player.underAttack': true },
     effects: { 'player.underAttack': false, 'agent.hidden': true },
-    narrativeTemplate: 'Realizing the battle is lost, {{agent.name}} turns and scrambles into the shadows, abandoning the fight.'
+    narrativeTemplate: '{{agent.name}} turns and scrambles into the shadows, abandoning the fight.'
   },
 
   // ─── Social Actions ──────────────────────────────────────────────────────

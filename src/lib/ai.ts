@@ -110,6 +110,7 @@ STEP 2 — If the choice passes validation, write the next chapter. It MUST foll
 - Maintain complete continuity of characters, setting, and plot points established in the path
 - End at a moment of decision or tension
 - Be immersive and vivid
+- Never state how a character feels — reveal emotional and inner states through visible behavior, dialogue, body language, and consequences alone. The reader infers; the author does not declare.
 - ${wordLimitInstruction}
 - Do NOT truncate sentences. Every sentence must be complete.
 

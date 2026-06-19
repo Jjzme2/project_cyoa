@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useAuth } from '@/components/Providers'
 import { CreatorResourceManager } from '@/lib/creator-resources'
+import { EconomyManager } from '@/lib/engine/economy-manager'
 import {
   playPageTurn,
   isPageSoundMuted,
@@ -338,6 +339,20 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
       const nextResHistory = [...resourcesHistory, resources]
       if (effects && effects.length > 0) {
         updatedResources = CreatorResourceManager.applyEffects(effects, updatedResources, story.resources)
+      }
+
+      // Apply economy-linked resource effects if the node has economy state
+      if (story.economyEffects && story.economyEffects.length > 0 && data.node.engineState?.economy) {
+        const ecoEffects = EconomyManager.computeEconomyEffects(data.node.engineState.economy, story.economyEffects)
+        if (ecoEffects.length > 0) {
+          updatedResources = CreatorResourceManager.applyEffects(ecoEffects, updatedResources, story.resources)
+          const changed = ecoEffects.map((e) => `${e.resourceName} ${e.operator} ${e.value}`).join(', ')
+          toast.info(`Market conditions: ${changed}`)
+        }
+      }
+
+      const resourcesChanged = updatedResources !== resources || (effects && effects.length > 0)
+      if (resourcesChanged) {
         setResourcesHistory(nextResHistory)
         setResources(updatedResources)
       } else {
@@ -812,6 +827,8 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
                 onModerated={refreshCurrentNode}
                 currentResources={resources}
                 storyResources={story.resources}
+                storyCharacters={story.characters}
+                protagonist={story.protagonist}
               />
               <p className="mt-4 text-center text-[10px] font-sans opacity-20 tracking-widest select-none">
                 — {pageNumber * 2} —

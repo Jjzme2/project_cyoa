@@ -114,7 +114,7 @@ function TreeNodeRow({
 
 // ─── Story Card ───────────────────────────────────────────────────────────────
 
-function StoryDashboardCard({ story, userId }: { story: Story; userId: string }) {
+function StoryDashboardCard({ story }: { story: Story }) {
   const [expanded, setExpanded] = useState(false)
   const [tree, setTree] = useState<StoryTreeNode[] | null>(null)
   const [treeLoading, setTreeLoading] = useState(false)
@@ -183,6 +183,7 @@ function StoryDashboardCard({ story, userId }: { story: Story; userId: string })
               { icon: Users, label: 'Completion', value: tree ? `${completionPct}%` : '—' },
             ].map(({ icon: Icon, label, value }) => (
               <div key={label} className="bg-white/[0.02] border border-white/[0.04] rounded-lg px-3 py-2 text-center">
+                <Icon className="h-3.5 w-3.5 mx-auto mb-1 opacity-30" />
                 <p className="text-sm font-mono font-bold text-amber-300/70">{value}</p>
                 <p className="text-[9px] font-sans text-muted-foreground/30 uppercase tracking-wider mt-0.5">{label}</p>
               </div>
@@ -321,7 +322,7 @@ export default function DashboardPage() {
           <GitBranch className="h-4 w-4 text-amber-400/60" />
           <h2 className="text-base font-semibold text-amber-200/80">Your Stories</h2>
           <span className="text-xs text-muted-foreground/30 font-sans ml-1">
-            Click "Tree" to explore branches
+            Click &quot;Tree&quot; to explore branches
           </span>
         </div>
 
@@ -333,7 +334,7 @@ export default function DashboardPage() {
           <div className="glass border-white/10 rounded-xl p-10 text-center space-y-4">
             <Globe className="h-8 w-8 text-amber-400/20 mx-auto" />
             <p className="text-sm text-muted-foreground/40">
-              You haven't started any stories yet.
+              You haven&apos;t started any stories yet.
             </p>
             <Link
               href="/stories/new"
@@ -345,7 +346,7 @@ export default function DashboardPage() {
         ) : (
           <div className="space-y-4">
             {stories.map((story) => (
-              <StoryDashboardCard key={story.id} story={story} userId={user.uid} />
+              <StoryDashboardCard key={story.id} story={story} />
             ))}
           </div>
         )}

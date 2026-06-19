@@ -295,6 +295,8 @@ export interface Story {
   implementQuests?: boolean
   /** The initial world state for GOAP at the start of the story */
   initialWorldState?: Record<string, string | number | boolean>
+  /** Market threshold rules: when a commodity becomes scarce or cheap, modify player resources. */
+  economyEffects?: import('@/types/economy').EconomyResourceEffect[]
 }
 
 export interface StoryNode {

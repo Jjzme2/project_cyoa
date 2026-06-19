@@ -19,3 +19,18 @@ export interface EconomyState {
   globalWealth: number; // General prosperity of the world
   markets: Record<string, MarketState>; // Keyed by commodityId
 }
+
+/**
+ * A rule that modifies a reader resource when a commodity crosses a market threshold.
+ * Authors configure these on a Story so trade has mechanical consequences.
+ */
+export interface EconomyResourceEffect {
+  /** Commodity whose price triggers this rule (e.g. 'food'). */
+  commodityId: string
+  /** 'scarce' fires when currentPrice > 1.5× base; 'cheap' fires when < 0.5× base. */
+  condition: 'scarce' | 'cheap'
+  /** The Story resource to modify (must match a ResourceDefinition.name). */
+  resourceName: string
+  operator: '=' | '+=' | '-='
+  value: number
+}

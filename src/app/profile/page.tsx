@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
+import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -17,7 +18,6 @@ import {
   Wand2,
   Check,
   ChevronRight,
-  ExternalLink,
   ShieldAlert,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -28,6 +28,27 @@ import { useAuth } from '@/components/Providers'
 import { APP_CONFIG } from '@/lib/config'
 import { AchievementDisplay } from '@/components/achievements/AchievementDisplay'
 
+interface ProfileApiData {
+  profile?: {
+    tier: string
+    purchasedCredits?: number
+    lifetimeCreditsPurchased?: number
+    stripeSubscriptionId?: string | null
+    subscriptionStatus?: string | null
+    subscriptionPeriodEnd?: string | null
+  }
+  credits?: {
+    dailyRemaining: number
+    dailyLimit: number
+    purchasedCredits: number
+    totalRemaining: number
+  }
+  isStripeMocked?: boolean
+  stories?: { id: string; title: string; nodeCount: number; views: number }[]
+  worlds?: { id: string; name: string; description?: string }[]
+  pathStats?: { pathsWritten: number; totalReads: number; totalLoves: number }
+}
+
 // Wrap SearchParam usages in a fallback-enclosed Suspense component to satisfy Next.js SSR build rules
 function ProfileContent() {
   const router = useRouter()
@@ -36,7 +57,7 @@ function ProfileContent() {
 
   // State
   const [profileLoading, setProfileLoading] = useState(true)
-  const [profileData, setProfileData] = useState<any>(null)
+  const [profileData, setProfileData] = useState<ProfileApiData | null>(null)
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
   
   // Gemini API Key State
@@ -47,7 +68,7 @@ function ProfileContent() {
   const [deletingKey, setDeletingKey] = useState(false)
 
   // Load profile details from API
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     if (!user) return
     try {
       const token = await user.getIdToken()
@@ -71,7 +92,25 @@ function ProfileContent() {
     } finally {
       setProfileLoading(false)
     }
-  }
+  }, [user])
+
+  // Initial profile load — uses .then() chain so setState calls land in async callbacks
+  useEffect(() => {
+    if (!user) return
+    user.getIdToken()
+      .then((token) =>
+        Promise.all([
+          fetch('/api/user/profile', { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.ok ? r.json() : null),
+          fetch('/api/settings/keys', { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.ok ? r.json() : null),
+        ])
+      )
+      .then(([profileD, keyD]) => {
+        if (profileD) setProfileData(profileD)
+        if (keyD) setHasKey(!!keyD.hasKey)
+      })
+      .catch(() => toast.error('Could not load profile settings.'))
+      .finally(() => setProfileLoading(false))
+  }, [user])
 
   // Handle URL callback parameters from Stripe Checkout redirects
   useEffect(() => {
@@ -81,17 +120,25 @@ function ProfileContent() {
       return
     }
 
-    fetchProfile()
-
     // Parse status flags from Stripe Checkout callbacks
     const checkoutStatus = searchParams.get('checkout_status')
     const mockCheckout = searchParams.get('mock_checkout')
     
     if (checkoutStatus === 'success') {
       toast.success('Your payment succeeded! Welcome to the new tier.')
-      // Clear query params
       router.replace('/profile')
-      fetchProfile()
+      user.getIdToken()
+        .then((token) =>
+          Promise.all([
+            fetch('/api/user/profile', { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.ok ? r.json() : null),
+            fetch('/api/settings/keys', { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.ok ? r.json() : null),
+          ])
+        )
+        .then(([profileD, keyD]) => {
+          if (profileD) setProfileData(profileD)
+          if (keyD) setHasKey(!!keyD.hasKey)
+        })
+        .finally(() => setProfileLoading(false))
     } else if (checkoutStatus === 'canceled') {
       toast.warning('Checkout was canceled.')
       router.replace('/profile')
@@ -126,7 +173,7 @@ function ProfileContent() {
       }
       processMock()
     }
-  }, [user, authLoading, searchParams, router])
+  }, [user, authLoading, searchParams, router, fetchProfile, openAuthModal]) // fetchProfile used in conditional checkout branches
 
   // Handle Checkout redirects
   const handlePurchase = async (type: 'subscription' | 'credits', packageId?: string) => {
@@ -278,7 +325,7 @@ function ProfileContent() {
         <div className="flex items-center gap-4 flex-col sm:flex-row text-center sm:text-left">
           <div className="w-20 h-20 rounded-full ring-2 ring-amber-500/30 overflow-hidden bg-amber-500/10 flex items-center justify-center text-xl text-amber-300 font-sans font-bold">
             {user.photoURL ? (
-              <img src={user.photoURL} alt="Avatar" className="w-full h-full object-cover" />
+              <Image src={user.photoURL} alt="Avatar" fill className="object-cover" sizes="80px" />
             ) : (
               initials
             )}
@@ -608,7 +655,7 @@ function ProfileContent() {
 
           {stories.length > 0 ? (
             <div className="divide-y divide-white/[0.03] max-h-64 overflow-y-auto space-y-2">
-              {stories.map((story: any) => (
+              {stories.map((story) => (
                 <div key={story.id} className="pt-2 flex justify-between items-center group">
                   <div className="space-y-0.5 min-w-0 pr-4">
                     <Link
@@ -650,7 +697,7 @@ function ProfileContent() {
 
           {worlds.length > 0 ? (
             <div className="divide-y divide-white/[0.03] max-h-64 overflow-y-auto space-y-2">
-              {worlds.map((world: any) => (
+              {worlds.map((world) => (
                 <div key={world.id} className="pt-2 flex justify-between items-center group">
                   <div className="space-y-0.5 min-w-0 pr-4">
                     <div className="text-xs font-semibold text-foreground/80 truncate block">

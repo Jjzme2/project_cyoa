@@ -40,8 +40,18 @@ export function NotificationBell() {
     }
   }
 
+  // Mount load — inline .then() so setState calls land in async callbacks, not synchronously in the effect
   useEffect(() => {
-    if (user) fetchNotifications()
+    if (!user) return
+    user.getIdToken()
+      .then((token) => fetch('/api/notifications', { headers: { Authorization: `Bearer ${token}` } }))
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (!data) return
+        setNotifications(data.notifications)
+        setUnread(data.unreadCount)
+      })
+      .catch(() => {})
   }, [user])
 
   useEffect(() => {
@@ -169,7 +179,7 @@ export function NotificationBell() {
                       </p>
                       {n.slotPrompt && (
                         <p className="text-[10px] text-muted-foreground/40 italic truncate">
-                          "{n.slotPrompt}"
+                          &quot;{n.slotPrompt}&quot;
                         </p>
                       )}
                       <p className="text-[10px] text-muted-foreground/30 font-sans">{timeAgo(n.createdAt)}</p>

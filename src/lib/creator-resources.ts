@@ -96,16 +96,16 @@ export class CreatorResourceManager {
           if (!arr.map(x => String(x).toLowerCase()).includes(item.toLowerCase())) {
             arr.push(item)
           }
-          updated[eff.resourceName] = arr as any
+          updated[eff.resourceName] = arr as string[]
         } else if (eff.operator === 'remove' || eff.operator === '-=') {
           updated[eff.resourceName] = arr.filter(
             (i) => String(i).toLowerCase() !== item.toLowerCase()
-          ) as any
+          ) as string[]
         } else if (eff.operator === '=') {
           updated[eff.resourceName] = item
             .split(',')
             .map((i) => i.trim())
-            .filter(Boolean) as any
+            .filter(Boolean) as string[]
         }
       } else if (typeof val === 'number' || def?.type === 'number') {
         const numVal = Number(val)
