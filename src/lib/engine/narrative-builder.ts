@@ -28,6 +28,7 @@ export interface NarrativeContext {
   demeanour: string; // per-character mood/emotional tone
   stakesDirective: string; // dynamic-difficulty instruction
   plotDirective: string; // story-level through-line beat
+  passageOfTime: string; // living-world catch-up note when the reader was away
 }
 
 /** How much a character's own action shifts their standing with the protagonist. */
@@ -99,7 +100,7 @@ export class NarrativeBuilder {
    * Runs one simulation tick (GOAP, factions, economy, procgen) and
    * returns both the AI-ready narrative context and the updated EngineState.
    */
-  public buildContext(nodePath: string, depth: number, currentState: WorldState, priorState?: EngineState): NarrativeBuildResult {
+  public buildContext(nodePath: string, depth: number, currentState: WorldState, priorState?: EngineState, catchUpTicks: number = 0): NarrativeBuildResult {
     const context: NarrativeContext = {
       environmentalContext: '',
       activeEncounters: [],
@@ -113,6 +114,7 @@ export class NarrativeBuilder {
       demeanour: '',
       stakesDirective: '',
       plotDirective: '',
+      passageOfTime: '',
     };
 
     // AI Director: decide this turn's pacing beat from carried-over tension.
@@ -152,20 +154,33 @@ export class NarrativeBuilder {
       }
     }
 
-    // 4. Factions
+    // 4. Factions + 5. Economy. Advance the autonomous world. When the reader
+    // has been away, "catch up" the world by ticking extra times so it feels
+    // alive between sessions — alliances and markets move while you're gone.
     const baseSeed = this.world.seed ?? SeededRNG.hashString(this.story.title);
-    const factions = priorState?.factions ?? FactionManager.generateDefaultFactions(baseSeed);
-    const economy  = priorState?.economy  ?? createDefaultEconomy();
+    let factions = priorState?.factions ?? FactionManager.generateDefaultFactions(baseSeed);
+    const economy = priorState?.economy ?? createDefaultEconomy();
 
-    const { narrativeEvents: factionEvents, updatedFactions } = this.factionManager.tick(factions, economy);
-    context.factionEvents = factionEvents.slice(0, 2); // cap to 2 per turn to avoid prompt bloat
+    const totalTicks = 1 + Math.max(0, Math.min(catchUpTicks, 10));
+    let factionEvents: string[] = [];
+    for (let i = 0; i < totalTicks; i++) {
+      const res = this.factionManager.tick(factions, economy);
+      factions = res.updatedFactions;
+      factionEvents = res.narrativeEvents; // surface only the most recent turn's events
+      this.economyManager.tick(economy);
+    }
+    const updatedFactions = factions;
+    context.factionEvents = factionEvents.slice(0, 2); // cap to avoid prompt bloat
     const factionStatus = FactionManager.getSummary(updatedFactions);
     if (factionStatus) context.factionStatus = factionStatus;
 
-    // 5. Economy
-    this.economyManager.tick(economy);
     const economySummary = EconomyManager.getSummary(economy);
     if (economySummary) context.economySummary = economySummary;
+
+    if (catchUpTicks > 0) {
+      context.passageOfTime =
+        'Real time has passed since the last chapter — reflect how the wider world has shifted in the protagonist’s absence (alliances, fortunes, the mood of the land).';
+    }
 
     // 6. GOAP agents + relationship graph. Seed baseline scene facts so action
     // preconditions are satisfiable (negative preconditions like
@@ -258,6 +273,7 @@ export class NarrativeBuilder {
     if (context.environmentalContext) lines.push(`**Environment:** ${context.environmentalContext}`);
     if (context.activeEncounters.length > 0) lines.push(`**Encounters:** ${context.activeEncounters.join(' ')}`);
     if (context.activeQuests.length > 0) lines.push(`**Events:** ${context.activeQuests.join(' ')}`);
+    if (context.passageOfTime) lines.push(`**Passage of time:** ${context.passageOfTime}`);
     if (context.factionStatus) lines.push(`**World Politics:** ${context.factionStatus}`);
     if (context.factionEvents.length > 0) lines.push(`**Faction Activity:** ${context.factionEvents.join(' ')}`);
     if (context.economySummary) lines.push(`**Economy:** ${context.economySummary}`);
