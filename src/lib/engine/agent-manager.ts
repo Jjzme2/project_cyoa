@@ -45,34 +45,35 @@ export function defaultGoapConfig(name: string): NonNullable<{
   personality: PersonalityWeights;
 }> {
   const p = seededPersonality(name);
-  const goals: GOAPGoal[] = [
-    {
-      id: 'earn_trust',
-      name: 'Earn the protagonist’s trust',
-      priority: 4 + p.loyalty * 3,
-      desiredState: { 'player.trustsAgent': true },
-      sentiment: 'pro_protagonist',
-    },
-    {
-      id: 'gain_advantage',
-      name: 'Gain the upper hand',
-      priority: 3 + (p.cunning + p.greed) * 1.5,
-      desiredState: { 'agent.hasAdvantage': true },
-      sentiment: 'anti_protagonist',
-    },
-  ];
-  return {
-    goals,
-    availableActions: [
-      'utility_search_area',
-      'social_persuade',
-      'social_betray',
-      'combat_attack_player',
-      'combat_flee',
-      'survival_rest',
-    ],
-    personality: p,
+  const scheming = (p.cunning + p.greed) / 2;
+
+  const earnTrust: GOAPGoal = {
+    id: 'earn_trust',
+    name: 'Earn the protagonist’s trust',
+    priority: 4 + p.loyalty * 3,
+    desiredState: { 'player.trustsAgent': true },
+    sentiment: 'pro_protagonist',
   };
+  const gainAdvantage: GOAPGoal = {
+    id: 'gain_advantage',
+    name: 'Gain the upper hand',
+    priority: 4 + scheming * 3,
+    desiredState: { 'agent.hasAdvantage': true },
+    sentiment: 'anti_protagonist',
+  };
+
+  // Disposition splits the cast into distinct archetypes so they don't all
+  // behave identically. Memory (player interactions) still tips the ambivalent.
+  const loyalAction = ['utility_search_area', 'social_persuade', 'survival_rest'];
+  const fullAction = [...loyalAction, 'social_betray', 'combat_attack_player', 'combat_flee'];
+
+  if (p.loyalty >= 0.55 && p.loyalty > scheming) {
+    return { goals: [earnTrust], availableActions: loyalAction, personality: p }; // steadfast ally
+  }
+  if (scheming >= 0.55 && scheming > p.loyalty) {
+    return { goals: [gainAdvantage], availableActions: fullAction, personality: p }; // schemer
+  }
+  return { goals: [earnTrust, gainAdvantage], availableActions: fullAction, personality: p }; // ambivalent
 }
 
 function actionSentiment(category: string): AgentMemory['sentiment'] {
@@ -80,6 +81,34 @@ function actionSentiment(category: string): AgentMemory['sentiment'] {
   // protagonist-relationship sentiment is driven by authored memory effects.
   void category;
   return 'neutral';
+}
+
+// ── Per-agent world-state scoping ───────────────────────────────────────────
+// Actions are written with generic keys (`agent.hasAdvantage`,
+// `player.trustsAgent`). To stop every character sharing one global flag, those
+// facts are stored per agent as `<name>::<key>`; only genuinely scene-wide
+// facts stay global. Each agent plans over a private view and writes its
+// effects back into its own namespace.
+
+const SHARED_FACTS = new Set(['player.inSight', 'player.underAttack']);
+
+function scopeStateFor(agentId: string, ws: WorldState): WorldState {
+  const view: WorldState = {};
+  for (const key of SHARED_FACTS) {
+    if (key in ws) view[key] = ws[key];
+  }
+  const prefix = `${agentId}::`;
+  for (const key in ws) {
+    if (key.startsWith(prefix)) view[key.slice(prefix.length)] = ws[key];
+  }
+  return view;
+}
+
+function applyScopedEffects(agentId: string, effects: Partial<WorldState>, ws: WorldState): void {
+  for (const key in effects) {
+    const target = SHARED_FACTS.has(key) ? key : `${agentId}::${key}`;
+    ws[target] = effects[key] as WorldState[string];
+  }
 }
 
 export class AgentManager {
@@ -144,18 +173,20 @@ export class AgentManager {
     const narrativeOutputs: string[] = [];
 
     for (const agent of this.agents.values()) {
-      const activeGoal = this.getHighestPriorityGoal(agent, currentState);
+      // Each agent reasons over its own private view of the world.
+      const view = scopeStateFor(agent.characterId, currentState);
+      const activeGoal = this.getHighestPriorityGoal(agent, view);
       if (!activeGoal) continue;
 
       const availableActions = getActionsFromIds(agent.availableActions);
-      const plan = this.planner.plan(currentState, activeGoal, availableActions, agent.personality);
+      const plan = this.planner.plan(view, activeGoal, availableActions, agent.personality);
       agent.currentPlan = plan;
 
       if (plan && plan.length > 0) {
         const nextAction = plan[0];
-        // Apply the action's effects to the live world state so the choice has
-        // lasting consequences carried into the next turn (real simulation).
-        Object.assign(currentState, nextAction.effects);
+        // Persist effects into this agent's namespace so consequences carry
+        // forward without bleeding into other characters.
+        applyScopedEffects(agent.characterId, nextAction.effects, currentState);
         // Log it as continuity memory (also exercises memory persistence/decay).
         this.addMemory(agent.characterId, {
           event: nextAction.name,
