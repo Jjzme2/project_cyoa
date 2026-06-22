@@ -309,14 +309,17 @@ export async function POST(
       if (newCharacters && newCharacters.length > 0) {
         ops.push(addStoryCharacters(storyId, newCharacters))
       }
-      // "You" mode: carry the world's regard for this reader forward (EMA of the
-      // cast's standing toward them), so it persists into the next story here.
-      if (youMode && updatedEngineState?.relationships) {
-        const aff = Object.values(updatedEngineState.relationships.affinity)
-        if (aff.length > 0) {
-          const observed = aff.reduce((s, v) => s + v, 0) / aff.length
-          ops.push(updateWorldStanding(uid, story.worldId, observed))
+      // "You" mode: carry the world's regard for this reader forward so it
+      // persists into the next story here. Prefer the Content Judge's reading of
+      // the protagonist's CONDUCT this chapter (the reader's actual deeds); fall
+      // back to the cast's net regard if the judge was unavailable.
+      if (youMode) {
+        let observed: number | null = judgment ? judgment.conduct : null
+        if (observed === null && updatedEngineState?.relationships) {
+          const aff = Object.values(updatedEngineState.relationships.affinity)
+          if (aff.length > 0) observed = aff.reduce((s, v) => s + v, 0) / aff.length
         }
+        if (observed !== null) ops.push(updateWorldStanding(uid, story.worldId, observed))
       }
       // Don't notify the author about a contribution that's hidden pending review.
       if (!pendingReview && story.authorId && story.authorId !== uid) {

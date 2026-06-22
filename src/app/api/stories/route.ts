@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
     tags: Array.isArray(tags) ? tags.slice(0, 5) : [],
     ...(coverTheme   ? { coverTheme }   : {}),
     ...(readingTheme ? { readingTheme } : {}),
-    goapEnabled: !!goapEnabled,
+    goapEnabled: !!goapEnabled || !!youMode, // "You" mode needs the social sim for reputation
     implementQuests: !!implementQuests,
   })
 

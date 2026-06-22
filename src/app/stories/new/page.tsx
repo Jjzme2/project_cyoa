@@ -936,12 +936,15 @@ export default function NewStoryPage() {
               <input
                 type="checkbox"
                 id="goapEnabled"
-                checked={goapEnabled}
+                checked={goapEnabled || youMode}
+                disabled={youMode}
                 onChange={(e) => setGoapEnabled(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded bg-background border-input text-amber-500 focus:ring-amber-500"
+                className="mt-1 h-4 w-4 rounded bg-background border-input text-amber-500 focus:ring-amber-500 disabled:opacity-60"
               />
               <div className="space-y-1">
-                <Label htmlFor="goapEnabled" className="text-sm cursor-pointer">Enable GOAP AI Characters</Label>
+                <Label htmlFor="goapEnabled" className="text-sm cursor-pointer">
+                  Enable GOAP AI Characters{youMode && <span className="text-amber-400/70 text-xs font-normal"> · required for You mode</span>}
+                </Label>
                 <p className="text-[11px] text-muted-foreground/50 leading-relaxed">
                   Allows characters to autonomously form goals and execute plans behind the scenes based on the story&apos;s world state. 
                   This creates a dynamic, living world where characters act independently of the reader.
