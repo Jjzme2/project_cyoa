@@ -78,6 +78,23 @@ export interface Protagonist {
   description?: string
 }
 
+/**
+ * An authored "director" sensibility that shapes HOW the AI directs each chapter
+ * (its craft and mood, within the content rating). Each axis is -1..1.
+ */
+export interface DirectorPersona {
+  /** -1 traditional .. +1 experimental */
+  experimental: number
+  /** -1 sensitive/gentle .. +1 assertive/intense */
+  intensity: number
+  /** -1 warm/romantic .. +1 dark/scary */
+  darkness: number
+  /** -1 slow-burn .. +1 propulsive */
+  pace: number
+  /** Optional free-text directorial vision. */
+  vision?: string
+}
+
 // ─── Bounties ───────────────────────────────────────────────────────────────
 export type BountyStatus = 'open' | 'paid' | 'refunded'
 
@@ -285,6 +302,8 @@ export interface Story {
   resources?: ResourceDefinition[]
   /** Author-defined hero the reader plays as; the AI writes them by name. */
   protagonist?: Protagonist
+  /** Authored directorial sensibility that shapes how chapters are directed. */
+  director?: DirectorPersona
   /** Canon cast — author-seeded and grown emergently as the AI introduces characters. */
   characters?: StoryCharacter[]
   coverTheme?: CoverTheme

@@ -9,7 +9,11 @@ import { FactionManager } from './faction-manager';
 import { EconomyManager, createDefaultEconomy } from './economy-manager';
 import { SeededRNG } from './seed-rng';
 import { DramaManager } from './drama-manager';
+import { DifficultyManager } from './difficulty';
+import { PlotPlanner } from './plot-planner';
 import { RelationshipGraph } from './relationship-graph';
+import { AgentAffect } from './agent-affect';
+import { BeliefModel } from './belief';
 
 export interface NarrativeContext {
   environmentalContext: string;
@@ -21,6 +25,9 @@ export interface NarrativeContext {
   economySummary: string;
   pacingDirective: string; // AI Director instruction for this turn's tension
   relationshipSummary: string; // who stands warm/cold toward the protagonist
+  demeanour: string; // per-character mood/emotional tone
+  stakesDirective: string; // dynamic-difficulty instruction
+  plotDirective: string; // story-level through-line beat
 }
 
 /** How much a character's own action shifts their standing with the protagonist. */
@@ -103,6 +110,9 @@ export class NarrativeBuilder {
       economySummary: '',
       pacingDirective: '',
       relationshipSummary: '',
+      demeanour: '',
+      stakesDirective: '',
+      plotDirective: '',
     };
 
     // AI Director: decide this turn's pacing beat from carried-over tension.
@@ -122,10 +132,24 @@ export class NarrativeBuilder {
       else if (beat === 'escalate') context.activeEncounters.push('A sudden complication forces itself upon the scene.');
     }
 
-    // 3. ProcGen: quests (if toggled)
+    // 3. ProcGen: quests (if toggled). Quests now run as a multi-beat arc
+    // (call → journey → struggle → resolution) persisted across nodes, so they
+    // read as a coherent mini-story. A new quest only starts once the last one
+    // resolves.
+    let questState = priorState?.quest;
     if (this.story.implementQuests) {
-      const quest = this.questGen.generateQuest(nodePath);
-      if (quest) context.activeQuests.push(quest.narrativePrompt);
+      let active = questState && questState.stage !== 'done' ? questState : undefined;
+      if (!active) {
+        const fresh = this.questGen.generateQuest(nodePath);
+        if (fresh) active = { ...fresh, stage: 'call', turnsOnStage: 0 };
+      }
+      if (active) {
+        const { prompt, next } = this.questGen.beat(active);
+        if (prompt) context.activeQuests.push(prompt);
+        questState = next;
+      } else {
+        questState = undefined;
+      }
     }
 
     // 4. Factions
@@ -149,6 +173,8 @@ export class NarrativeBuilder {
     // carried-forward state still wins.
     let hostileNpc = false;
     let relationships = priorState?.relationships;
+    let affect = priorState?.affect;
+    let belief = priorState?.belief;
     if (this.story.goapEnabled) {
       const baseline: WorldState = { 'player.inSight': true, 'player.underAttack': false };
       for (const k in baseline) {
@@ -159,8 +185,10 @@ export class NarrativeBuilder {
         .filter((c) => !(c.status && c.status.toLowerCase() === 'deceased'))
         .map((c) => c.name);
       relationships = RelationshipGraph.init(living, priorState?.relationships);
-      // Standing (incl. gossip about the whole cast) steers each agent's goals.
-      this.agentManager.setAffinities(relationships.affinity);
+      // Characters act on PERCEIVED standing, which lags the truth — so gossip
+      // changes behaviour gradually and the naive can be briefly deceived.
+      belief = BeliefModel.update(living, relationships.affinity, priorState?.belief);
+      this.agentManager.setAffinities(belief.perceived);
 
       const outcomes = this.agentManager.updateTurn(currentState);
       context.npcActions = outcomes.map((o) => o.prose);
@@ -174,6 +202,15 @@ export class NarrativeBuilder {
         (o) => o.category === 'combat' || o.actionId === 'social_betray' || o.actionId === 'social_intimidate',
       );
       context.relationshipSummary = RelationshipGraph.summary(relationships);
+
+      // Affective layer: mood reflects each character's PERCEIVED standing.
+      affect = AgentAffect.compute(
+        living,
+        belief.perceived,
+        currentState['player.underAttack'] === true,
+        priorState?.affect,
+      );
+      context.demeanour = AgentAffect.summary(affect);
     }
 
     // 7. AI Director: fold this turn's events into the next tension level and
@@ -186,6 +223,14 @@ export class NarrativeBuilder {
     });
     context.pacingDirective = dm.directive(beat);
 
+    // 7b. Dynamic difficulty: stakes escalate with depth, adapt to recent tension.
+    const difficulty = DifficultyManager.update(depth, priorDirector.tension, priorState?.difficulty);
+    context.stakesDirective = DifficultyManager.directive(difficulty.level);
+
+    // 7c. Plot planner: advance the story's through-line one beat at a time.
+    const plot = PlotPlanner.advance(PlotPlanner.init(this.story.title, priorState?.plot, this.story.director));
+    context.plotDirective = PlotPlanner.directive(plot);
+
     // 8. Build updated EngineState for persistence
     const turnCount = (priorState?.turnCount ?? 0) + 1;
     const updatedEngineState: EngineState = {
@@ -196,6 +241,11 @@ export class NarrativeBuilder {
       turnCount,
       director,
       ...(relationships ? { relationships } : {}),
+      ...(questState ? { quest: questState } : {}),
+      ...(affect ? { affect } : {}),
+      ...(belief ? { belief } : {}),
+      difficulty,
+      plot,
     };
 
     return { context, updatedEngineState };
@@ -213,7 +263,14 @@ export class NarrativeBuilder {
     if (context.economySummary) lines.push(`**Economy:** ${context.economySummary}`);
     if (context.npcActions.length > 0) lines.push(`**Character Actions:** ${context.npcActions.join(' ')}`);
     if (context.relationshipSummary) lines.push(`**Standing:** ${context.relationshipSummary}`);
-    if (context.pacingDirective) lines.push(`**Pacing (director):** ${context.pacingDirective}`);
+    if (context.demeanour) lines.push(`**Demeanour:** ${context.demeanour}`);
+
+    // The director family (plot through-line, pacing, stakes) is consolidated
+    // into one guidance line so it reads as unified direction, not a checklist.
+    const guidance = [context.plotDirective, context.pacingDirective, context.stakesDirective]
+      .filter(Boolean)
+      .join(' ')
+    if (guidance) lines.push(`**Director's guidance:** ${guidance}`)
 
     if (lines.length === 0) return '';
 

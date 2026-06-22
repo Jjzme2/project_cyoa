@@ -46,3 +46,12 @@ export interface ProcGenQuest {
   rewardText: string;
   narrativePrompt: string;
 }
+
+/** Propp-style narrative beats a quest moves through, one per chapter. */
+export type QuestStage = 'call' | 'journey' | 'struggle' | 'resolution' | 'done';
+
+/** A quest currently unfolding, tracked across nodes in EngineState. */
+export interface ActiveQuest extends ProcGenQuest {
+  stage: QuestStage;
+  turnsOnStage: number;
+}

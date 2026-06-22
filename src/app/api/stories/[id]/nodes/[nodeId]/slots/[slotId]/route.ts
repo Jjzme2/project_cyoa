@@ -140,6 +140,7 @@ export async function POST(
       rating: effectiveRating,
       protagonist: story.protagonist,
       characters: story.characters,
+      director: story.director,
     }
 
     // Autonomous Editor: void genuinely illegitimate / world-breaking entries
