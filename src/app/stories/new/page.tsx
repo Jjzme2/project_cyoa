@@ -52,6 +52,7 @@ export default function NewStoryPage() {
   const [protagonistName, setProtagonistName] = useState('')
   const [protagonistDesc, setProtagonistDesc] = useState('')
   const [youMode, setYouMode] = useState(false)
+  const [shared, setShared] = useState(true)
   const [director, setDirector] = useState({ experimental: 0, intensity: 0, darkness: 0, pace: 0, vision: '' })
   const [opening, setOpening] = useState('')
   const [choice1, setChoice1] = useState('')
@@ -107,7 +108,7 @@ export default function NewStoryPage() {
     resources: typeof resources
     goapEnabled: boolean; implementQuests: boolean
     director: typeof director
-    youMode: boolean
+    youMode: boolean; shared: boolean
   }>('chronicle:draft:story')
 
   useEffect(() => {
@@ -141,6 +142,7 @@ export default function NewStoryPage() {
     setImplementQuests(d.implementQuests ?? false)
     if (d.director) setDirector(d.director)
     setYouMode(d.youMode ?? false)
+    setShared(d.shared ?? true)
     setHasDraft(false)
     toast.success('Draft restored')
   }
@@ -224,6 +226,7 @@ export default function NewStoryPage() {
           worldName: selectedWorld.name,
           rating,
           youMode,
+          shared,
           protagonist: !youMode && protagonistName.trim()
             ? { name: protagonistName.trim(), description: protagonistDesc.trim() }
             : undefined,
@@ -268,7 +271,7 @@ export default function NewStoryPage() {
         protagonistName, protagonistDesc, opening,
         choice1, choice2, choice3, tags,
         coverTheme, readingTheme, resources,
-        goapEnabled, implementQuests, director, youMode,
+        goapEnabled, implementQuests, director, youMode, shared,
       })
       toast.error(err instanceof Error ? err.message : 'Something went wrong')
       toast.info('Draft saved — your story is preserved for next time.')
@@ -535,6 +538,23 @@ export default function NewStoryPage() {
                 </p>
               </>
             )}
+          </div>
+
+          <div className="space-y-2 border-t border-white/[0.06] pt-5">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={shared}
+                onChange={(e) => setShared(e.target.checked)}
+                className="accent-amber-500"
+              />
+              <span className="text-sm">Share with the community</span>
+            </label>
+            <p className="text-[11px] text-muted-foreground/45">
+              {shared
+                ? 'Listed in the library' + (youMode ? ' and the Personal Saga browse, for anyone to play.' : ' for anyone to read.')
+                : 'Kept personal — hidden from public listings (still reachable by direct link and from your dashboard).'}
+            </p>
           </div>
 
           <div className="space-y-3 border-t border-white/[0.06] pt-5">

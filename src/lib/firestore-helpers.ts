@@ -50,15 +50,29 @@ export async function getStories(limit = 20): Promise<Story[]> {
 
     return snap.docs
       .map((doc) => ({ id: doc.id, ...doc.data() } as Story))
-      .filter((s) => s.published !== false)
+      .filter((s) => s.published !== false && !s.unlisted)
   } catch (err) {
     console.error('[getStories] orderBy failed, falling back to scan:', (err as Error).message)
     const fallback = await adminDb.collection('stories').limit(limit).get()
     return fallback.docs
       .map((doc) => ({ id: doc.id, ...doc.data() } as Story))
-      .filter((s) => s.published !== false)
+      .filter((s) => s.published !== false && !s.unlisted)
       .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
   }
+}
+
+/** Recent shared "You" mode stories — the Personal Saga browse feed. */
+export async function getYouModeStories(limit = 60): Promise<Story[]> {
+  'use cache'
+  cacheLife('minutes')
+  cacheTag('stories')
+
+  // Scan recent stories and filter in memory to avoid a composite index.
+  const snap = await adminDb.collection('stories').orderBy('createdAt', 'desc').limit(300).get()
+  return snap.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() } as Story))
+    .filter((s) => s.youMode === true && s.published !== false && !s.unlisted)
+    .slice(0, limit)
 }
 
 export async function getStory(id: string): Promise<Story | null> {
@@ -855,7 +869,7 @@ export async function getStoriesByWorld(worldId: string, limit = 100): Promise<S
   const snap = await adminDb.collection('stories').where('worldId', '==', worldId).limit(limit).get()
   return snap.docs
     .map((d) => ({ id: d.id, ...d.data() } as Story))
-    .filter((s) => s.published !== false)
+    .filter((s) => s.published !== false && !s.unlisted)
     .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
 }
 

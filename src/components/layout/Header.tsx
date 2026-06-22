@@ -44,6 +44,10 @@ export function Header() {
         <Globe className="h-3.5 w-3.5 opacity-60" />
         Worlds
       </Link>
+      <Link href="/saga" className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+        <Sparkles className="h-3.5 w-3.5 opacity-60" />
+        Sagas
+      </Link>
       {user && (
         <>
           <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">

@@ -314,6 +314,9 @@ export interface Story {
   /** "You" mode: the reader IS the protagonist (no authored protagonist), and
    * their standing persists across stories in this world. */
   youMode?: boolean
+  /** When true, the story is kept personal — hidden from public listings
+   * (still reachable by direct link and shown in the author's own spaces). */
+  unlisted?: boolean
   /** Authored directorial sensibility that shapes how chapters are directed. */
   director?: DirectorPersona
   /** Canon cast — author-seeded and grown emergently as the AI introduces characters. */
