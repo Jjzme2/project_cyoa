@@ -117,24 +117,27 @@ export class GOAPPlanner {
    */
   private calculateActionCost(action: GOAPAction, personality?: PersonalityWeights): number {
     let cost = action.cost;
-    
-    if (!personality) return cost;
 
-    // Modify cost based on action category and personality
+    if (!personality) return cost;
+    const { aggression, loyalty, cunning, courage } = personality;
+
+    // Personality reshapes which path an agent finds "cheapest" — this is what
+    // makes brutes intimidate, schemers befriend-then-betray, and the loyal
+    // simply help, rather than everyone taking the same route to a goal.
     switch (action.category) {
       case 'combat':
-        // High aggression lowers combat cost (more likely to choose violence)
-        cost -= (personality.aggression * 2);
-        // Low courage increases combat cost
-        cost += ((1 - personality.courage) * 2);
+        cost -= aggression * 2;        // the aggressive embrace violence
+        cost += (1 - courage) * 2;     // the timid shy from it
         break;
       case 'social':
-        // Can be complex, maybe based on cunning
+        if (action.id === 'social_betray') cost -= cunning * 3;        // the cunning love a long con
+        else if (action.id === 'social_intimidate') cost -= aggression * 3; // brutes coerce
+        else if (action.id === 'social_persuade') cost -= cunning * 1.5;
+        else if (action.id === 'social_offer_aid') cost -= loyalty * 2; // the loyal give freely
         break;
       case 'movement':
-        // Cowardly agents might prefer movement (fleeing) if courage is low
+        if (action.id === 'combat_flee') cost -= (1 - courage) * 2;    // cowards flee readily
         break;
-      // Add more personality modifiers as needed
     }
 
     // Ensure cost never goes negative to prevent infinite loops in A*

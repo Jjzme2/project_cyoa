@@ -63,17 +63,23 @@ export function defaultGoapConfig(name: string): NonNullable<{
   };
 
   // Disposition splits the cast into distinct archetypes so they don't all
-  // behave identically. Memory (player interactions) still tips the ambivalent.
-  const loyalAction = ['utility_search_area', 'social_persuade', 'survival_rest'];
-  const fullAction = [...loyalAction, 'social_betray', 'combat_attack_player', 'combat_flee'];
+  // behave identically. Within an archetype, the personality-weighted action
+  // costs (see GOAPPlanner) pick different routes — e.g. an aggressive schemer
+  // intimidates while a cunning one befriends then betrays.
+  const trustActions = ['social_offer_aid', 'utility_observe', 'utility_search_area', 'social_persuade'];
+  const schemeActions = ['utility_observe', 'utility_search_area', 'social_persuade', 'social_betray', 'social_intimidate', 'combat_attack_player'];
 
   if (p.loyalty >= 0.55 && p.loyalty > scheming) {
-    return { goals: [earnTrust], availableActions: loyalAction, personality: p }; // steadfast ally
+    // steadfast ally — earns trust, never coerces or betrays
+    return { goals: [earnTrust], availableActions: [...trustActions, 'survival_rest', 'combat_flee'], personality: p };
   }
   if (scheming >= 0.55 && scheming > p.loyalty) {
-    return { goals: [gainAdvantage], availableActions: fullAction, personality: p }; // schemer
+    // schemer — routes to advantage by intimidation or a long con
+    return { goals: [gainAdvantage], availableActions: [...schemeActions, 'combat_flee'], personality: p };
   }
-  return { goals: [earnTrust, gainAdvantage], availableActions: fullAction, personality: p }; // ambivalent
+  // ambivalent — both drives; memory of the protagonist tips the balance
+  const union = Array.from(new Set([...trustActions, ...schemeActions, 'survival_rest', 'combat_flee']));
+  return { goals: [earnTrust, gainAdvantage], availableActions: union, personality: p };
 }
 
 function actionSentiment(category: string): AgentMemory['sentiment'] {
