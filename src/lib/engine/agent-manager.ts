@@ -1,6 +1,86 @@
-import { GOAPAgent, AgentMemory, WorldState } from '@/types/goap';
+import { GOAPAgent, AgentMemory, WorldState, GOAPGoal, PersonalityWeights } from '@/types/goap';
 import { GOAPPlanner } from './goap-planner';
 import { getActionsFromIds } from './action-library';
+
+// ── Deterministic personality / default behaviour ──────────────────────────
+// Emergent characters arrive with no authored goapConfig, so we synthesise a
+// stable one from the character's name. This is what makes `goapEnabled`
+// actually produce living behaviour instead of nothing.
+
+function hashString(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function makeRng(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export function seededPersonality(name: string): PersonalityWeights {
+  const rng = makeRng(hashString(`${name}:personality`));
+  const r = () => Math.round(rng() * 100) / 100;
+  return { aggression: r(), loyalty: r(), cunning: r(), courage: r(), greed: r() };
+}
+
+/**
+ * A universal behaviour profile for any character. Two competing drives —
+ * earning the protagonist's trust vs. seeking the upper hand — are weighted by
+ * personality, and the memory system (below) tips the balance based on how the
+ * protagonist has treated them. Befriend-then-betray emerges naturally because
+ * `social_betray` requires trust first.
+ */
+export function defaultGoapConfig(name: string): NonNullable<{
+  goals: GOAPGoal[];
+  availableActions: string[];
+  personality: PersonalityWeights;
+}> {
+  const p = seededPersonality(name);
+  const goals: GOAPGoal[] = [
+    {
+      id: 'earn_trust',
+      name: 'Earn the protagonist’s trust',
+      priority: 4 + p.loyalty * 3,
+      desiredState: { 'player.trustsAgent': true },
+      sentiment: 'pro_protagonist',
+    },
+    {
+      id: 'gain_advantage',
+      name: 'Gain the upper hand',
+      priority: 3 + (p.cunning + p.greed) * 1.5,
+      desiredState: { 'agent.hasAdvantage': true },
+      sentiment: 'anti_protagonist',
+    },
+  ];
+  return {
+    goals,
+    availableActions: [
+      'utility_search_area',
+      'social_persuade',
+      'social_betray',
+      'combat_attack_player',
+      'combat_flee',
+      'survival_rest',
+    ],
+    personality: p,
+  };
+}
+
+function actionSentiment(category: string): AgentMemory['sentiment'] {
+  // Auto-recorded agent actions are logged as neutral continuity; the
+  // protagonist-relationship sentiment is driven by authored memory effects.
+  void category;
+  return 'neutral';
+}
 
 export class AgentManager {
   private planner: GOAPPlanner;
@@ -73,11 +153,18 @@ export class AgentManager {
 
       if (plan && plan.length > 0) {
         const nextAction = plan[0];
-        const prose = nextAction.narrativeTemplate.replace(/\{\{agent\.name\}\}/g, `The character (${agent.characterId})`);
+        // Apply the action's effects to the live world state so the choice has
+        // lasting consequences carried into the next turn (real simulation).
+        Object.assign(currentState, nextAction.effects);
+        // Log it as continuity memory (also exercises memory persistence/decay).
+        this.addMemory(agent.characterId, {
+          event: nextAction.name,
+          nodeId: '',
+          sentiment: actionSentiment(nextAction.category),
+          decayWeight: 1,
+        });
+        const prose = nextAction.narrativeTemplate.replace(/\{\{agent\.name\}\}/g, agent.characterId);
         narrativeOutputs.push(prose);
-        agent.currentPlan?.shift();
-      } else if (!plan) {
-        narrativeOutputs.push(`The character (${agent.characterId}) stands still, doing nothing in particular.`);
       }
     }
 
