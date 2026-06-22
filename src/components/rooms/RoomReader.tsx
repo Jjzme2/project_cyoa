@@ -4,10 +4,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { toast } from 'sonner'
-import { Loader2, Users, Share2, SkipForward, Check, Crown, BookOpen } from 'lucide-react'
+import { Loader2, Users, Share2, SkipForward, Check, Crown, BookOpen, Feather, X } from 'lucide-react'
 import { db } from '@/lib/firebase-client'
 import { useAuth } from '@/components/Providers'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import { StoryContent } from '@/components/book/StoryContent'
 import type { Room, StoryNode } from '@/types'
 
@@ -26,6 +27,8 @@ export function RoomReader({ roomId }: { roomId: string }) {
   const [nodeLoading, setNodeLoading] = useState(false)
   const [ageBlocked, setAgeBlocked] = useState(false)
   const [voting, setVoting] = useState(false)
+  const [writeText, setWriteText] = useState('')
+  const [submittingWrite, setSubmittingWrite] = useState(false)
   const [now, setNow] = useState(() => Date.now())
 
   const joinedRef = useRef(false)
@@ -150,6 +153,42 @@ export function RoomReader({ roomId }: { roomId: string }) {
       .catch(() => toast.error('Could not copy the link.'))
   }
 
+  // Write a new path at a frontier (reuses the normal contribution endpoint),
+  // then advance the whole room to it once it's published.
+  async function submitWrite(slotId: string) {
+    if (!user || !room || !writeText.trim()) return
+    setSubmittingWrite(true)
+    try {
+      const token = await user.getIdToken()
+      const res = await fetch(`/api/stories/${room.storyId}/nodes/${room.currentNodeId}/slots/${slotId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ promptText: writeText.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Could not write this path')
+      setWriteText('')
+      if (data.pendingReview) {
+        toast.message('Submitted — your path needs moderation before the room can continue.')
+      } else {
+        await api('/advance', { toNodeId: data.nodeId })
+        toast.success('The story continues, together!')
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not write this path')
+    } finally {
+      setSubmittingWrite(false)
+    }
+  }
+
+  async function kick(targetUid: string) {
+    try {
+      await api('/kick', { targetUid })
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not remove member')
+    }
+  }
+
   // ── Render states ───────────────────────────────────────────────────────
   if (loading) {
     return <Centered><Loader2 className="h-5 w-5 animate-spin opacity-50" /></Centered>
@@ -185,6 +224,7 @@ export function RoomReader({ roomId }: { roomId: string }) {
 
   const members = Object.entries(room.members)
   const navSlots = (node?.slots ?? []).filter((s) => s.filled && s.childNodeId)
+  const openSlots = (node?.slots ?? []).filter((s) => !s.filled && !s.pendingReview)
   const totalVotes = Object.keys(room.votes).length
   const myVote = room.votes[user.uid]
   const isHost = room.hostId === user.uid
@@ -233,12 +273,46 @@ export function RoomReader({ roomId }: { roomId: string }) {
         )}
       </div>
 
-      {/* Voting / ended */}
+      {/* Ended / writing / voting */}
       {room.status === 'ended' ? (
         <div className="glass-card rounded-xl p-6 text-center space-y-3">
           <BookOpen className="h-6 w-6 mx-auto text-amber-400/60" />
           <p className="text-sm text-foreground/75">Your tale has reached its end, together.</p>
+          <p className="text-[11px] font-sans text-muted-foreground/45">
+            {room.round} {room.round === 1 ? 'chapter' : 'chapters'} ·{' '}
+            {members.length} {members.length === 1 ? 'reader' : 'readers'}
+          </p>
           <Link href={`/stories/${room.storyId}`} className={outlineLink}>Read this story on your own</Link>
+        </div>
+      ) : room.status === 'writing' ? (
+        <div className="space-y-3">
+          <p className="text-[11px] uppercase tracking-widest font-sans text-amber-400/55">
+            A frontier — write what happens next, together
+          </p>
+          {openSlots.length === 0 ? (
+            <p className="text-sm text-muted-foreground/50 py-4 text-center">Waiting for an open path…</p>
+          ) : (
+            <div className="space-y-2">
+              <Textarea
+                value={writeText}
+                onChange={(e) => setWriteText(e.target.value)}
+                placeholder="Describe the path the group takes next…"
+                rows={4}
+                disabled={submittingWrite}
+              />
+              <Button
+                onClick={() => submitWrite(openSlots[0].id)}
+                disabled={submittingWrite || !writeText.trim()}
+                className="w-full gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300"
+              >
+                {submittingWrite ? <Loader2 className="h-4 w-4 animate-spin" /> : <Feather className="h-4 w-4" />}
+                {submittingWrite ? 'Weaving the tale…' : 'Write & continue'}
+              </Button>
+              <p className="text-[10px] font-sans text-muted-foreground/40 text-center">
+                Anyone in the room can write; the first published path continues the story for everyone.
+              </p>
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
@@ -308,6 +382,15 @@ export function RoomReader({ roomId }: { roomId: string }) {
           >
             {room.hostId === uid && <Crown className="h-2.5 w-2.5 text-amber-400/70" />}
             {m.name}
+            {isHost && room.hostId !== uid && (
+              <button
+                onClick={() => kick(uid)}
+                title={`Remove ${m.name}`}
+                className="ml-0.5 opacity-40 hover:opacity-100 hover:text-red-400 transition-colors"
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            )}
           </span>
         ))}
       </div>

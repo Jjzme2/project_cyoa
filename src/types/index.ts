@@ -95,7 +95,7 @@ export interface SlotBounty {
 }
 
 // ─── Co-op reading rooms ──────────────────────────────────────────────────────
-export type RoomStatus = 'voting' | 'ended'
+export type RoomStatus = 'voting' | 'writing' | 'ended'
 
 export interface RoomMember {
   name: string
