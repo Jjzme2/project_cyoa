@@ -122,10 +122,24 @@ export class NarrativeBuilder {
       else if (beat === 'escalate') context.activeEncounters.push('A sudden complication forces itself upon the scene.');
     }
 
-    // 3. ProcGen: quests (if toggled)
+    // 3. ProcGen: quests (if toggled). Quests now run as a multi-beat arc
+    // (call → journey → struggle → resolution) persisted across nodes, so they
+    // read as a coherent mini-story. A new quest only starts once the last one
+    // resolves.
+    let questState = priorState?.quest;
     if (this.story.implementQuests) {
-      const quest = this.questGen.generateQuest(nodePath);
-      if (quest) context.activeQuests.push(quest.narrativePrompt);
+      let active = questState && questState.stage !== 'done' ? questState : undefined;
+      if (!active) {
+        const fresh = this.questGen.generateQuest(nodePath);
+        if (fresh) active = { ...fresh, stage: 'call', turnsOnStage: 0 };
+      }
+      if (active) {
+        const { prompt, next } = this.questGen.beat(active);
+        if (prompt) context.activeQuests.push(prompt);
+        questState = next;
+      } else {
+        questState = undefined;
+      }
     }
 
     // 4. Factions
@@ -196,6 +210,7 @@ export class NarrativeBuilder {
       turnCount,
       director,
       ...(relationships ? { relationships } : {}),
+      ...(questState ? { quest: questState } : {}),
     };
 
     return { context, updatedEngineState };

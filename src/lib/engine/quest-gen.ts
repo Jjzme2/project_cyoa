@@ -1,6 +1,24 @@
-import { ProcGenQuest } from '@/types/procgen';
+import { ProcGenQuest, ActiveQuest, QuestStage } from '@/types/procgen';
 import { SeededRNG } from './seed-rng';
 import { NameGenerator } from './name-gen';
+
+const STAGE_ORDER: QuestStage[] = ['call', 'journey', 'struggle', 'resolution', 'done'];
+
+const STRUGGLE_VERB: Record<ProcGenQuest['type'], string> = {
+  kill: 'confront',
+  fetch: 'claim',
+  escort: 'see safely through with',
+  explore: 'brave',
+  deliver: 'complete the delivery of',
+};
+
+const JOURNEY_OBSTACLES = [
+  'an unexpected obstacle blocks the way',
+  'old enemies take notice of the effort',
+  'the path exacts a price before it yields',
+  'a rival is pursuing the same end',
+  'the way forward demands a hard choice',
+];
 
 export class QuestGenerator {
   private rng: SeededRNG;
@@ -68,5 +86,35 @@ export class QuestGenerator {
       rewardText,
       narrativePrompt
     };
+  }
+
+  /**
+   * Emit the prompt for the quest's current beat and return the quest advanced
+   * to the next beat. The arc runs call → journey → struggle → resolution →
+   * done, one beat per chapter, so a quest reads as a coherent mini-story rather
+   * than an isolated prompt.
+   */
+  public beat(active: ActiveQuest): { prompt: string; next: ActiveQuest } {
+    const prompt = this.stagePrompt(active);
+    const idx = STAGE_ORDER.indexOf(active.stage);
+    const nextStage = STAGE_ORDER[Math.min(idx + 1, STAGE_ORDER.length - 1)];
+    return { prompt, next: { ...active, stage: nextStage, turnsOnStage: 0 } };
+  }
+
+  private stagePrompt(q: ActiveQuest): string {
+    switch (q.stage) {
+      case 'call':
+        return q.narrativePrompt;
+      case 'journey': {
+        const r = new SeededRNG(SeededRNG.hashString(`${q.id}_journey`));
+        return `The pursuit of ${q.target} grows complicated — ${r.pick(JOURNEY_OBSTACLES)}.`;
+      }
+      case 'struggle':
+        return `The moment comes to ${STRUGGLE_VERB[q.type]} ${q.target}; ${q.giverId}'s hopes turn on what happens next.`;
+      case 'resolution':
+        return `The matter of ${q.target} reaches its end — ${q.giverId}'s promise of ${q.rewardText} now comes due, for better or worse.`;
+      default:
+        return '';
+    }
   }
 }
