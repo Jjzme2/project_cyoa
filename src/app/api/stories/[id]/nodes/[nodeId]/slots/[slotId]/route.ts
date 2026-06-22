@@ -171,11 +171,17 @@ export async function POST(
         ...(priorEngineState?.worldState ?? {}),
         ...worldState,
       }
+      // Living world: catch the autonomous systems up by ~1 tick per hour since
+      // the parent chapter (capped), so the world feels like it moved on while
+      // the reader was away.
+      const ageMs = Date.now() - new Date(parentNode.createdAt).getTime()
+      const catchUpTicks = Math.min(10, Math.floor(ageMs / 3_600_000))
       const { context, updatedEngineState: nextState } = builder.buildContext(
         pathString,
         parentNode.depth + 1,
         effectiveWorldState,
         priorEngineState,
+        catchUpTicks,
       )
       systemNarrativeEvents = builder.formatForPrompt(context)
 

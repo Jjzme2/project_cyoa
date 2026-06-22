@@ -22,4 +22,5 @@ export interface EngineState {
   belief?: BeliefState; // Per-character PERCEIVED standing (lags reality)
   difficulty?: DifficultyState; // Adaptive stakes level
   plot?: PlotState; // Story-level through-line (HTN plot planner)
+  lastInterlude?: number; // turnCount of the last non-linear interlude (cooldown)
 }
