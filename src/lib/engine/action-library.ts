@@ -63,6 +63,35 @@ export const DefaultActionLibrary: Record<string, GOAPAction> = {
     preconditions: { 'player.underAttack': false },
     effects: { 'agent.hasInformation': true },
     narrativeTemplate: '{{agent.name}} meticulously scours the area, turning over rocks and inspecting the surroundings for clues.'
+  },
+  'utility_observe': {
+    id: 'utility_observe',
+    name: 'Observe',
+    cost: 2,
+    category: 'movement',
+    preconditions: { 'player.inSight': true },
+    effects: { 'agent.hasInformation': true },
+    narrativeTemplate: '{{agent.name}} hangs back, watching you with unhurried, calculating eyes, missing nothing.'
+  },
+
+  // ─── Alternative trust / advantage paths (drive personality variety) ───────
+  'social_offer_aid': {
+    id: 'social_offer_aid',
+    name: 'Offer Aid',
+    cost: 4,
+    category: 'social',
+    preconditions: { 'player.inSight': true },
+    effects: { 'player.trustsAgent': true },
+    narrativeTemplate: '{{agent.name}} offers a steadying hand and quiet reassurance, asking nothing in return.'
+  },
+  'social_intimidate': {
+    id: 'social_intimidate',
+    name: 'Intimidate',
+    cost: 5,
+    category: 'social',
+    preconditions: { 'player.inSight': true },
+    effects: { 'agent.hasAdvantage': true, 'player.fearsAgent': true },
+    narrativeTemplate: '{{agent.name}} looms close, voice like cold iron, and the balance of power tilts sharply toward them.'
   }
 };
 

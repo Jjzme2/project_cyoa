@@ -1,6 +1,121 @@
-import { GOAPAgent, AgentMemory, WorldState } from '@/types/goap';
+import { GOAPAgent, AgentMemory, WorldState, GOAPGoal, PersonalityWeights } from '@/types/goap';
 import { GOAPPlanner } from './goap-planner';
 import { getActionsFromIds } from './action-library';
+
+// ── Deterministic personality / default behaviour ──────────────────────────
+// Emergent characters arrive with no authored goapConfig, so we synthesise a
+// stable one from the character's name. This is what makes `goapEnabled`
+// actually produce living behaviour instead of nothing.
+
+function hashString(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function makeRng(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export function seededPersonality(name: string): PersonalityWeights {
+  const rng = makeRng(hashString(`${name}:personality`));
+  const r = () => Math.round(rng() * 100) / 100;
+  return { aggression: r(), loyalty: r(), cunning: r(), courage: r(), greed: r() };
+}
+
+/**
+ * A universal behaviour profile for any character. Two competing drives —
+ * earning the protagonist's trust vs. seeking the upper hand — are weighted by
+ * personality, and the memory system (below) tips the balance based on how the
+ * protagonist has treated them. Befriend-then-betray emerges naturally because
+ * `social_betray` requires trust first.
+ */
+export function defaultGoapConfig(name: string): NonNullable<{
+  goals: GOAPGoal[];
+  availableActions: string[];
+  personality: PersonalityWeights;
+}> {
+  const p = seededPersonality(name);
+  const scheming = (p.cunning + p.greed) / 2;
+
+  const earnTrust: GOAPGoal = {
+    id: 'earn_trust',
+    name: 'Earn the protagonist’s trust',
+    priority: 4 + p.loyalty * 3,
+    desiredState: { 'player.trustsAgent': true },
+    sentiment: 'pro_protagonist',
+  };
+  const gainAdvantage: GOAPGoal = {
+    id: 'gain_advantage',
+    name: 'Gain the upper hand',
+    priority: 4 + scheming * 3,
+    desiredState: { 'agent.hasAdvantage': true },
+    sentiment: 'anti_protagonist',
+  };
+
+  // Disposition splits the cast into distinct archetypes so they don't all
+  // behave identically. Within an archetype, the personality-weighted action
+  // costs (see GOAPPlanner) pick different routes — e.g. an aggressive schemer
+  // intimidates while a cunning one befriends then betrays.
+  const trustActions = ['social_offer_aid', 'utility_observe', 'utility_search_area', 'social_persuade'];
+  const schemeActions = ['utility_observe', 'utility_search_area', 'social_persuade', 'social_betray', 'social_intimidate', 'combat_attack_player'];
+
+  if (p.loyalty >= 0.55 && p.loyalty > scheming) {
+    // steadfast ally — earns trust, never coerces or betrays
+    return { goals: [earnTrust], availableActions: [...trustActions, 'survival_rest', 'combat_flee'], personality: p };
+  }
+  if (scheming >= 0.55 && scheming > p.loyalty) {
+    // schemer — routes to advantage by intimidation or a long con
+    return { goals: [gainAdvantage], availableActions: [...schemeActions, 'combat_flee'], personality: p };
+  }
+  // ambivalent — both drives; memory of the protagonist tips the balance
+  const union = Array.from(new Set([...trustActions, ...schemeActions, 'survival_rest', 'combat_flee']));
+  return { goals: [earnTrust, gainAdvantage], availableActions: union, personality: p };
+}
+
+function actionSentiment(category: string): AgentMemory['sentiment'] {
+  // Auto-recorded agent actions are logged as neutral continuity; the
+  // protagonist-relationship sentiment is driven by authored memory effects.
+  void category;
+  return 'neutral';
+}
+
+// ── Per-agent world-state scoping ───────────────────────────────────────────
+// Actions are written with generic keys (`agent.hasAdvantage`,
+// `player.trustsAgent`). To stop every character sharing one global flag, those
+// facts are stored per agent as `<name>::<key>`; only genuinely scene-wide
+// facts stay global. Each agent plans over a private view and writes its
+// effects back into its own namespace.
+
+const SHARED_FACTS = new Set(['player.inSight', 'player.underAttack']);
+
+function scopeStateFor(agentId: string, ws: WorldState): WorldState {
+  const view: WorldState = {};
+  for (const key of SHARED_FACTS) {
+    if (key in ws) view[key] = ws[key];
+  }
+  const prefix = `${agentId}::`;
+  for (const key in ws) {
+    if (key.startsWith(prefix)) view[key.slice(prefix.length)] = ws[key];
+  }
+  return view;
+}
+
+function applyScopedEffects(agentId: string, effects: Partial<WorldState>, ws: WorldState): void {
+  for (const key in effects) {
+    const target = SHARED_FACTS.has(key) ? key : `${agentId}::${key}`;
+    ws[target] = effects[key] as WorldState[string];
+  }
+}
 
 export class AgentManager {
   private planner: GOAPPlanner;
@@ -64,20 +179,29 @@ export class AgentManager {
     const narrativeOutputs: string[] = [];
 
     for (const agent of this.agents.values()) {
-      const activeGoal = this.getHighestPriorityGoal(agent, currentState);
+      // Each agent reasons over its own private view of the world.
+      const view = scopeStateFor(agent.characterId, currentState);
+      const activeGoal = this.getHighestPriorityGoal(agent, view);
       if (!activeGoal) continue;
 
       const availableActions = getActionsFromIds(agent.availableActions);
-      const plan = this.planner.plan(currentState, activeGoal, availableActions, agent.personality);
+      const plan = this.planner.plan(view, activeGoal, availableActions, agent.personality);
       agent.currentPlan = plan;
 
       if (plan && plan.length > 0) {
         const nextAction = plan[0];
-        const prose = nextAction.narrativeTemplate.replace(/\{\{agent\.name\}\}/g, `The character (${agent.characterId})`);
+        // Persist effects into this agent's namespace so consequences carry
+        // forward without bleeding into other characters.
+        applyScopedEffects(agent.characterId, nextAction.effects, currentState);
+        // Log it as continuity memory (also exercises memory persistence/decay).
+        this.addMemory(agent.characterId, {
+          event: nextAction.name,
+          nodeId: '',
+          sentiment: actionSentiment(nextAction.category),
+          decayWeight: 1,
+        });
+        const prose = nextAction.narrativeTemplate.replace(/\{\{agent\.name\}\}/g, agent.characterId);
         narrativeOutputs.push(prose);
-        agent.currentPlan?.shift();
-      } else if (!plan) {
-        narrativeOutputs.push(`The character (${agent.characterId}) stands still, doing nothing in particular.`);
       }
     }
 

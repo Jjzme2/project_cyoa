@@ -148,10 +148,17 @@ export async function POST(
       const priorEngineState = parentNode.engineState ?? undefined
       const builder = new NarrativeBuilder(story, world, priorEngineState)
       const pathString = storyPath.map(p => p.id).join('_')
+      // Carry world facts forward for continuity: seed from the story's initial
+      // state, layer the parent node's persisted state, then any client deltas.
+      const effectiveWorldState: WorldState = {
+        ...(story.initialWorldState ?? {}),
+        ...(priorEngineState?.worldState ?? {}),
+        ...worldState,
+      }
       const { context, updatedEngineState: nextState } = builder.buildContext(
         pathString,
         parentNode.depth + 1,
-        worldState,
+        effectiveWorldState,
         priorEngineState,
       )
       systemNarrativeEvents = builder.formatForPrompt(context)

@@ -4,7 +4,7 @@ import { EngineState } from '@/types/engine';
 import { EnvironmentGenerator } from './environment-gen';
 import { EncounterGenerator } from './encounter-gen';
 import { QuestGenerator } from './quest-gen';
-import { AgentManager } from './agent-manager';
+import { AgentManager, defaultGoapConfig } from './agent-manager';
 import { FactionManager } from './faction-manager';
 import { EconomyManager, createDefaultEconomy } from './economy-manager';
 import { SeededRNG } from './seed-rng';
@@ -52,20 +52,22 @@ export class NarrativeBuilder {
     this.factionManager = new FactionManager(storySeed);
     this.economyManager = new EconomyManager();
 
-    // Restore or initialise GOAP agents
+    // Register a GOAP agent for every living character. Authored goapConfigs
+    // are used as-is; everyone else (including emergent characters) gets a
+    // synthesised default so enabling GOAP actually produces living behaviour.
     if (this.story.goapEnabled && this.story.characters) {
       for (const char of this.story.characters) {
-        if (char.goapConfig) {
-          const agent: GOAPAgent = {
-            characterId: char.name,
-            goals: char.goapConfig.goals,
-            availableActions: char.goapConfig.availableActions,
-            personality: char.goapConfig.personality,
-            currentPlan: null,
-            memory: [],
-          };
-          this.agentManager.registerAgent(agent);
-        }
+        if (char.status && char.status.toLowerCase() === 'deceased') continue;
+        const config = char.goapConfig ?? defaultGoapConfig(char.name);
+        const agent: GOAPAgent = {
+          characterId: char.name,
+          goals: config.goals,
+          availableActions: config.availableActions,
+          personality: config.personality,
+          currentPlan: null,
+          memory: [],
+        };
+        this.agentManager.registerAgent(agent);
       }
       if (priorState?.agentMemories) {
         this.agentManager.restoreMemories(priorState.agentMemories);
@@ -117,8 +119,14 @@ export class NarrativeBuilder {
     const economySummary = EconomyManager.getSummary(economy);
     if (economySummary) context.economySummary = economySummary;
 
-    // 6. GOAP agents
+    // 6. GOAP agents. Seed baseline scene facts so action preconditions are
+    // satisfiable (negative preconditions like `player.underAttack: false`
+    // can't match an absent key). Explicit/carried-forward state still wins.
     if (this.story.goapEnabled) {
+      const baseline: WorldState = { 'player.inSight': true, 'player.underAttack': false };
+      for (const k in baseline) {
+        if (currentState[k] === undefined) currentState[k] = baseline[k];
+      }
       context.npcActions = this.agentManager.updateTurn(currentState);
     }
 

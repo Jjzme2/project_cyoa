@@ -1,7 +1,7 @@
 import { adminDb } from './firebase-admin'
 import { FieldValue } from 'firebase-admin/firestore'
 import { getStory, getStoryNode } from './firestore-helpers'
-import type { Room, RoomMember, ChoiceSlot } from '@/types'
+import type { Room, RoomMember, RoomStatus, ChoiceSlot } from '@/types'
 
 /**
  * Co-op reading rooms.
@@ -14,9 +14,51 @@ import type { Room, RoomMember, ChoiceSlot } from '@/types'
 
 export const ROUND_SECONDS = 30
 export const MAX_MEMBERS = 20
+/** A member is considered present if they've sent a heartbeat within this window. */
+export const STALE_MS = 90_000
 
 function roomRef(roomId: string) {
   return adminDb.collection('rooms').doc(roomId)
+}
+
+/** Open paths a member could write at a frontier node. */
+function openSlots(slots: ChoiceSlot[] | undefined): ChoiceSlot[] {
+  return (slots ?? []).filter((s) => !s.filled && !s.pendingReview)
+}
+
+/**
+ * The room status implied by a node: vote when there are written paths, pause
+ * to write at a frontier with open slots, otherwise the tale has ended.
+ */
+async function statusForNode(storyId: string, nodeId: string): Promise<RoomStatus> {
+  const node = await getStoryNode(storyId, nodeId)
+  if (navigableSlots(node?.slots).length > 0) return 'voting'
+  if (openSlots(node?.slots).length > 0) return 'writing'
+  return 'ended'
+}
+
+/**
+ * Drops members who haven't sent a heartbeat within STALE_MS and returns the
+ * dotted-path updates to apply. Ends the room if everyone has gone. Mutates
+ * `data.members` so callers can reason about who remains.
+ */
+function pruneStaleMembers(data: Room, update: Record<string, unknown>): void {
+  const cutoff = Date.now() - STALE_MS
+  let host = data.hostId
+  for (const [uid, m] of Object.entries(data.members)) {
+    if (new Date(m.lastSeen).getTime() < cutoff) {
+      update[`members.${uid}`] = FieldValue.delete()
+      update[`votes.${uid}`] = FieldValue.delete()
+      delete data.members[uid]
+      if (uid === host) host = ''
+    }
+  }
+  const remaining = Object.keys(data.members)
+  if (remaining.length === 0) {
+    update.status = 'ended'
+  } else if (!host) {
+    update.hostId = remaining[0] // promote someone if the host went stale
+  }
 }
 
 interface Actor {
@@ -42,10 +84,9 @@ export async function createRoom(
   if (!story) return { error: 'Story not found.' }
   if (!story.rootNodeId) return { error: 'This story has no opening chapter yet.' }
 
-  const rootNode = await getStoryNode(storyId, story.rootNodeId)
   const now = new Date()
-  // A story with no branches yet can't be co-read — start it already ended.
-  const status = navigableSlots(rootNode?.slots).length > 0 ? 'voting' : 'ended'
+  // Vote if there are written paths, pause to write at a frontier, else ended.
+  const status = await statusForNode(storyId, story.rootNodeId)
 
   const room: Omit<Room, 'id'> = {
     storyId,
@@ -76,16 +117,25 @@ export async function joinRoom(roomId: string, actor: Actor): Promise<{ error?: 
     }
     const data = doc.data() as Room
     const now = new Date().toISOString()
+    // Keep the joiner fresh so pruning never targets them (avoids a
+    // delete+set conflict on the same member field).
+    if (data.members[actor.uid]) data.members[actor.uid].lastSeen = now
+    const update: Record<string, unknown> = { lastActivity: now }
+    pruneStaleMembers(data, update)
     if (data.members[actor.uid]) {
       // Already a member — just refresh presence.
-      txn.update(ref, { [`members.${actor.uid}.lastSeen`]: now, lastActivity: now })
+      update[`members.${actor.uid}.lastSeen`] = now
+      delete update.status // rejoining keeps the room alive
+      txn.update(ref, update)
       return
     }
     if (Object.keys(data.members).length >= MAX_MEMBERS) {
       error = 'This room is full.'
       return
     }
-    txn.update(ref, { [`members.${actor.uid}`]: member(actor), lastActivity: now })
+    update[`members.${actor.uid}`] = member(actor)
+    delete update.status // a new member keeps the room alive
+    txn.update(ref, update)
   })
   return { error }
 }
@@ -159,7 +209,9 @@ export async function resolveRound(
   const node = await getStoryNode(room.storyId, room.currentNodeId)
   const nav = navigableSlots(node?.slots)
   if (nav.length === 0) {
-    await ref.update({ status: 'ended', lastActivity: new Date().toISOString() })
+    // A path was unwritten under us (e.g. moderation reject) — re-derive state.
+    const status = await statusForNode(room.storyId, room.currentNodeId)
+    await ref.update({ status, lastActivity: new Date().toISOString() })
     return {}
   }
 
@@ -197,14 +249,76 @@ export async function resolveRound(
     advanced = true
   })
 
-  // If the destination is a dead-end (an ending), the tale is over.
+  // Re-derive status at the destination: it may be another vote, a frontier to
+  // write, or an ending.
   if (advanced) {
-    const next = await getStoryNode(room.storyId, newNodeId)
-    if (navigableSlots(next?.slots).length === 0) {
-      await ref.update({ status: 'ended', lastActivity: new Date().toISOString() })
+    const status = await statusForNode(room.storyId, newNodeId)
+    if (status !== 'voting') {
+      await ref.update({ status, lastActivity: new Date().toISOString() })
     }
   }
   return {}
+}
+
+/**
+ * Advance the room to a freshly written child node (after an in-room
+ * contribution fills a frontier slot). Validates the target really is a written
+ * path off the current node to prevent arbitrary jumps.
+ */
+export async function advanceRoom(
+  roomId: string,
+  toNodeId: string,
+): Promise<{ error?: string }> {
+  const ref = roomRef(roomId)
+  const snap = await ref.get()
+  if (!snap.exists) return { error: 'Room not found.' }
+  const room = snap.data() as Room
+  if (room.status === 'ended') return {}
+
+  // The target must be a filled path on the room's current node.
+  const node = await getStoryNode(room.storyId, room.currentNodeId)
+  const isChild = navigableSlots(node?.slots).some((s) => s.childNodeId === toNodeId)
+  if (!isChild) return { error: 'That path isn’t reachable from here yet.' }
+
+  const status = await statusForNode(room.storyId, toNodeId)
+  await ref.update({
+    currentNodeId: toNodeId,
+    round: room.round + 1,
+    votes: {},
+    status,
+    roundEndsAt: new Date(Date.now() + room.roundSeconds * 1000).toISOString(),
+    lastActivity: new Date().toISOString(),
+  })
+  return {}
+}
+
+/** Host-only: remove a member from the room. */
+export async function kickMember(
+  roomId: string,
+  hostUid: string,
+  targetUid: string,
+): Promise<{ error?: string }> {
+  const ref = roomRef(roomId)
+  let error: string | undefined
+  await adminDb.runTransaction(async (txn) => {
+    const doc = await txn.get(ref)
+    if (!doc.exists) {
+      error = 'Room not found.'
+      return
+    }
+    const data = doc.data() as Room
+    if (data.hostId !== hostUid) {
+      error = 'Only the host can remove members.'
+      return
+    }
+    if (targetUid === hostUid || !data.members[targetUid]) return
+    txn.update(ref, {
+      [`members.${targetUid}`]: FieldValue.delete(),
+      [`votes.${targetUid}`]: FieldValue.delete(),
+      lastActivity: new Date().toISOString(),
+    })
+  })
+  return { error }
 }
 
 export async function heartbeat(roomId: string, uid: string): Promise<void> {
@@ -215,7 +329,14 @@ export async function heartbeat(roomId: string, uid: string): Promise<void> {
     const data = doc.data() as Room
     if (!data.members[uid]) return
     const now = new Date().toISOString()
-    txn.update(ref, { [`members.${uid}.lastSeen`]: now, lastActivity: now })
+    // This member is alive (they're beating); keep them fresh before pruning so
+    // pruning never targets them (avoids a delete+set conflict).
+    data.members[uid].lastSeen = now
+    const update: Record<string, unknown> = { lastActivity: now }
+    pruneStaleMembers(data, update)
+    update[`members.${uid}.lastSeen`] = now
+    delete update.status
+    txn.update(ref, update)
   })
 }
 
