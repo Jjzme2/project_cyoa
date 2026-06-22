@@ -9,6 +9,7 @@ import { FactionManager } from './faction-manager';
 import { EconomyManager, createDefaultEconomy } from './economy-manager';
 import { SeededRNG } from './seed-rng';
 import { DramaManager } from './drama-manager';
+import { RelationshipGraph } from './relationship-graph';
 
 export interface NarrativeContext {
   environmentalContext: string;
@@ -19,7 +20,17 @@ export interface NarrativeContext {
   factionEvents: string[]; // per-turn action outcomes
   economySummary: string;
   pacingDirective: string; // AI Director instruction for this turn's tension
+  relationshipSummary: string; // who stands warm/cold toward the protagonist
 }
+
+/** How much a character's own action shifts their standing with the protagonist. */
+const RELATIONSHIP_DELTA: Record<string, number> = {
+  social_betray: -0.35,
+  combat_attack_player: -0.4,
+  social_intimidate: -0.25,
+  social_offer_aid: 0.3,
+  social_persuade: 0.15,
+};
 
 export interface NarrativeBuildResult {
   context: NarrativeContext;
@@ -91,6 +102,7 @@ export class NarrativeBuilder {
       factionEvents: [],
       economySummary: '',
       pacingDirective: '',
+      relationshipSummary: '',
     };
 
     // AI Director: decide this turn's pacing beat from carried-over tension.
@@ -131,15 +143,37 @@ export class NarrativeBuilder {
     const economySummary = EconomyManager.getSummary(economy);
     if (economySummary) context.economySummary = economySummary;
 
-    // 6. GOAP agents. Seed baseline scene facts so action preconditions are
-    // satisfiable (negative preconditions like `player.underAttack: false`
-    // can't match an absent key). Explicit/carried-forward state still wins.
+    // 6. GOAP agents + relationship graph. Seed baseline scene facts so action
+    // preconditions are satisfiable (negative preconditions like
+    // `player.underAttack: false` can't match an absent key); explicit/
+    // carried-forward state still wins.
+    let hostileNpc = false;
+    let relationships = priorState?.relationships;
     if (this.story.goapEnabled) {
       const baseline: WorldState = { 'player.inSight': true, 'player.underAttack': false };
       for (const k in baseline) {
         if (currentState[k] === undefined) currentState[k] = baseline[k];
       }
-      context.npcActions = this.agentManager.updateTurn(currentState);
+
+      const living = (this.story.characters ?? [])
+        .filter((c) => !(c.status && c.status.toLowerCase() === 'deceased'))
+        .map((c) => c.name);
+      relationships = RelationshipGraph.init(living, priorState?.relationships);
+      // Standing (incl. gossip about the whole cast) steers each agent's goals.
+      this.agentManager.setAffinities(relationships.affinity);
+
+      const outcomes = this.agentManager.updateTurn(currentState);
+      context.npcActions = outcomes.map((o) => o.prose);
+
+      // Each action shifts the actor's standing and ripples to kindred characters.
+      for (const o of outcomes) {
+        const delta = RELATIONSHIP_DELTA[o.actionId];
+        if (delta) RelationshipGraph.applyEvent(relationships, o.actorId, delta, living);
+      }
+      hostileNpc = outcomes.some(
+        (o) => o.category === 'combat' || o.actionId === 'social_betray' || o.actionId === 'social_intimidate',
+      );
+      context.relationshipSummary = RelationshipGraph.summary(relationships);
     }
 
     // 7. AI Director: fold this turn's events into the next tension level and
@@ -147,7 +181,7 @@ export class NarrativeBuilder {
     const director = dm.update(priorDirector, beat, {
       encounter: context.activeEncounters.length > 0,
       factionConflict: context.factionEvents.length > 0,
-      hostileNpc: context.npcActions.some((a) => /betray|trap|looms|cold iron|true colors|strike|lunge/i.test(a)),
+      hostileNpc,
       combat: currentState['player.underAttack'] === true,
     });
     context.pacingDirective = dm.directive(beat);
@@ -161,6 +195,7 @@ export class NarrativeBuilder {
       economy,
       turnCount,
       director,
+      ...(relationships ? { relationships } : {}),
     };
 
     return { context, updatedEngineState };
@@ -177,6 +212,7 @@ export class NarrativeBuilder {
     if (context.factionEvents.length > 0) lines.push(`**Faction Activity:** ${context.factionEvents.join(' ')}`);
     if (context.economySummary) lines.push(`**Economy:** ${context.economySummary}`);
     if (context.npcActions.length > 0) lines.push(`**Character Actions:** ${context.npcActions.join(' ')}`);
+    if (context.relationshipSummary) lines.push(`**Standing:** ${context.relationshipSummary}`);
     if (context.pacingDirective) lines.push(`**Pacing (director):** ${context.pacingDirective}`);
 
     if (lines.length === 0) return '';

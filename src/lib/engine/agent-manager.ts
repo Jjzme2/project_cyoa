@@ -117,13 +117,28 @@ function applyScopedEffects(agentId: string, effects: Partial<WorldState>, ws: W
   }
 }
 
+/** A structured record of what an agent did this turn (for the relationship graph). */
+export interface ActionOutcome {
+  actorId: string;
+  actionId: string;
+  category: string;
+  prose: string;
+}
+
 export class AgentManager {
   private planner: GOAPPlanner;
   private agents: Map<string, GOAPAgent>;
+  /** Per-character affinity toward the protagonist (-1..1), from the relationship graph. */
+  private affinities: Record<string, number> = {};
 
   constructor(maxPlannerDepth: number = 6) {
     this.planner = new GOAPPlanner(maxPlannerDepth);
     this.agents = new Map();
+  }
+
+  /** Supply current protagonist affinities so goal selection reflects standing + gossip. */
+  public setAffinities(affinities: Record<string, number>): void {
+    this.affinities = affinities;
   }
 
   public registerAgent(agent: GOAPAgent): void {
@@ -175,8 +190,8 @@ export class AgentManager {
    * Core turn updater. Re-evaluates goals for all agents given the current world state.
    * Returns narrative descriptions of what each agent decided to do this turn.
    */
-  public updateTurn(currentState: WorldState): string[] {
-    const narrativeOutputs: string[] = [];
+  public updateTurn(currentState: WorldState): ActionOutcome[] {
+    const outcomes: ActionOutcome[] = [];
 
     for (const agent of this.agents.values()) {
       // Each agent reasons over its own private view of the world.
@@ -200,12 +215,16 @@ export class AgentManager {
           sentiment: actionSentiment(nextAction.category),
           decayWeight: 1,
         });
-        const prose = nextAction.narrativeTemplate.replace(/\{\{agent\.name\}\}/g, agent.characterId);
-        narrativeOutputs.push(prose);
+        outcomes.push({
+          actorId: agent.characterId,
+          actionId: nextAction.id,
+          category: nextAction.category,
+          prose: nextAction.narrativeTemplate.replace(/\{\{agent\.name\}\}/g, agent.characterId),
+        });
       }
     }
 
-    return narrativeOutputs;
+    return outcomes;
   }
 
   /**
@@ -213,11 +232,14 @@ export class AgentManager {
    * and the agent's memory of protagonist interactions (Utility AI layer).
    */
   private getHighestPriorityGoal(agent: GOAPAgent, currentState: WorldState) {
-    // Compute net protagonist sentiment from memory (-1..1 range)
+    // Protagonist sentiment: prefer the relationship-graph affinity (which folds
+    // in gossip about the whole cast); fall back to this agent's own memory.
     const memorySentimentScore = agent.memory.reduce((acc, m) => {
       const weight = m.decayWeight;
       return acc + (m.sentiment === 'positive' ? weight : m.sentiment === 'negative' ? -weight : 0);
     }, 0);
+    const sentiment =
+      agent.characterId in this.affinities ? this.affinities[agent.characterId] : memorySentimentScore;
 
     let bestGoal = null;
     let highestPriority = -1;
@@ -228,11 +250,12 @@ export class AgentManager {
 
       let priority = goal.dynamicPriority ? goal.dynamicPriority(currentState) : goal.priority;
 
-      // Memory modifier: positive history boosts pro-protagonist goals; negative boosts anti-protagonist goals
+      // Standing modifier: warmth boosts pro-protagonist goals; hostility boosts
+      // anti-protagonist goals.
       if (goal.sentiment === 'pro_protagonist') {
-        priority += memorySentimentScore * 15;
+        priority += sentiment * 15;
       } else if (goal.sentiment === 'anti_protagonist') {
-        priority -= memorySentimentScore * 15;
+        priority -= sentiment * 15;
       }
 
       if (priority > highestPriority) {
