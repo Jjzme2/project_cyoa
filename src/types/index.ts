@@ -78,6 +78,15 @@ export interface Protagonist {
   description?: string
 }
 
+/** A reader's persistent standing within a world (across stories), for "You" mode. */
+export interface WorldReputation {
+  userId: string
+  worldId: string
+  /** -1 reviled .. +1 revered — how the world's denizens regard this reader. */
+  standing: number
+  updatedAt: string
+}
+
 /**
  * An authored "director" sensibility that shapes HOW the AI directs each chapter
  * (its craft and mood, within the content rating). Each axis is -1..1.
@@ -302,6 +311,9 @@ export interface Story {
   resources?: ResourceDefinition[]
   /** Author-defined hero the reader plays as; the AI writes them by name. */
   protagonist?: Protagonist
+  /** "You" mode: the reader IS the protagonist (no authored protagonist), and
+   * their standing persists across stories in this world. */
+  youMode?: boolean
   /** Authored directorial sensibility that shapes how chapters are directed. */
   director?: DirectorPersona
   /** Canon cast — author-seeded and grown emergently as the AI introduces characters. */

@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { title, description, worldId, worldName, coverGradient, resources, tags, coverTheme, readingTheme, rating, protagonist, director, goapEnabled, implementQuests } = body
+  const { title, description, worldId, worldName, coverGradient, resources, tags, coverTheme, readingTheme, rating, protagonist, director, youMode, goapEnabled, implementQuests } = body
 
   if (!title || !worldId || !worldName) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -84,7 +84,9 @@ export async function POST(req: NextRequest) {
     ratingOverriddenBy: null,
     resources: resources ?? [],
     characters: [],
-    ...(safeProtagonist ? { protagonist: safeProtagonist } : {}),
+    youMode: !!youMode,
+    // In "You" mode there's no authored protagonist — the reader is the hero.
+    ...(safeProtagonist && !youMode ? { protagonist: safeProtagonist } : {}),
     ...(safeDirector ? { director: safeDirector } : {}),
     tags: Array.isArray(tags) ? tags.slice(0, 5) : [],
     ...(coverTheme   ? { coverTheme }   : {}),

@@ -45,12 +45,16 @@ function bond(a: PersonalityWeights, b: PersonalityWeights): number {
 }
 
 export const RelationshipGraph = {
-  /** Seed any unknown characters' baseline affinity; preserve prior values. */
-  init(names: string[], prior?: RelationshipState): RelationshipState {
+  /**
+   * Seed any unknown characters' baseline affinity; preserve prior values.
+   * `bias` shifts every newly-seen character's baseline — used in "You" mode to
+   * carry a reader's reputation in this world into how strangers first regard them.
+   */
+  init(names: string[], prior?: RelationshipState, bias = 0): RelationshipState {
     const affinity: Record<string, number> = { ...(prior?.affinity ?? {}) };
     for (const n of names) {
       if (affinity[n] === undefined) {
-        affinity[n] = Math.round(baseline(seededPersonality(n)) * 100) / 100;
+        affinity[n] = clamp(Math.round((baseline(seededPersonality(n)) + bias) * 100) / 100);
       }
     }
     return { affinity };

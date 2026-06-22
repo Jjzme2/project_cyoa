@@ -89,6 +89,40 @@ export async function incrementStoryViews(storyId: string) {
   await storyRef(storyId).update({ views: FieldValue.increment(1) })
 }
 
+// ─── "You" mode: per-reader, per-world reputation ─────────────────────────────
+
+function worldRepRef(userId: string, worldId: string) {
+  return adminDb.collection('worldReputation').doc(`${userId}__${worldId}`)
+}
+
+/** A reader's standing in a world (-1..1); 0 when they're a stranger here. */
+export async function getWorldStanding(userId: string, worldId: string): Promise<number> {
+  const doc = await worldRepRef(userId, worldId).get()
+  return doc.exists ? ((doc.data()?.standing as number) ?? 0) : 0
+}
+
+/**
+ * Nudge a reader's world standing toward the standing observed in the story they
+ * just played (EMA), so the world remembers them across stories.
+ */
+export async function updateWorldStanding(
+  userId: string,
+  worldId: string,
+  observed: number,
+): Promise<void> {
+  const ref = worldRepRef(userId, worldId)
+  await adminDb.runTransaction(async (txn) => {
+    const doc = await txn.get(ref)
+    const prior = doc.exists ? ((doc.data()?.standing as number) ?? 0) : 0
+    const next = Math.max(-1, Math.min(1, Math.round((prior + (observed - prior) * 0.3) * 100) / 100))
+    txn.set(
+      ref,
+      { userId, worldId, standing: next, updatedAt: new Date().toISOString() },
+      { merge: true },
+    )
+  })
+}
+
 /** Append emergent canon characters to a story, deduped by name (case-insensitive). */
 export async function addStoryCharacters(
   storyId: string,

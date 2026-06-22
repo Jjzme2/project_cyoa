@@ -102,7 +102,7 @@ export class NarrativeBuilder {
    * Runs one simulation tick (GOAP, factions, economy, procgen) and
    * returns both the AI-ready narrative context and the updated EngineState.
    */
-  public buildContext(nodePath: string, depth: number, currentState: WorldState, priorState?: EngineState, catchUpTicks: number = 0): NarrativeBuildResult {
+  public buildContext(nodePath: string, depth: number, currentState: WorldState, priorState?: EngineState, catchUpTicks: number = 0, readerStanding: number = 0): NarrativeBuildResult {
     const context: NarrativeContext = {
       environmentalContext: '',
       activeEncounters: [],
@@ -203,7 +203,9 @@ export class NarrativeBuilder {
       const living = (this.story.characters ?? [])
         .filter((c) => !(c.status && c.status.toLowerCase() === 'deceased'))
         .map((c) => c.name);
-      relationships = RelationshipGraph.init(living, priorState?.relationships);
+      // In "You" mode, the reader's standing in this world biases how
+      // not-yet-met characters first regard them.
+      relationships = RelationshipGraph.init(living, priorState?.relationships, readerStanding);
       // Characters act on PERCEIVED standing, which lags the truth — so gossip
       // changes behaviour gradually and the naive can be briefly deceived.
       belief = BeliefModel.update(living, relationships.affinity, priorState?.belief);

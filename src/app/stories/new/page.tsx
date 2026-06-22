@@ -51,6 +51,7 @@ export default function NewStoryPage() {
   const [rating, setRating] = useState<ContentRating>(DEFAULT_CONTENT_RATING)
   const [protagonistName, setProtagonistName] = useState('')
   const [protagonistDesc, setProtagonistDesc] = useState('')
+  const [youMode, setYouMode] = useState(false)
   const [director, setDirector] = useState({ experimental: 0, intensity: 0, darkness: 0, pace: 0, vision: '' })
   const [opening, setOpening] = useState('')
   const [choice1, setChoice1] = useState('')
@@ -106,6 +107,7 @@ export default function NewStoryPage() {
     resources: typeof resources
     goapEnabled: boolean; implementQuests: boolean
     director: typeof director
+    youMode: boolean
   }>('chronicle:draft:story')
 
   useEffect(() => {
@@ -138,6 +140,7 @@ export default function NewStoryPage() {
     setGoapEnabled(d.goapEnabled ?? false)
     setImplementQuests(d.implementQuests ?? false)
     if (d.director) setDirector(d.director)
+    setYouMode(d.youMode ?? false)
     setHasDraft(false)
     toast.success('Draft restored')
   }
@@ -220,7 +223,8 @@ export default function NewStoryPage() {
           worldId,
           worldName: selectedWorld.name,
           rating,
-          protagonist: protagonistName.trim()
+          youMode,
+          protagonist: !youMode && protagonistName.trim()
             ? { name: protagonistName.trim(), description: protagonistDesc.trim() }
             : undefined,
           director:
@@ -264,7 +268,7 @@ export default function NewStoryPage() {
         protagonistName, protagonistDesc, opening,
         choice1, choice2, choice3, tags,
         coverTheme, readingTheme, resources,
-        goapEnabled, implementQuests, director,
+        goapEnabled, implementQuests, director, youMode,
       })
       toast.error(err instanceof Error ? err.message : 'Something went wrong')
       toast.info('Draft saved — your story is preserved for next time.')
@@ -491,27 +495,46 @@ export default function NewStoryPage() {
           </div>
 
           <div className="space-y-2 border-t border-white/[0.06] pt-5">
-            <Label htmlFor="protagonist">
-              Protagonist{' '}
-              <span className="text-muted-foreground/35 font-normal text-xs">(optional)</span>
-            </Label>
-            <Input
-              id="protagonist"
-              placeholder="Who does the reader play as? e.g. Elara, a cautious thief"
-              value={protagonistName}
-              onChange={(e) => setProtagonistName(e.target.value)}
-            />
-            {protagonistName.trim() && (
-              <Input
-                placeholder="A short description the AI should keep consistent (optional)"
-                value={protagonistDesc}
-                onChange={(e) => setProtagonistDesc(e.target.value)}
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={youMode}
+                onChange={(e) => setYouMode(e.target.checked)}
+                className="accent-amber-500"
               />
+              <span className="text-sm">“You” mode — the reader is the protagonist</span>
+            </label>
+            {youMode ? (
+              <p className="text-[11px] text-muted-foreground/45">
+                Each reader plays as themselves, by name. Their standing carries across every story
+                in this world — the cast remembers how they’ve been treated. (Works best with AI
+                characters enabled.)
+              </p>
+            ) : (
+              <>
+                <Label htmlFor="protagonist" className="pt-1 block">
+                  Protagonist{' '}
+                  <span className="text-muted-foreground/35 font-normal text-xs">(optional)</span>
+                </Label>
+                <Input
+                  id="protagonist"
+                  placeholder="Who does the reader play as? e.g. Elara, a cautious thief"
+                  value={protagonistName}
+                  onChange={(e) => setProtagonistName(e.target.value)}
+                />
+                {protagonistName.trim() && (
+                  <Input
+                    placeholder="A short description the AI should keep consistent (optional)"
+                    value={protagonistDesc}
+                    onChange={(e) => setProtagonistDesc(e.target.value)}
+                  />
+                )}
+                <p className="text-[11px] text-muted-foreground/45">
+                  The AI writes the story around this character by name. The rest of the cast emerges
+                  as your story grows.
+                </p>
+              </>
             )}
-            <p className="text-[11px] text-muted-foreground/45">
-              The AI writes the story around this character by name. The rest of the cast emerges
-              as your story grows.
-            </p>
           </div>
 
           <div className="space-y-3 border-t border-white/[0.06] pt-5">
