@@ -5,15 +5,19 @@ import {
   signInWithPopup,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  sendEmailVerification,
+  sendPasswordResetEmail,
   updateProfile,
 } from 'firebase/auth'
 import { toast } from 'sonner'
-import { LogIn, Eye, EyeOff, Loader2, BookOpen } from 'lucide-react'
+import { LogIn, Eye, EyeOff, Loader2, BookOpen, ArrowLeft, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { PasswordStrengthMeter } from '@/components/auth/PasswordStrengthMeter'
+import { evaluatePasswordStrength, checkPasswordBreached } from '@/lib/password-strength'
 
 async function getFirebase() {
   const { auth, googleProvider } = await import('@/lib/firebase-client')
@@ -43,6 +47,9 @@ export function AuthModal({ open, onOpenChange }: Props) {
   const [displayName, setDisplayName] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [showReset, setShowReset] = useState(false)
+
+  const registerAssessment = evaluatePasswordStrength(password, { email, name: displayName })
 
   function reset() {
     setEmail('')
@@ -50,6 +57,25 @@ export function AuthModal({ open, onOpenChange }: Props) {
     setDisplayName('')
     setShowPassword(false)
     setLoading(false)
+    setShowReset(false)
+  }
+
+  async function handleResetPassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (!email.trim()) return
+    setLoading(true)
+    try {
+      const { auth } = await getFirebase()
+      await sendPasswordResetEmail(auth, email.trim())
+      // Don't reveal whether an account exists — always confirm.
+      toast.success('If an account exists for that email, a reset link is on its way.')
+      setShowReset(false)
+      setLoading(false)
+    } catch {
+      toast.success('If an account exists for that email, a reset link is on its way.')
+      setShowReset(false)
+      setLoading(false)
+    }
   }
 
   function handleClose(open: boolean) {
@@ -95,12 +121,28 @@ export function AuthModal({ open, onOpenChange }: Props) {
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault()
+    // Strong-password gate (local checks first, then the breach lookup).
+    const assessment = evaluatePasswordStrength(password, { email, name: displayName })
+    if (!assessment.ok) {
+      toast.error(assessment.issues[0] ?? 'Please choose a stronger password.')
+      return
+    }
     setLoading(true)
     try {
+      const breachCount = await checkPasswordBreached(password)
+      if (breachCount && breachCount > 0) {
+        toast.error(
+          `This password has appeared in ${breachCount.toLocaleString()} known data breaches. Please choose another.`,
+        )
+        setLoading(false)
+        return
+      }
+
       const { auth } = await getFirebase()
       const cred = await createUserWithEmailAndPassword(auth, email, password)
       await updateProfile(cred.user, { displayName: displayName.trim() })
-      toast.success('Your chronicle begins! Welcome.')
+      await sendEmailVerification(cred.user).catch(() => {})
+      toast.success('Your chronicle begins! Check your inbox to verify your email.')
       onOpenChange(false)
       reset()
     } catch (err: unknown) {
@@ -158,6 +200,42 @@ export function AuthModal({ open, onOpenChange }: Props) {
           </TabsList>
 
           <TabsContent value="signin" className="mt-4">
+            {showReset ? (
+              <form onSubmit={handleResetPassword} className="space-y-3">
+                <p className="text-[11px] text-muted-foreground/60 font-sans">
+                  Enter your email and we’ll send a password reset link.
+                </p>
+                <div className="space-y-1.5">
+                  <Label htmlFor="reset-email" className="text-xs">
+                    Email
+                  </Label>
+                  <Input
+                    id="reset-email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 mt-1"
+                >
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                  Send reset link
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setShowReset(false)}
+                  className="flex items-center gap-1 text-[11px] text-muted-foreground/55 hover:text-muted-foreground mx-auto"
+                >
+                  <ArrowLeft className="h-3 w-3" /> Back to sign in
+                </button>
+              </form>
+            ) : (
             <form onSubmit={handleEmailSignIn} className="space-y-3">
               <div className="space-y-1.5">
                 <Label htmlFor="si-email" className="text-xs">
@@ -210,7 +288,15 @@ export function AuthModal({ open, onOpenChange }: Props) {
                 )}
                 Sign in
               </Button>
+              <button
+                type="button"
+                onClick={() => setShowReset(true)}
+                className="block text-[11px] text-muted-foreground/55 hover:text-amber-300 mx-auto"
+              >
+                Forgot password?
+              </button>
             </form>
+            )}
           </TabsContent>
 
           <TabsContent value="register" className="mt-4">
@@ -250,11 +336,11 @@ export function AuthModal({ open, onOpenChange }: Props) {
                   <Input
                     id="reg-password"
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="At least 6 characters"
+                    placeholder="At least 8 characters"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    minLength={6}
+                    minLength={8}
                     autoComplete="new-password"
                     className="pr-10"
                   />
@@ -267,10 +353,11 @@ export function AuthModal({ open, onOpenChange }: Props) {
                     {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                   </button>
                 </div>
+                <PasswordStrengthMeter password={password} email={email} name={displayName} />
               </div>
               <Button
                 type="submit"
-                disabled={loading || !displayName.trim()}
+                disabled={loading || !displayName.trim() || !registerAssessment.ok}
                 className="w-full gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 mt-1"
               >
                 {loading && <Loader2 className="h-4 w-4 animate-spin" />}

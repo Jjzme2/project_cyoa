@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { Providers } from '@/components/Providers'
 import { Header } from '@/components/layout/Header'
+import { VerifyEmailBanner } from '@/components/auth/VerifyEmailBanner'
 import { APP_CONFIG } from '@/lib/config'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="antialiased">
         <Providers>
           <Header />
+          <VerifyEmailBanner />
           {children}
         </Providers>
       </body>
