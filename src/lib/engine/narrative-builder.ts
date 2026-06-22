@@ -8,6 +8,7 @@ import { AgentManager, defaultGoapConfig } from './agent-manager';
 import { FactionManager } from './faction-manager';
 import { EconomyManager, createDefaultEconomy } from './economy-manager';
 import { SeededRNG } from './seed-rng';
+import { DramaManager } from './drama-manager';
 
 export interface NarrativeContext {
   environmentalContext: string;
@@ -17,6 +18,7 @@ export interface NarrativeContext {
   factionStatus: string;   // standing power summary (dominant faction, rivalries)
   factionEvents: string[]; // per-turn action outcomes
   economySummary: string;
+  pacingDirective: string; // AI Director instruction for this turn's tension
 }
 
 export interface NarrativeBuildResult {
@@ -88,15 +90,25 @@ export class NarrativeBuilder {
       factionStatus: '',
       factionEvents: [],
       economySummary: '',
+      pacingDirective: '',
     };
+
+    // AI Director: decide this turn's pacing beat from carried-over tension.
+    const dm = new DramaManager();
+    const priorDirector = priorState?.director ?? DramaManager.INITIAL;
+    const beat = dm.decideBeat(priorDirector);
 
     // 1. ProcGen: environment
     const env = this.envGen.generateEnvironment(nodePath, depth);
     context.environmentalContext = env.ambientDescription;
 
-    // 2. ProcGen: encounters
-    const encounter = this.encounterGen.generateEncounter(nodePath, env.biome, currentState);
-    if (encounter) context.activeEncounters.push(encounter.narrativeHook);
+    // 2. ProcGen: encounters — the Director suppresses them during respite and
+    // forces a complication when escalating out of a lull.
+    if (beat !== 'respite') {
+      const encounter = this.encounterGen.generateEncounter(nodePath, env.biome, currentState);
+      if (encounter) context.activeEncounters.push(encounter.narrativeHook);
+      else if (beat === 'escalate') context.activeEncounters.push('A sudden complication forces itself upon the scene.');
+    }
 
     // 3. ProcGen: quests (if toggled)
     if (this.story.implementQuests) {
@@ -130,7 +142,17 @@ export class NarrativeBuilder {
       context.npcActions = this.agentManager.updateTurn(currentState);
     }
 
-    // 7. Build updated EngineState for persistence
+    // 7. AI Director: fold this turn's events into the next tension level and
+    // hand the AI an explicit pacing instruction.
+    const director = dm.update(priorDirector, beat, {
+      encounter: context.activeEncounters.length > 0,
+      factionConflict: context.factionEvents.length > 0,
+      hostileNpc: context.npcActions.some((a) => /betray|trap|looms|cold iron|true colors|strike|lunge/i.test(a)),
+      combat: currentState['player.underAttack'] === true,
+    });
+    context.pacingDirective = dm.directive(beat);
+
+    // 8. Build updated EngineState for persistence
     const turnCount = (priorState?.turnCount ?? 0) + 1;
     const updatedEngineState: EngineState = {
       worldState: currentState,
@@ -138,6 +160,7 @@ export class NarrativeBuilder {
       factions: updatedFactions,
       economy,
       turnCount,
+      director,
     };
 
     return { context, updatedEngineState };
@@ -154,6 +177,7 @@ export class NarrativeBuilder {
     if (context.factionEvents.length > 0) lines.push(`**Faction Activity:** ${context.factionEvents.join(' ')}`);
     if (context.economySummary) lines.push(`**Economy:** ${context.economySummary}`);
     if (context.npcActions.length > 0) lines.push(`**Character Actions:** ${context.npcActions.join(' ')}`);
+    if (context.pacingDirective) lines.push(`**Pacing (director):** ${context.pacingDirective}`);
 
     if (lines.length === 0) return '';
 
