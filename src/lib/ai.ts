@@ -6,7 +6,7 @@ import type { ContentRating, Protagonist, StoryCharacter } from '@/types'
 
 const PRIMARY_MODEL = 'google/gemini-2.5-pro'
 const OPENROUTER_MODEL = 'google/gemma-4-31b-it:free'
-const IMAGE_MODEL = 'sourceful/riverflow-v2.5-fast:free'
+const IMAGE_MODEL = 'google/gemini-2.5-flash-image-preview'
 
 interface WorldContext {
   name: string
@@ -204,7 +204,7 @@ export async function generateStoryImage(
       body: JSON.stringify({
         model: IMAGE_MODEL,
         messages: [{ role: 'user', content: prompt }],
-        modalities: ['image'],
+        modalities: ['image', 'text'],
       }),
     })
 
@@ -256,7 +256,7 @@ export async function generateCoverImage(
       body: JSON.stringify({
         model: IMAGE_MODEL,
         messages: [{ role: 'user', content: prompt }],
-        modalities: ['image'],
+        modalities: ['image', 'text'],
       }),
     })
 
