@@ -228,7 +228,7 @@ export class NarrativeBuilder {
     context.stakesDirective = DifficultyManager.directive(difficulty.level);
 
     // 7c. Plot planner: advance the story's through-line one beat at a time.
-    const plot = PlotPlanner.advance(PlotPlanner.init(this.story.title, priorState?.plot));
+    const plot = PlotPlanner.advance(PlotPlanner.init(this.story.title, priorState?.plot, this.story.director));
     context.plotDirective = PlotPlanner.directive(plot);
 
     // 8. Build updated EngineState for persistence

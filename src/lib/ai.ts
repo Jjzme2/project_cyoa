@@ -2,7 +2,7 @@ import { generateText, APICallError } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { put } from '@vercel/blob'
 import { StoryPathSegment } from '@/types'
-import type { ContentRating, Protagonist, StoryCharacter } from '@/types'
+import type { ContentRating, Protagonist, StoryCharacter, DirectorPersona } from '@/types'
 import type { ModerationResult, ModerationAction } from './moderation'
 
 const PRIMARY_MODEL = 'google/gemini-2.5-pro'
@@ -18,6 +18,24 @@ interface WorldContext {
   rating?: ContentRating
   protagonist?: Protagonist
   characters?: StoryCharacter[]
+  director?: DirectorPersona
+}
+
+/** Translate the authored director persona into directorial guidance for the prompt. */
+function directorBlock(d?: DirectorPersona): string {
+  if (!d) return ''
+  const notes: string[] = []
+  if (d.experimental > 0.3) notes.push('Take bold, unconventional narrative risks and subvert expectations.')
+  else if (d.experimental < -0.3) notes.push('Favor classic, well-structured storytelling and familiar, satisfying beats.')
+  if (d.intensity > 0.3) notes.push('Direct with assertive force — decisive turns and high emotional voltage.')
+  else if (d.intensity < -0.3) notes.push('Direct with a sensitive, restrained hand — nuance, subtext, and quiet emotional beats.')
+  if (d.darkness > 0.3) notes.push('Lean into darker, ominous, frightening tones.')
+  else if (d.darkness < -0.3) notes.push('Lean into warmth, tenderness, and romance.')
+  if (d.pace > 0.3) notes.push('Keep events propulsive and fast-moving.')
+  else if (d.pace < -0.3) notes.push('Let scenes breathe with a patient, slow-burn build.')
+  if (d.vision && d.vision.trim()) notes.push(`Honor the director's stated vision: "${d.vision.trim()}"`)
+  if (notes.length === 0) return ''
+  return `\nDIRECTOR'S VISION (shape HOW this chapter is directed — its craft and sensibility, always within the CONTENT RATING above):\n${notes.map((n) => `- ${n}`).join('\n')}\n`
 }
 
 function castBlock(world: WorldContext): string {
@@ -83,7 +101,7 @@ WORLD RULES: ${world.rules}
 TONE: ${world.tone}
 
 ${ratingGuidance(world.rating)}
-${castBlock(world)}
+${castBlock(world)}${directorBlock(world.director)}
 STORY PATH SO FAR:
 ${pathContent}
 

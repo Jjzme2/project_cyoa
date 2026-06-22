@@ -68,9 +68,15 @@ const ARCS: PlotArc[] = [
 const CHAPTERS_PER_BEAT = 2;
 
 export const PlotPlanner = {
-  init(storyTitle: string, prior?: PlotState): PlotState {
+  init(storyTitle: string, prior?: PlotState, persona?: { darkness?: number }): PlotState {
     if (prior) return prior;
-    const arc = ARCS[SeededRNG.hashString(storyTitle) % ARCS.length];
+    // The director's darkness leans the structural arc: dark steers away from the
+    // heroic alliance arc; warm steers toward it.
+    const dark = persona?.darkness ?? 0;
+    let pool = ARCS;
+    if (dark > 0.3) pool = ARCS.filter((a) => a.id !== 'forge_and_test');
+    else if (dark < -0.3) pool = ARCS.filter((a) => a.id === 'forge_and_test');
+    const arc = pool[SeededRNG.hashString(storyTitle) % pool.length];
     return { arcId: arc.id, beatIndex: 0, turnsOnBeat: 0 };
   },
 

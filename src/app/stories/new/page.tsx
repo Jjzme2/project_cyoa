@@ -51,6 +51,7 @@ export default function NewStoryPage() {
   const [rating, setRating] = useState<ContentRating>(DEFAULT_CONTENT_RATING)
   const [protagonistName, setProtagonistName] = useState('')
   const [protagonistDesc, setProtagonistDesc] = useState('')
+  const [director, setDirector] = useState({ experimental: 0, intensity: 0, darkness: 0, pace: 0, vision: '' })
   const [opening, setOpening] = useState('')
   const [choice1, setChoice1] = useState('')
   const [choice2, setChoice2] = useState('')
@@ -104,6 +105,7 @@ export default function NewStoryPage() {
     coverTheme: CoverTheme; readingTheme: ReadingTheme
     resources: typeof resources
     goapEnabled: boolean; implementQuests: boolean
+    director: typeof director
   }>('chronicle:draft:story')
 
   useEffect(() => {
@@ -135,6 +137,7 @@ export default function NewStoryPage() {
     setResources(d.resources)
     setGoapEnabled(d.goapEnabled ?? false)
     setImplementQuests(d.implementQuests ?? false)
+    if (d.director) setDirector(d.director)
     setHasDraft(false)
     toast.success('Draft restored')
   }
@@ -220,6 +223,10 @@ export default function NewStoryPage() {
           protagonist: protagonistName.trim()
             ? { name: protagonistName.trim(), description: protagonistDesc.trim() }
             : undefined,
+          director:
+            director.experimental || director.intensity || director.darkness || director.pace || director.vision.trim()
+              ? { ...director, vision: director.vision.trim() }
+              : undefined,
           published: true,
           coverGradient: null,
           resources: formattedResources,
@@ -257,7 +264,7 @@ export default function NewStoryPage() {
         protagonistName, protagonistDesc, opening,
         choice1, choice2, choice3, tags,
         coverTheme, readingTheme, resources,
-        goapEnabled, implementQuests,
+        goapEnabled, implementQuests, director,
       })
       toast.error(err instanceof Error ? err.message : 'Something went wrong')
       toast.info('Draft saved — your story is preserved for next time.')
@@ -505,6 +512,45 @@ export default function NewStoryPage() {
               The AI writes the story around this character by name. The rest of the cast emerges
               as your story grows.
             </p>
+          </div>
+
+          <div className="space-y-3 border-t border-white/[0.06] pt-5">
+            <Label>
+              Director{' '}
+              <span className="text-muted-foreground/35 font-normal text-xs">(optional)</span>
+            </Label>
+            <p className="text-[11px] text-muted-foreground/45 -mt-1">
+              Sets the directorial sensibility — how chapters are directed, within your rating.
+            </p>
+            {([
+              { key: 'experimental', left: 'Traditional', right: 'Experimental' },
+              { key: 'intensity', left: 'Sensitive', right: 'Assertive' },
+              { key: 'darkness', left: 'Romantic', right: 'Scary' },
+              { key: 'pace', left: 'Slow-burn', right: 'Propulsive' },
+            ] as const).map(({ key, left, right }) => (
+              <div key={key} className="space-y-1">
+                <div className="flex items-center justify-between text-[11px] font-sans text-muted-foreground/55">
+                  <span>{left}</span>
+                  <span>{right}</span>
+                </div>
+                <input
+                  type="range"
+                  min={-1}
+                  max={1}
+                  step={0.1}
+                  value={director[key]}
+                  onChange={(e) => setDirector((d) => ({ ...d, [key]: Number(e.target.value) }))}
+                  className="w-full accent-amber-500"
+                  aria-label={`${left} to ${right}`}
+                />
+              </div>
+            ))}
+            <Input
+              placeholder="Optional: a one-line directorial vision (e.g. “a tender story about quiet courage”)"
+              value={director.vision}
+              onChange={(e) => setDirector((d) => ({ ...d, vision: e.target.value }))}
+              maxLength={300}
+            />
           </div>
 
           <div className="space-y-4 border-t border-white/[0.06] pt-5 mt-5">

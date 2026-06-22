@@ -28,11 +28,29 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { title, description, worldId, worldName, coverGradient, resources, tags, coverTheme, readingTheme, rating, protagonist, goapEnabled, implementQuests } = body
+  const { title, description, worldId, worldName, coverGradient, resources, tags, coverTheme, readingTheme, rating, protagonist, director, goapEnabled, implementQuests } = body
 
   if (!title || !worldId || !worldName) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
+
+  // Authored director persona (optional). Axes are clamped to [-1, 1]; only kept
+  // if the author actually set something.
+  const clampAxis = (v: unknown) => Math.max(-1, Math.min(1, Number(v) || 0))
+  const safeDirector =
+    director && typeof director === 'object'
+      ? (() => {
+          const d = {
+            experimental: clampAxis(director.experimental),
+            intensity: clampAxis(director.intensity),
+            darkness: clampAxis(director.darkness),
+            pace: clampAxis(director.pace),
+            vision: typeof director.vision === 'string' ? director.vision.trim().slice(0, 300) : '',
+          }
+          const meaningful = d.experimental || d.intensity || d.darkness || d.pace || d.vision
+          return meaningful ? d : null
+        })()
+      : null
 
   // Author-defined protagonist (optional); the canon cast grows emergently.
   const protagonistName = typeof protagonist?.name === 'string' ? protagonist.name.trim().slice(0, 60) : ''
@@ -67,6 +85,7 @@ export async function POST(req: NextRequest) {
     resources: resources ?? [],
     characters: [],
     ...(safeProtagonist ? { protagonist: safeProtagonist } : {}),
+    ...(safeDirector ? { director: safeDirector } : {}),
     tags: Array.isArray(tags) ? tags.slice(0, 5) : [],
     ...(coverTheme   ? { coverTheme }   : {}),
     ...(readingTheme ? { readingTheme } : {}),
