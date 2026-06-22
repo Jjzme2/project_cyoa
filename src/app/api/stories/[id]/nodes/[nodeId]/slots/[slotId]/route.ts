@@ -20,7 +20,7 @@ import {
   settleBountyOnFill,
 } from '@/lib/firestore-helpers'
 import { CreditManager } from '@/lib/credit-manager'
-import { generateStoryNode, generateStoryImage, PromptRejectedError } from '@/lib/ai'
+import { generateStoryNode, generateStoryImage, reviewContribution, PromptRejectedError } from '@/lib/ai'
 import { validatePromptLocal } from '@/lib/validate'
 import { moderateText, moderationToNodeFields } from '@/lib/moderation'
 import { NarrativeBuilder } from '@/lib/engine/narrative-builder'
@@ -141,6 +141,20 @@ export async function POST(
       characters: story.characters,
     }
 
+    // Autonomous Editor: void genuinely illegitimate / world-breaking entries
+    // (no chapter is generated for them), and silently fix typos & grammar while
+    // preserving the author's voice. The (possibly corrected) text is what gets
+    // generated from and stored as the choice label.
+    const review = await reviewContribution(promptText, worldCtx, uid)
+    if (review.verdict === 'void') {
+      await Promise.all([
+        releaseChoiceSlot(storyId, nodeId, slotId),
+        CreditManager.refund(uid, tier, credits, source),
+      ])
+      return NextResponse.json({ error: review.reason, voided: true }, { status: 422 })
+    }
+    const editedPrompt = review.text
+
     let systemNarrativeEvents = ''
     let updatedEngineState = undefined
     if (story.goapEnabled || story.implementQuests) {
@@ -179,7 +193,7 @@ export async function POST(
     const { content, choices, model, newCharacters } = await generateStoryNode(
       worldCtx,
       storyPath,
-      promptText,
+      editedPrompt,
       uid,
       includeImage,
       systemNarrativeEvents
@@ -208,7 +222,7 @@ export async function POST(
 
     const [imageResult, newNodeId] = await Promise.all([
       includeImage
-        ? generateStoryImage(worldCtx, content, promptText, imagePlaceholder, userApiKey ?? undefined)
+        ? generateStoryImage(worldCtx, content, editedPrompt, imagePlaceholder, userApiKey ?? undefined)
         : Promise.resolve({ url: null, error: undefined }),
       createStoryNode(
         {
@@ -216,7 +230,7 @@ export async function POST(
           content,
           depth: parentNode.depth + 1,
           parentId: parentNode.id,
-          choiceText: promptText,
+          choiceText: editedPrompt,
           authorId: uid,
           aiGenerated: true,
           aiModel: model,
@@ -232,7 +246,7 @@ export async function POST(
     const imageError = imageResult.error
 
     const patchOps: Promise<unknown>[] = [
-      fillChoiceSlot(storyId, nodeId, slotId, newNodeId, uid, displayName ?? 'Anonymous', promptText, requirements, effects),
+      fillChoiceSlot(storyId, nodeId, slotId, newNodeId, uid, displayName ?? 'Anonymous', editedPrompt, requirements, effects),
       incrementStoryNodeCount(storyId),
     ]
 
@@ -276,7 +290,7 @@ export async function POST(
             storyTitle: story.title,
             nodeId: newNodeId,
             contributorName: displayName ?? 'Anonymous',
-            slotPrompt: promptText,
+            slotPrompt: editedPrompt,
           }),
         )
       }
