@@ -9,6 +9,7 @@ import { FactionManager } from './faction-manager';
 import { EconomyManager, createDefaultEconomy } from './economy-manager';
 import { SeededRNG } from './seed-rng';
 import { DramaManager } from './drama-manager';
+import { DifficultyManager } from './difficulty';
 import { RelationshipGraph } from './relationship-graph';
 import { AgentAffect } from './agent-affect';
 import { BeliefModel } from './belief';
@@ -24,6 +25,7 @@ export interface NarrativeContext {
   pacingDirective: string; // AI Director instruction for this turn's tension
   relationshipSummary: string; // who stands warm/cold toward the protagonist
   demeanour: string; // per-character mood/emotional tone
+  stakesDirective: string; // dynamic-difficulty instruction
 }
 
 /** How much a character's own action shifts their standing with the protagonist. */
@@ -107,6 +109,7 @@ export class NarrativeBuilder {
       pacingDirective: '',
       relationshipSummary: '',
       demeanour: '',
+      stakesDirective: '',
     };
 
     // AI Director: decide this turn's pacing beat from carried-over tension.
@@ -217,6 +220,10 @@ export class NarrativeBuilder {
     });
     context.pacingDirective = dm.directive(beat);
 
+    // 7b. Dynamic difficulty: stakes escalate with depth, adapt to recent tension.
+    const difficulty = DifficultyManager.update(depth, priorDirector.tension, priorState?.difficulty);
+    context.stakesDirective = DifficultyManager.directive(difficulty.level);
+
     // 8. Build updated EngineState for persistence
     const turnCount = (priorState?.turnCount ?? 0) + 1;
     const updatedEngineState: EngineState = {
@@ -230,6 +237,7 @@ export class NarrativeBuilder {
       ...(questState ? { quest: questState } : {}),
       ...(affect ? { affect } : {}),
       ...(belief ? { belief } : {}),
+      difficulty,
     };
 
     return { context, updatedEngineState };
@@ -249,6 +257,7 @@ export class NarrativeBuilder {
     if (context.relationshipSummary) lines.push(`**Standing:** ${context.relationshipSummary}`);
     if (context.demeanour) lines.push(`**Demeanour:** ${context.demeanour}`);
     if (context.pacingDirective) lines.push(`**Pacing (director):** ${context.pacingDirective}`);
+    if (context.stakesDirective) lines.push(`**Stakes:** ${context.stakesDirective}`);
 
     if (lines.length === 0) return '';
 
