@@ -3,6 +3,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { put } from '@vercel/blob'
 import { StoryPathSegment } from '@/types'
 import type { ContentRating, Protagonist, StoryCharacter } from '@/types'
+import type { ModerationResult, ModerationAction } from './moderation'
 
 const PRIMARY_MODEL = 'google/gemini-2.5-pro'
 const OPENROUTER_MODEL = 'google/gemma-4-31b-it:free'
@@ -563,6 +564,93 @@ Respond with ONLY valid JSON, no markdown:
       return normalize(tryParseJSON(result.text))
     } catch {
       return { verdict: 'ok', text: original } // fail open
+    }
+  }
+}
+
+export interface ContentJudgment {
+  /** Safety verdict in the same shape as rules moderation, for easy combination. */
+  safety: ModerationResult
+  /** Craft score 0-100 (informational — does not gate publication). */
+  quality: { score: number; notes?: string }
+}
+
+/**
+ * The Content Judge: an LLM-as-judge that evaluates a freshly generated chapter
+ * on two axes in a single call — SAFETY (does it stay within the story's content
+ * rating?) and QUALITY (craft score, informational only). The safety verdict is
+ * meant to be combined with the rules-based `moderateText` by taking the more
+ * restrictive of the two, so the judge can escalate borderline content the regex
+ * rules miss but never loosen the rules gate. Returns null on failure so callers
+ * fall back to rules-only moderation.
+ */
+export async function judgeContent(
+  chapter: string,
+  choiceText: string,
+  world: WorldContext,
+  userId: string,
+): Promise<ContentJudgment | null> {
+  const rating = world.rating ?? 'Mature'
+
+  const aiPrompt = `You are the Content Judge for "Chronicle", a collaborative storytelling platform. Evaluate ONE freshly generated chapter and respond with strict JSON.
+
+CONTENT RATING for this story: ${rating}.
+Rating guide — Everyone: wholesome, no violence/profanity/sexual/frightening content. Teen: mild action, peril, and language; no graphic or explicit content. Mature: mature themes allowed, but NEVER sexual content involving minors, hate slurs, or real instructions for serious harm.
+
+1) SAFETY — judge the chapter as fiction against the ${rating} rating:
+   - "allow": within the rating.
+   - "flag": borderline, or slightly exceeds the rating — hold for human review.
+   - "refuse": clearly far beyond the rating, or contains always-prohibited content (sexual content involving minors, hate slurs, real weapons-of-mass-harm instructions).
+   Dark or violent themes are acceptable IF the rating allows them. Do NOT refuse merely because a character dies in a Teen/Mature story.
+
+2) QUALITY — score 0-100 for craft: coherence with the chosen path ("${choiceText.slice(0, 120)}"), vividness, tone consistency, and grammatical soundness. Informational only; it does not gate publication.
+
+Chapter:
+"""${chapter.slice(0, 2000)}"""
+
+Respond with ONLY valid JSON, no markdown:
+{"safety":{"action":"allow|flag|refuse","reason":"short reason if flag/refuse, else empty"},"quality":{"score":0,"notes":"one short phrase"}}`
+
+  const normalize = (data: Record<string, unknown>): ContentJudgment => {
+    const s = (data.safety ?? {}) as Record<string, unknown>
+    const a = String(s.action ?? 'allow').toLowerCase()
+    const action: ModerationAction = a === 'refuse' ? 'refuse' : a === 'flag' ? 'flag' : 'allow'
+    const q = (data.quality ?? {}) as Record<string, unknown>
+    let score = Number(q.score)
+    if (!Number.isFinite(score)) score = 0
+    score = Math.max(0, Math.min(100, Math.round(score)))
+    return {
+      safety: {
+        action,
+        categories: action === 'allow' ? [] : ['ai-judge'],
+        reason:
+          action === 'allow'
+            ? undefined
+            : String(s.reason ?? '').trim().slice(0, 200) || 'Flagged by the content judge.',
+      },
+      quality: { score, notes: String(q.notes ?? '').trim().slice(0, 120) || undefined },
+    }
+  }
+
+  try {
+    const result = await generateText({
+      model: PRIMARY_MODEL,
+      prompt: aiPrompt,
+      maxOutputTokens: 200,
+      providerOptions: { gateway: { user: userId, tags: ['feature:content-judge', 'env:production'] } },
+    })
+    return normalize(tryParseJSON(result.text))
+  } catch (error) {
+    if (APICallError.isInstance(error) && (error.statusCode === 402 || error.statusCode === 429)) {
+      return null // fall back to rules-only moderation
+    }
+    if (!process.env.OPENROUTER_API_KEY) return null
+    try {
+      const openrouter = createOpenAI({ baseURL: 'https://openrouter.ai/api/v1', apiKey: process.env.OPENROUTER_API_KEY })
+      const result = await generateText({ model: openrouter(OPENROUTER_MODEL), prompt: aiPrompt, maxOutputTokens: 200 })
+      return normalize(tryParseJSON(result.text))
+    } catch {
+      return null
     }
   }
 }

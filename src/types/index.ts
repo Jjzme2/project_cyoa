@@ -321,6 +321,8 @@ export interface StoryNode {
   traversals?: number
   /** Serialised simulation state at this node (factions, economy, agent memories). */
   engineState?: EngineState
+  /** Content Judge craft score (0-100); informational, for future ranking. */
+  qualityScore?: number
   createdAt: string
 }
 
