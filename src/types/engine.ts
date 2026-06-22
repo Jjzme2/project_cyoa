@@ -5,6 +5,7 @@ import type { DirectorState } from '../lib/engine/drama-manager';
 import type { RelationshipState } from '../lib/engine/relationship-graph';
 import type { ActiveQuest } from './procgen';
 import type { AffectState } from '../lib/engine/agent-affect';
+import type { BeliefState } from '../lib/engine/belief';
 
 export interface EngineState {
   worldState: WorldState; // The node's specific world state (for GOAP)
@@ -16,4 +17,5 @@ export interface EngineState {
   relationships?: RelationshipState; // Character↔protagonist affinity + gossip
   quest?: ActiveQuest; // The quest arc currently unfolding
   affect?: AffectState; // Per-character mood (emotional tone)
+  belief?: BeliefState; // Per-character PERCEIVED standing (lags reality)
 }

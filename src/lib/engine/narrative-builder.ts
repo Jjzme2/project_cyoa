@@ -11,6 +11,7 @@ import { SeededRNG } from './seed-rng';
 import { DramaManager } from './drama-manager';
 import { RelationshipGraph } from './relationship-graph';
 import { AgentAffect } from './agent-affect';
+import { BeliefModel } from './belief';
 
 export interface NarrativeContext {
   environmentalContext: string;
@@ -167,6 +168,7 @@ export class NarrativeBuilder {
     let hostileNpc = false;
     let relationships = priorState?.relationships;
     let affect = priorState?.affect;
+    let belief = priorState?.belief;
     if (this.story.goapEnabled) {
       const baseline: WorldState = { 'player.inSight': true, 'player.underAttack': false };
       for (const k in baseline) {
@@ -177,8 +179,10 @@ export class NarrativeBuilder {
         .filter((c) => !(c.status && c.status.toLowerCase() === 'deceased'))
         .map((c) => c.name);
       relationships = RelationshipGraph.init(living, priorState?.relationships);
-      // Standing (incl. gossip about the whole cast) steers each agent's goals.
-      this.agentManager.setAffinities(relationships.affinity);
+      // Characters act on PERCEIVED standing, which lags the truth — so gossip
+      // changes behaviour gradually and the naive can be briefly deceived.
+      belief = BeliefModel.update(living, relationships.affinity, priorState?.belief);
+      this.agentManager.setAffinities(belief.perceived);
 
       const outcomes = this.agentManager.updateTurn(currentState);
       context.npcActions = outcomes.map((o) => o.prose);
@@ -193,10 +197,10 @@ export class NarrativeBuilder {
       );
       context.relationshipSummary = RelationshipGraph.summary(relationships);
 
-      // Affective layer: derive each character's mood from standing + threat.
+      // Affective layer: mood reflects each character's PERCEIVED standing.
       affect = AgentAffect.compute(
         living,
-        relationships.affinity,
+        belief.perceived,
         currentState['player.underAttack'] === true,
         priorState?.affect,
       );
@@ -225,6 +229,7 @@ export class NarrativeBuilder {
       ...(relationships ? { relationships } : {}),
       ...(questState ? { quest: questState } : {}),
       ...(affect ? { affect } : {}),
+      ...(belief ? { belief } : {}),
     };
 
     return { context, updatedEngineState };
