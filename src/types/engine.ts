@@ -7,6 +7,7 @@ import type { ActiveQuest } from './procgen';
 import type { AffectState } from '../lib/engine/agent-affect';
 import type { BeliefState } from '../lib/engine/belief';
 import type { DifficultyState } from '../lib/engine/difficulty';
+import type { PlotState } from '../lib/engine/plot-planner';
 
 export interface EngineState {
   worldState: WorldState; // The node's specific world state (for GOAP)
@@ -20,4 +21,5 @@ export interface EngineState {
   affect?: AffectState; // Per-character mood (emotional tone)
   belief?: BeliefState; // Per-character PERCEIVED standing (lags reality)
   difficulty?: DifficultyState; // Adaptive stakes level
+  plot?: PlotState; // Story-level through-line (HTN plot planner)
 }

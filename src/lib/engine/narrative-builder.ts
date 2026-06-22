@@ -10,6 +10,7 @@ import { EconomyManager, createDefaultEconomy } from './economy-manager';
 import { SeededRNG } from './seed-rng';
 import { DramaManager } from './drama-manager';
 import { DifficultyManager } from './difficulty';
+import { PlotPlanner } from './plot-planner';
 import { RelationshipGraph } from './relationship-graph';
 import { AgentAffect } from './agent-affect';
 import { BeliefModel } from './belief';
@@ -26,6 +27,7 @@ export interface NarrativeContext {
   relationshipSummary: string; // who stands warm/cold toward the protagonist
   demeanour: string; // per-character mood/emotional tone
   stakesDirective: string; // dynamic-difficulty instruction
+  plotDirective: string; // story-level through-line beat
 }
 
 /** How much a character's own action shifts their standing with the protagonist. */
@@ -110,6 +112,7 @@ export class NarrativeBuilder {
       relationshipSummary: '',
       demeanour: '',
       stakesDirective: '',
+      plotDirective: '',
     };
 
     // AI Director: decide this turn's pacing beat from carried-over tension.
@@ -224,6 +227,10 @@ export class NarrativeBuilder {
     const difficulty = DifficultyManager.update(depth, priorDirector.tension, priorState?.difficulty);
     context.stakesDirective = DifficultyManager.directive(difficulty.level);
 
+    // 7c. Plot planner: advance the story's through-line one beat at a time.
+    const plot = PlotPlanner.advance(PlotPlanner.init(this.story.title, priorState?.plot));
+    context.plotDirective = PlotPlanner.directive(plot);
+
     // 8. Build updated EngineState for persistence
     const turnCount = (priorState?.turnCount ?? 0) + 1;
     const updatedEngineState: EngineState = {
@@ -238,6 +245,7 @@ export class NarrativeBuilder {
       ...(affect ? { affect } : {}),
       ...(belief ? { belief } : {}),
       difficulty,
+      plot,
     };
 
     return { context, updatedEngineState };
@@ -256,8 +264,13 @@ export class NarrativeBuilder {
     if (context.npcActions.length > 0) lines.push(`**Character Actions:** ${context.npcActions.join(' ')}`);
     if (context.relationshipSummary) lines.push(`**Standing:** ${context.relationshipSummary}`);
     if (context.demeanour) lines.push(`**Demeanour:** ${context.demeanour}`);
-    if (context.pacingDirective) lines.push(`**Pacing (director):** ${context.pacingDirective}`);
-    if (context.stakesDirective) lines.push(`**Stakes:** ${context.stakesDirective}`);
+
+    // The director family (plot through-line, pacing, stakes) is consolidated
+    // into one guidance line so it reads as unified direction, not a checklist.
+    const guidance = [context.plotDirective, context.pacingDirective, context.stakesDirective]
+      .filter(Boolean)
+      .join(' ')
+    if (guidance) lines.push(`**Director's guidance:** ${guidance}`)
 
     if (lines.length === 0) return '';
 
