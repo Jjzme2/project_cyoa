@@ -10,6 +10,7 @@ import { EconomyManager, createDefaultEconomy } from './economy-manager';
 import { SeededRNG } from './seed-rng';
 import { DramaManager } from './drama-manager';
 import { RelationshipGraph } from './relationship-graph';
+import { AgentAffect } from './agent-affect';
 
 export interface NarrativeContext {
   environmentalContext: string;
@@ -21,6 +22,7 @@ export interface NarrativeContext {
   economySummary: string;
   pacingDirective: string; // AI Director instruction for this turn's tension
   relationshipSummary: string; // who stands warm/cold toward the protagonist
+  demeanour: string; // per-character mood/emotional tone
 }
 
 /** How much a character's own action shifts their standing with the protagonist. */
@@ -103,6 +105,7 @@ export class NarrativeBuilder {
       economySummary: '',
       pacingDirective: '',
       relationshipSummary: '',
+      demeanour: '',
     };
 
     // AI Director: decide this turn's pacing beat from carried-over tension.
@@ -163,6 +166,7 @@ export class NarrativeBuilder {
     // carried-forward state still wins.
     let hostileNpc = false;
     let relationships = priorState?.relationships;
+    let affect = priorState?.affect;
     if (this.story.goapEnabled) {
       const baseline: WorldState = { 'player.inSight': true, 'player.underAttack': false };
       for (const k in baseline) {
@@ -188,6 +192,15 @@ export class NarrativeBuilder {
         (o) => o.category === 'combat' || o.actionId === 'social_betray' || o.actionId === 'social_intimidate',
       );
       context.relationshipSummary = RelationshipGraph.summary(relationships);
+
+      // Affective layer: derive each character's mood from standing + threat.
+      affect = AgentAffect.compute(
+        living,
+        relationships.affinity,
+        currentState['player.underAttack'] === true,
+        priorState?.affect,
+      );
+      context.demeanour = AgentAffect.summary(affect);
     }
 
     // 7. AI Director: fold this turn's events into the next tension level and
@@ -211,6 +224,7 @@ export class NarrativeBuilder {
       director,
       ...(relationships ? { relationships } : {}),
       ...(questState ? { quest: questState } : {}),
+      ...(affect ? { affect } : {}),
     };
 
     return { context, updatedEngineState };
@@ -228,6 +242,7 @@ export class NarrativeBuilder {
     if (context.economySummary) lines.push(`**Economy:** ${context.economySummary}`);
     if (context.npcActions.length > 0) lines.push(`**Character Actions:** ${context.npcActions.join(' ')}`);
     if (context.relationshipSummary) lines.push(`**Standing:** ${context.relationshipSummary}`);
+    if (context.demeanour) lines.push(`**Demeanour:** ${context.demeanour}`);
     if (context.pacingDirective) lines.push(`**Pacing (director):** ${context.pacingDirective}`);
 
     if (lines.length === 0) return '';
