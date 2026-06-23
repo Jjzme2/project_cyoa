@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button'
 import { AgeFilteredStoryGrid } from '@/components/library/AgeFilteredStoryGrid'
 import { SeededBadge } from '@/components/ContentBadges'
 import { WorldRatingControl } from '@/components/world/WorldRatingControl'
-import { getWorld, getStoriesByWorld } from '@/lib/firestore-helpers'
+import { WorldLore } from '@/components/world/WorldLore'
+import { getWorld, getStoriesByWorld, getWorldChronicle, getWorldLegends } from '@/lib/firestore-helpers'
 import { APP_CONFIG } from '@/lib/config'
 
 interface Props {
@@ -50,7 +51,11 @@ async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
   const world = await getWorld(id).catch(() => null)
   if (!world) notFound()
 
-  const stories = await getStoriesByWorld(id).catch(() => [])
+  const [stories, chronicle, legends] = await Promise.all([
+    getStoriesByWorld(id).catch(() => []),
+    getWorldChronicle(id).catch(() => []),
+    getWorldLegends(id).catch(() => ({ revered: [], reviled: [] })),
+  ])
   const toneClass = TONE_COLORS[world.tone] ?? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
 
   return (
@@ -134,6 +139,8 @@ async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
           </h2>
           <div className="flex-1 h-px bg-white/5" />
         </div>
+
+        <WorldLore chronicle={chronicle} legends={legends} />
 
         {stories.length === 0 ? (
           <div className="text-center py-16 space-y-4">

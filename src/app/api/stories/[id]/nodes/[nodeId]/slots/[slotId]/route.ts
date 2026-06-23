@@ -20,6 +20,8 @@ import {
   settleBountyOnFill,
   getWorldStanding,
   updateWorldStanding,
+  getWorldChronicle,
+  appendWorldChronicle,
 } from '@/lib/firestore-helpers'
 import { CreditManager } from '@/lib/credit-manager'
 import { generateStoryNode, generateStoryImage, reviewContribution, judgeContent, PromptRejectedError } from '@/lib/ai'
@@ -139,6 +141,9 @@ export async function POST(
       youMode && displayName
         ? { name: displayName, description: 'the reader, playing as themselves' }
         : story.protagonist
+    // The world's chronicle is shared lore — injected for every story so
+    // characters are aware of the legends that prior personal sagas wrote.
+    const chronicle = await getWorldChronicle(story.worldId).catch(() => [])
     const worldCtx = {
       name: world.name,
       description: world.description,
@@ -149,6 +154,7 @@ export async function POST(
       protagonist,
       characters: story.characters,
       director: story.director,
+      chronicle: chronicle.map((e) => e.text),
     }
 
     // Autonomous Editor: void genuinely illegitimate / world-breaking entries
@@ -319,7 +325,21 @@ export async function POST(
           const aff = Object.values(updatedEngineState.relationships.affinity)
           if (aff.length > 0) observed = aff.reduce((s, v) => s + v, 0) / aff.length
         }
-        if (observed !== null) ops.push(updateWorldStanding(uid, story.worldId, observed))
+        if (observed !== null) ops.push(updateWorldStanding(uid, story.worldId, observed, displayName ?? undefined))
+
+        // A genuinely notable deed enters the world chronicle — shared lore that
+        // every future story (and its NPCs) in this world will know.
+        if (judgment?.legend && Math.abs(judgment.conduct) >= 0.6) {
+          ops.push(
+            appendWorldChronicle(story.worldId, {
+              text: judgment.legend,
+              byName: displayName ?? 'A wanderer',
+              conduct: judgment.conduct,
+              storyId,
+              at: new Date().toISOString(),
+            }),
+          )
+        }
       }
       // Don't notify the author about a contribution that's hidden pending review.
       if (!pendingReview && story.authorId && story.authorId !== uid) {

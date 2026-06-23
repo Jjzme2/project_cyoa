@@ -19,6 +19,15 @@ interface WorldContext {
   protagonist?: Protagonist
   characters?: StoryCharacter[]
   director?: DirectorPersona
+  /** Legendary deeds the world remembers (from past personal sagas) — shared lore. */
+  chronicle?: string[]
+}
+
+/** Injects the world's chronicle so characters can reference its legends. */
+function chronicleBlock(chronicle?: string[]): string {
+  if (!chronicle || chronicle.length === 0) return ''
+  const lines = chronicle.slice(0, 5).map((c) => `- ${c}`).join('\n')
+  return `\nWORLD CHRONICLE (legends the people of this world remember and may speak of — honor them as established history; do not contradict them):\n${lines}\n`
 }
 
 /** Translate the authored director persona into directorial guidance for the prompt. */
@@ -101,7 +110,7 @@ WORLD RULES: ${world.rules}
 TONE: ${world.tone}
 
 ${ratingGuidance(world.rating)}
-${castBlock(world)}${directorBlock(world.director)}
+${castBlock(world)}${chronicleBlock(world.chronicle)}${directorBlock(world.director)}
 STORY PATH SO FAR:
 ${pathContent}
 
@@ -593,6 +602,8 @@ export interface ContentJudgment {
   quality: { score: number; notes?: string }
   /** How the protagonist's deeds this chapter reflect on them: -1 cruel/treacherous .. +1 kind/honorable. Drives "You" mode reputation. */
   conduct: number
+  /** A one-line in-world account of the deed, when it's notable enough to enter the world chronicle. */
+  legend?: string
 }
 
 /**
@@ -627,11 +638,13 @@ Rating guide — Everyone: wholesome, no violence/profanity/sexual/frightening c
 
 3) CONDUCT — score -1.0 to 1.0 for how the PROTAGONIST's choice and actions in this chapter reflect on their character morally and socially: -1 cruel, treacherous, or villainous; 0 neutral or ambiguous; +1 kind, brave, or honorable. Judge the protagonist's deeds, not the events that befall them.
 
+4) LEGEND — ONLY if the protagonist's deed this chapter is genuinely notable (clearly heroic or villainous, not routine), write a single in-world sentence a chronicler might record about it (third person; name the protagonist if their name appears in the chapter). Otherwise return an empty string.
+
 Chapter:
 """${chapter.slice(0, 2000)}"""
 
 Respond with ONLY valid JSON, no markdown:
-{"safety":{"action":"allow|flag|refuse","reason":"short reason if flag/refuse, else empty"},"quality":{"score":0,"notes":"one short phrase"},"conduct":0}`
+{"safety":{"action":"allow|flag|refuse","reason":"short reason if flag/refuse, else empty"},"quality":{"score":0,"notes":"one short phrase"},"conduct":0,"legend":""}`
 
   const normalize = (data: Record<string, unknown>): ContentJudgment => {
     const s = (data.safety ?? {}) as Record<string, unknown>
@@ -655,6 +668,7 @@ Respond with ONLY valid JSON, no markdown:
       },
       quality: { score, notes: String(q.notes ?? '').trim().slice(0, 120) || undefined },
       conduct,
+      legend: String(data.legend ?? '').trim().slice(0, 240) || undefined,
     }
   }
 
