@@ -671,13 +671,13 @@ function ProfileContent() {
                     </p>
                   </div>
                   <Link href={`/stories/${story.id}`}>
-                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-amber-300 transition-colors" />
+                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-amber-300 transition-colors" />
                   </Link>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="py-8 text-center text-xs text-muted-foreground/30">
+            <div className="py-8 text-center text-xs text-muted-foreground/50">
               No stories created yet. Start a new book inside the library.
             </div>
           )}
@@ -712,7 +712,7 @@ function ProfileContent() {
               ))}
             </div>
           ) : (
-            <div className="py-8 text-center text-xs text-muted-foreground/30">
+            <div className="py-8 text-center text-xs text-muted-foreground/50">
               No custom worlds configured yet. Start a world-building template.
             </div>
           )}

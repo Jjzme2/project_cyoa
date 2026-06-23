@@ -67,7 +67,7 @@ export function WorldLore({ chronicle, legends }: Props) {
               <li key={i} className="text-[13px] leading-snug text-foreground/70 flex gap-2">
                 <span className={e.conduct >= 0 ? 'text-emerald-400/50' : 'text-red-400/50'}>—</span>
                 <span>
-                  {e.text} <span className="text-muted-foreground/35 text-xs">({e.byName})</span>
+                  {e.text} <span className="text-muted-foreground/55 text-xs">({e.byName})</span>
                 </span>
               </li>
             ))}

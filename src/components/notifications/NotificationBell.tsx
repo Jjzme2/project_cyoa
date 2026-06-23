@@ -128,7 +128,7 @@ export function NotificationBell() {
                     Mark all read
                   </button>
                 )}
-                <button onClick={() => setOpen(false)} className="text-muted-foreground/30 hover:text-muted-foreground transition-colors">
+                <button onClick={() => setOpen(false)} className="text-muted-foreground/50 hover:text-muted-foreground transition-colors">
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -140,7 +140,7 @@ export function NotificationBell() {
                   <div className="w-5 h-5 border border-amber-400/30 border-t-amber-400 rounded-full animate-spin mx-auto" />
                 </div>
               ) : notifications.length === 0 ? (
-                <div className="py-10 text-center text-xs text-muted-foreground/30 font-sans">
+                <div className="py-10 text-center text-xs text-muted-foreground/50 font-sans">
                   No notifications yet
                 </div>
               ) : (
@@ -182,7 +182,7 @@ export function NotificationBell() {
                           &quot;{n.slotPrompt}&quot;
                         </p>
                       )}
-                      <p className="text-[10px] text-muted-foreground/30 font-sans">{timeAgo(n.createdAt)}</p>
+                      <p className="text-[10px] text-muted-foreground/50 font-sans">{timeAgo(n.createdAt)}</p>
                     </div>
                     {!n.read && (
                       <div className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-500 mt-2" />

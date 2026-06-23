@@ -183,7 +183,7 @@ export function AuthModal({ open, onOpenChange }: Props) {
             <div className="w-full border-t border-white/10" />
           </div>
           <div className="relative flex justify-center">
-            <span className="bg-popover px-3 text-[11px] uppercase tracking-widest text-muted-foreground/35">
+            <span className="bg-popover px-3 text-[11px] uppercase tracking-widest text-muted-foreground/55">
               or
             </span>
           </div>
@@ -270,7 +270,7 @@ export function AuthModal({ open, onOpenChange }: Props) {
                     type="button"
                     onClick={() => setShowPassword((s) => !s)}
                     tabIndex={-1}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/35 hover:text-muted-foreground transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/55 hover:text-muted-foreground transition-colors"
                   >
                     {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                   </button>
@@ -348,7 +348,7 @@ export function AuthModal({ open, onOpenChange }: Props) {
                     type="button"
                     onClick={() => setShowPassword((s) => !s)}
                     tabIndex={-1}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/35 hover:text-muted-foreground transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/55 hover:text-muted-foreground transition-colors"
                   >
                     {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                   </button>

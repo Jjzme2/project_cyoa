@@ -149,7 +149,7 @@ function HowItWorks() {
           </div>
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground/35">
+              <span className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground/55">
                 Step {i + 1}
               </span>
               <span className="text-sm font-semibold text-foreground/85">{step.title}</span>

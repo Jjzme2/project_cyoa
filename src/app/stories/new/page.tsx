@@ -410,7 +410,7 @@ export default function NewStoryPage() {
           <div className="space-y-2">
             <Label htmlFor="desc">
               Description{' '}
-              <span className="text-muted-foreground/35 font-normal text-xs">(optional)</span>
+              <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span>
             </Label>
             <Input
               id="desc"
@@ -423,7 +423,7 @@ export default function NewStoryPage() {
           <div className="space-y-2">
             <Label>
               Genre tags{' '}
-              <span className="text-muted-foreground/35 font-normal text-xs">(up to 5)</span>
+              <span className="text-muted-foreground/55 font-normal text-xs">(up to 5)</span>
             </Label>
             <div className="flex flex-wrap gap-2">
               {STORY_TAGS.map((tag) => {
@@ -517,7 +517,7 @@ export default function NewStoryPage() {
               <>
                 <Label htmlFor="protagonist" className="pt-1 block">
                   Protagonist{' '}
-                  <span className="text-muted-foreground/35 font-normal text-xs">(optional)</span>
+                  <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span>
                 </Label>
                 <Input
                   id="protagonist"
@@ -560,7 +560,7 @@ export default function NewStoryPage() {
           <div className="space-y-3 border-t border-white/[0.06] pt-5">
             <Label>
               Director{' '}
-              <span className="text-muted-foreground/35 font-normal text-xs">(optional)</span>
+              <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span>
             </Label>
             <p className="text-[11px] text-muted-foreground/45 -mt-1">
               Sets the directorial sensibility — how chapters are directed, within your rating.
@@ -889,7 +889,7 @@ export default function NewStoryPage() {
           <h2 className="text-sm font-medium text-foreground/65 flex items-center gap-2">
             <Feather className="h-4 w-4 text-amber-400/55" />
             Reading Atmosphere
-            <span className="text-muted-foreground/35 font-normal text-xs">(readers will see this)</span>
+            <span className="text-muted-foreground/55 font-normal text-xs">(readers will see this)</span>
           </h2>
 
           <div className="space-y-3">
@@ -1109,7 +1109,7 @@ export default function NewStoryPage() {
           <div>
             <h2 className="text-sm font-medium text-foreground/65">
               Seed choices{' '}
-              <span className="text-muted-foreground/35 font-normal text-xs">(optional)</span>
+              <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span>
             </h2>
             <p className="text-xs text-muted-foreground/45 mt-1">
               Suggest where the story might go. Leave blank for open-ended community discovery.

@@ -118,7 +118,7 @@ export function SaveSlotPicker({ storyId, activeSlotId, onSwitchSlot, onSaveAs }
 
             <div className="max-h-52 overflow-y-auto">
               {slots.length === 0 ? (
-                <p className="px-3 py-4 text-[11px] text-muted-foreground/30 text-center font-sans">
+                <p className="px-3 py-4 text-[11px] text-muted-foreground/50 text-center font-sans">
                   No named saves yet
                 </p>
               ) : (
@@ -142,7 +142,7 @@ export function SaveSlotPicker({ storyId, activeSlotId, onSwitchSlot, onSaveAs }
                           {slot.name}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1 mt-0.5 text-[9px] text-muted-foreground/30 font-sans">
+                      <div className="flex items-center gap-1 mt-0.5 text-[9px] text-muted-foreground/50 font-sans">
                         <Clock className="h-2.5 w-2.5" />
                         <span>{timeAgo(slot.savedAt)}</span>
                         <span>·</span>
