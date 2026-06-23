@@ -84,6 +84,8 @@ export interface WorldReputation {
   worldId: string
   /** -1 reviled .. +1 revered — how the world's denizens regard this reader. */
   standing: number
+  /** Recent standing samples, for trend display (capped). */
+  history?: { standing: number; at: string }[]
   updatedAt: string
 }
 
