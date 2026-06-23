@@ -17,6 +17,8 @@ export interface FactionActionContext {
     globalWealth: number;
     markets: Record<string, { commodityId: string; supply: number; demand: number; currentPrice: number }>;
   };
+  /** Picks phrasing variants so faction events don't read identically every time. */
+  pickVariant?: <T>(arr: T[]) => T;
 }
 
 export interface FactionAction {
