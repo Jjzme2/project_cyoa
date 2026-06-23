@@ -66,7 +66,7 @@ export function AchievementDisplay() {
           {/* Earned */}
           {earned.length > 0 && (
             <div className="space-y-2">
-              <p className="text-[10px] uppercase tracking-widest text-muted-foreground/30 font-sans font-semibold">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-sans font-semibold">
                 Earned
               </p>
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
@@ -80,7 +80,7 @@ export function AchievementDisplay() {
                     <span className="text-[9px] font-sans font-semibold text-amber-300/80 leading-tight">
                       {a.name}
                     </span>
-                    <span className="text-[8px] font-sans text-muted-foreground/30 leading-tight hidden group-hover:block absolute bg-background border border-white/10 rounded-lg p-2 z-10 max-w-[140px] shadow-xl mt-16 text-left">
+                    <span className="text-[8px] font-sans text-muted-foreground/50 leading-tight hidden group-hover:block absolute bg-background border border-white/10 rounded-lg p-2 z-10 max-w-[140px] shadow-xl mt-16 text-left">
                       {a.description}
                     </span>
                   </div>
@@ -92,7 +92,7 @@ export function AchievementDisplay() {
           {/* Locked */}
           {locked.length > 0 && (
             <div className="space-y-2">
-              <p className="text-[10px] uppercase tracking-widest text-muted-foreground/30 font-sans font-semibold">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-sans font-semibold">
                 Locked
               </p>
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
@@ -124,7 +124,7 @@ export function AchievementDisplay() {
             ].map(({ label, value }) => (
               <div key={label} className="text-center space-y-0.5">
                 <p className="text-lg font-mono font-bold text-amber-300/80">{value}</p>
-                <p className="text-[9px] font-sans text-muted-foreground/35 uppercase tracking-wider">{label}</p>
+                <p className="text-[9px] font-sans text-muted-foreground/55 uppercase tracking-wider">{label}</p>
               </div>
             ))}
           </div>

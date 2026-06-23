@@ -82,11 +82,25 @@ export interface Protagonist {
 export interface WorldReputation {
   userId: string
   worldId: string
+  /** The reader's display name, for the Legends board. */
+  name?: string
   /** -1 reviled .. +1 revered — how the world's denizens regard this reader. */
   standing: number
   /** Recent standing samples, for trend display (capped). */
   history?: { standing: number; at: string }[]
   updatedAt: string
+}
+
+/** A notable deed recorded in a world's shared chronicle (from personal sagas). */
+export interface ChronicleEntry {
+  /** A one-line, in-world account of the deed. */
+  text: string
+  /** The reader (protagonist) who did it. */
+  byName: string
+  /** -1 villainous .. +1 heroic. */
+  conduct: number
+  storyId: string
+  at: string
 }
 
 /**

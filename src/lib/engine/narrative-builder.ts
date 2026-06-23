@@ -161,7 +161,7 @@ export class NarrativeBuilder {
     // has been away, "catch up" the world by ticking extra times so it feels
     // alive between sessions — alliances and markets move while you're gone.
     const baseSeed = this.world.seed ?? SeededRNG.hashString(this.story.title);
-    let factions = priorState?.factions ?? FactionManager.generateDefaultFactions(baseSeed);
+    let factions = priorState?.factions ?? FactionManager.generateDefaultFactions(baseSeed, SeededRNG.deriveSeed(baseSeed, this.story.id));
     const economy = priorState?.economy ?? createDefaultEconomy();
 
     const totalTicks = 1 + Math.max(0, Math.min(catchUpTicks, 10));

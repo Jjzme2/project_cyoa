@@ -44,7 +44,7 @@ export default async function SagaPage() {
         <AgeFilteredStoryGrid stories={stories} />
       )}
 
-      <p className="text-[11px] text-muted-foreground/30 font-sans pt-4">
+      <p className="text-[11px] text-muted-foreground/50 font-sans pt-4">
         {APP_CONFIG.site.name} · Personal Sagas are shared by their authors; you can keep your own personal if you prefer.
       </p>
     </div>

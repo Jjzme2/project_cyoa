@@ -33,7 +33,7 @@ export function SharePathButton({ storyId, nodeHistory, currentNodeId }: Props) 
     <button
       onClick={handleShare}
       title="Share this path"
-      className="flex items-center gap-1 text-[10px] font-sans text-muted-foreground/35 hover:text-muted-foreground/70 transition-colors px-2 py-1 rounded border border-white/[0.05] hover:border-white/10 bg-white/[0.01]"
+      className="flex items-center gap-1 text-[10px] font-sans text-muted-foreground/55 hover:text-muted-foreground/70 transition-colors px-2 py-1 rounded border border-white/[0.05] hover:border-white/10 bg-white/[0.01]"
     >
       {copied ? (
         <>

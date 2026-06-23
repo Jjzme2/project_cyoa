@@ -144,7 +144,7 @@ async function ShareContent({
           <BookOpen className="h-4 w-4" />
           Read and write your own path
         </Link>
-        <p className="text-[10px] text-muted-foreground/25 font-sans">Chronicle · Community CYOA</p>
+        <p className="text-[10px] text-muted-foreground/45 font-sans">Chronicle · Community CYOA</p>
       </div>
     </>
   )

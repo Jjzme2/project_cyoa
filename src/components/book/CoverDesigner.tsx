@@ -383,9 +383,9 @@ export function CoverDesigner({ value, onChange, title, onGenerateImage }: Props
                   )}
                 </button>
                 {!title.trim() && (
-                  <span className="text-[10px] text-muted-foreground/35">Enter a title first</span>
+                  <span className="text-[10px] text-muted-foreground/55">Enter a title first</span>
                 )}
-                <span className="text-[10px] text-muted-foreground/25 flex items-center gap-1">
+                <span className="text-[10px] text-muted-foreground/45 flex items-center gap-1">
                   <ImageOff className="h-3 w-3" />
                   uses 3 credits
                 </span>
@@ -456,7 +456,7 @@ export function CoverDesigner({ value, onChange, title, onGenerateImage }: Props
               />
               <span className="text-[10px] text-muted-foreground/40">Bottom</span>
             </div>
-            <span className="text-[9px] text-muted-foreground/25 ml-1">
+            <span className="text-[9px] text-muted-foreground/45 ml-1">
               or click a swatch above
             </span>
           </div>
@@ -499,7 +499,7 @@ export function CoverDesigner({ value, onChange, title, onGenerateImage }: Props
                 className="sr-only"
                 title="Custom accent color"
               />
-              <span className="text-[9px] text-muted-foreground/30">custom</span>
+              <span className="text-[9px] text-muted-foreground/50">custom</span>
             </div>
           </div>
         </div>
@@ -532,7 +532,7 @@ export function CoverDesigner({ value, onChange, title, onGenerateImage }: Props
               onChange={(e) => setCustomIcon(e.target.value)}
               onKeyDown={handleCustomIconKeyDown}
               placeholder="Type any emoji & press Enter…"
-              className="flex-1 h-8 rounded-md border border-white/10 bg-white/[0.03] px-3 text-sm text-foreground/70 placeholder:text-muted-foreground/25 focus:outline-none focus:border-amber-500/30"
+              className="flex-1 h-8 rounded-md border border-white/10 bg-white/[0.03] px-3 text-sm text-foreground/70 placeholder:text-muted-foreground/45 focus:outline-none focus:border-amber-500/30"
             />
             {customIcon.trim() && (
               <button
@@ -546,7 +546,7 @@ export function CoverDesigner({ value, onChange, title, onGenerateImage }: Props
                 Use
               </button>
             )}
-            <span className="text-[9px] text-muted-foreground/25 shrink-0">
+            <span className="text-[9px] text-muted-foreground/45 shrink-0">
               current: <span className="text-base leading-none">{value.icon}</span>
             </span>
           </div>
@@ -604,14 +604,14 @@ export function CoverDesigner({ value, onChange, title, onGenerateImage }: Props
 
       {/* ── Live Preview ── */}
       <div className="flex flex-col items-center gap-3 sticky top-4 md:pt-5">
-        <p className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground/30 font-sans">
+        <p className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground/50 font-sans">
           Preview
         </p>
         <div className="flex gap-3 items-end">
           {/* Spine preview */}
           <div className="flex flex-col items-center gap-1.5">
             <SpinePreview theme={value} title={title} />
-            <p className="text-[7px] uppercase tracking-[0.15em] text-muted-foreground/20 font-sans">Spine</p>
+            <p className="text-[7px] uppercase tracking-[0.15em] text-muted-foreground/45 font-sans">Spine</p>
           </div>
           {/* Cover preview */}
           <div className="flex flex-col items-center gap-1.5">
@@ -625,11 +625,11 @@ export function CoverDesigner({ value, onChange, title, onGenerateImage }: Props
                 style={{ background: '#111' }}
               />
             </div>
-            <p className="text-[7px] uppercase tracking-[0.15em] text-muted-foreground/20 font-sans">Cover</p>
+            <p className="text-[7px] uppercase tracking-[0.15em] text-muted-foreground/45 font-sans">Cover</p>
           </div>
         </div>
         <p
-          className="text-[9px] text-muted-foreground/25 text-center max-w-[160px] leading-relaxed"
+          className="text-[9px] text-muted-foreground/45 text-center max-w-[160px] leading-relaxed"
           style={{ fontFamily: coverFontFamily(value.fontStyle) }}
         >
           {title || 'Your story title'}

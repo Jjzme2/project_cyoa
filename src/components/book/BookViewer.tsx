@@ -844,7 +844,7 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
         )}
       </div>
 
-      <p className="text-[11px] text-muted-foreground/30 font-sans tracking-wide">
+      <p className="text-[11px] text-muted-foreground/50 font-sans tracking-wide">
         {story.title} · {story.authorName} · {story.nodeCount}{' '}
         {story.nodeCount === 1 ? 'chapter' : 'chapters'}
         {story.protagonist?.name ? ` · playing as ${story.protagonist.name}` : ''}

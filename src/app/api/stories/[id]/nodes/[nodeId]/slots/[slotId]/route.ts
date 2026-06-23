@@ -20,6 +20,8 @@ import {
   settleBountyOnFill,
   getWorldStanding,
   updateWorldStanding,
+  getWorldChronicle,
+  appendWorldChronicle,
 } from '@/lib/firestore-helpers'
 import { CreditManager } from '@/lib/credit-manager'
 import { generateStoryNode, generateStoryImage, reviewContribution, judgeContent, PromptRejectedError } from '@/lib/ai'
@@ -58,7 +60,6 @@ export async function POST(
   const includeImage: boolean = body.includeImage === true
   const requirements = body.requirements ?? []
   const effects = body.effects ?? []
-  const memoryEffects: import('@/types').ChoiceMemoryEffect[] = body.memoryEffects ?? []
   const worldState: WorldState = body.worldState ?? {}
   const credits = includeImage ? IMAGE_CREDIT_COST : 1
 
@@ -139,6 +140,9 @@ export async function POST(
       youMode && displayName
         ? { name: displayName, description: 'the reader, playing as themselves' }
         : story.protagonist
+    // The world's chronicle is shared lore — injected for every story so
+    // characters are aware of the legends that prior personal sagas wrote.
+    const chronicle = await getWorldChronicle(story.worldId).catch(() => [])
     const worldCtx = {
       name: world.name,
       description: world.description,
@@ -149,6 +153,7 @@ export async function POST(
       protagonist,
       characters: story.characters,
       director: story.director,
+      chronicle: chronicle.map((e) => e.text),
     }
 
     // Autonomous Editor: void genuinely illegitimate / world-breaking entries
@@ -195,17 +200,6 @@ export async function POST(
         readerStanding,
       )
       systemNarrativeEvents = builder.formatForPrompt(context)
-
-      // Apply any memory effects declared on the slot (protagonist ↔ character interactions)
-      if (memoryEffects.length > 0) {
-        for (const effect of memoryEffects) {
-          const existing: AgentMemory[] = nextState.agentMemories[effect.characterName] ?? []
-          for (const m of existing) m.decayWeight = Math.max(0, m.decayWeight - 0.1)
-          existing.push({ event: effect.event, nodeId: nodeId, sentiment: effect.sentiment, decayWeight: 1.0 })
-          nextState.agentMemories[effect.characterName] = existing.filter((m) => m.decayWeight > 0)
-        }
-      }
-
       updatedEngineState = nextState
     }
 
@@ -222,7 +216,7 @@ export async function POST(
     // the AI Content Judge can only escalate it (flag/refuse), never loosen it —
     // defense in depth. It also returns a craft score we persist for ranking.
     const rulesVerdict = moderateText(content, effectiveRating)
-    const judgment = await judgeContent(content, editedPrompt, worldCtx, uid).catch(() => null)
+    const judgment = await judgeContent(content, editedPrompt, worldCtx, uid, (story.characters ?? []).map((c) => c.name)).catch(() => null)
     const SEVERITY: Record<string, number> = { allow: 0, flag: 1, refuse: 2 }
     const verdict: ModerationResult =
       judgment && SEVERITY[judgment.safety.action] > SEVERITY[rulesVerdict.action]
@@ -241,6 +235,30 @@ export async function POST(
     }
     const moderationFields = moderationToNodeFields(verdict)
     const pendingReview = verdict.action === 'flag'
+
+    // Intelligently fold the written action's consequences into the persisted
+    // simulation: the Content Judge infers how named characters' regard shifted
+    // from what actually happened (no manual memory editing). Applied to the
+    // child node's engine state so the next chapter reflects it.
+    if (updatedEngineState && judgment?.relationshipShifts?.length) {
+      const known = new Map((story.characters ?? []).map((c) => [c.name.toLowerCase(), c.name]))
+      for (const shift of judgment.relationshipShifts) {
+        const name = known.get(shift.name.toLowerCase())
+        if (!name || !shift.delta) continue
+        if (updatedEngineState.relationships) {
+          const cur = updatedEngineState.relationships.affinity[name] ?? 0
+          updatedEngineState.relationships.affinity[name] = Math.max(-1, Math.min(1, Math.round((cur + shift.delta) * 100) / 100))
+        }
+        const mems: AgentMemory[] = updatedEngineState.agentMemories[name] ?? []
+        mems.push({
+          event: shift.delta >= 0 ? 'The protagonist earned their regard.' : 'The protagonist wronged them.',
+          nodeId,
+          sentiment: shift.delta >= 0 ? 'positive' : 'negative',
+          decayWeight: 1,
+        })
+        updatedEngineState.agentMemories[name] = mems.slice(-12)
+      }
+    }
 
     // Generate image concurrently with Firestore work if requested
     const userApiKey = includeImage ? await getDecryptedUserApiKey(uid) : null
@@ -319,7 +337,21 @@ export async function POST(
           const aff = Object.values(updatedEngineState.relationships.affinity)
           if (aff.length > 0) observed = aff.reduce((s, v) => s + v, 0) / aff.length
         }
-        if (observed !== null) ops.push(updateWorldStanding(uid, story.worldId, observed))
+        if (observed !== null) ops.push(updateWorldStanding(uid, story.worldId, observed, displayName ?? undefined))
+
+        // A genuinely notable deed enters the world chronicle — shared lore that
+        // every future story (and its NPCs) in this world will know.
+        if (judgment?.legend && Math.abs(judgment.conduct) >= 0.6) {
+          ops.push(
+            appendWorldChronicle(story.worldId, {
+              text: judgment.legend,
+              byName: displayName ?? 'A wanderer',
+              conduct: judgment.conduct,
+              storyId,
+              at: new Date().toISOString(),
+            }),
+          )
+        }
       }
       // Don't notify the author about a contribution that's hidden pending review.
       if (!pendingReview && story.authorId && story.authorId !== uid) {

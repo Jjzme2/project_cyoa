@@ -114,13 +114,13 @@ export function LibraryClient({ stories }: Props) {
             placeholder="Search by title, author, or description…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-10 pl-10 pr-10 rounded-lg text-sm border border-white/10 bg-white/[0.04] text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500/25 transition-colors font-sans"
+            className="w-full h-10 pl-10 pr-10 rounded-lg text-sm border border-white/10 bg-white/[0.04] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500/25 transition-colors font-sans"
           />
           {search && (
             <button
               onClick={() => setSearch('')}
               aria-label="Clear search"
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/30 hover:text-muted-foreground transition-colors"
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -131,7 +131,7 @@ export function LibraryClient({ stories }: Props) {
         {worlds.length > 1 && (
           <div className="relative shrink-0">
             <Library className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-amber-400/35 pointer-events-none" />
-            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/30 pointer-events-none" />
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50 pointer-events-none" />
             <select
               value={worldFilter ?? ''}
               onChange={(e) => setWorld(e.target.value || null)}
@@ -162,7 +162,7 @@ export function LibraryClient({ stories }: Props) {
       {/* ── Genre chips (reader favorites) ── */}
       {allTags.length > 0 && (
         <div className="space-y-2">
-          <p className="text-[10px] uppercase tracking-widest text-muted-foreground/25 font-sans font-semibold flex items-center gap-1.5">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground/45 font-sans font-semibold flex items-center gap-1.5">
             <Tag className="h-3 w-3" /> Genres
           </p>
           <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by genre">
@@ -201,7 +201,7 @@ export function LibraryClient({ stories }: Props) {
       )}
 
       {totalVisible > 0 && (
-        <p className="text-[11px] text-muted-foreground/20 font-sans text-center pb-4">
+        <p className="text-[11px] text-muted-foreground/45 font-sans text-center pb-4">
           {totalVisible} {totalVisible === 1 ? 'story' : 'stories'} across{' '}
           {shelves.length} {shelves.length === 1 ? 'world' : 'worlds'}
         </p>
@@ -253,7 +253,7 @@ function WorldShelf({ worldName, books }: { worldName: string; books: Story[] })
             {worldName}
           </h2>
         </div>
-        <span className="text-[10px] font-sans text-muted-foreground/25 uppercase tracking-widest shrink-0">
+        <span className="text-[10px] font-sans text-muted-foreground/45 uppercase tracking-widest shrink-0">
           {books.length} {books.length === 1 ? 'story' : 'stories'}
         </span>
         <div

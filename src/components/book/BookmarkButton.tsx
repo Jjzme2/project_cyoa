@@ -67,7 +67,7 @@ export function BookmarkButton({ storyId }: Props) {
       className={`flex items-center gap-1 text-[10px] font-sans transition-colors px-2 py-1 rounded border bg-white/[0.01] ${
         bookmarked
           ? 'text-amber-400 border-amber-500/30 bg-amber-500/[0.08]'
-          : 'text-muted-foreground/35 hover:text-muted-foreground/70 border-white/[0.05] hover:border-white/10'
+          : 'text-muted-foreground/55 hover:text-muted-foreground/70 border-white/[0.05] hover:border-white/10'
       }`}
     >
       {bookmarked ? <BookmarkCheck className="h-3 w-3" /> : <Bookmark className="h-3 w-3" />}

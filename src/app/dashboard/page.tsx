@@ -48,7 +48,7 @@ function TreeNodeRow({
         {hasChildren ? (
           <button
             onClick={() => setExpanded((e) => !e)}
-            className="shrink-0 mt-0.5 text-muted-foreground/30 hover:text-muted-foreground/70 transition-colors"
+            className="shrink-0 mt-0.5 text-muted-foreground/50 hover:text-muted-foreground/70 transition-colors"
           >
             <ChevronRight className={`h-3.5 w-3.5 transition-transform ${expanded ? 'rotate-90' : ''}`} />
           </button>
@@ -60,7 +60,7 @@ function TreeNodeRow({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-sans text-muted-foreground/30 shrink-0">
+            <span className="text-[10px] font-sans text-muted-foreground/50 shrink-0">
               Ch.{node.depth + 1}
             </span>
             <span className="text-[12px] text-foreground/70 truncate">
@@ -83,9 +83,9 @@ function TreeNodeRow({
                 {slot.filled ? (
                   <CheckCircle2 className="h-2.5 w-2.5 text-emerald-400/60" />
                 ) : (
-                  <Circle className="h-2.5 w-2.5 text-muted-foreground/20" />
+                  <Circle className="h-2.5 w-2.5 text-muted-foreground/45" />
                 )}
-                <span className={slot.filled ? 'text-emerald-400/60' : 'text-muted-foreground/25'}>
+                <span className={slot.filled ? 'text-emerald-400/60' : 'text-muted-foreground/45'}>
                   {slot.filled ? slot.submitterName ?? 'Anon' : `Path ${i + 1}`}
                 </span>
               </div>
@@ -96,7 +96,7 @@ function TreeNodeRow({
         <div className="flex items-center gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
           <span className="text-[9px] font-sans text-emerald-400/50">{filledSlots}✓</span>
           {pendingSlots > 0 && (
-            <span className="text-[9px] font-sans text-muted-foreground/25">{pendingSlots}○</span>
+            <span className="text-[9px] font-sans text-muted-foreground/45">{pendingSlots}○</span>
           )}
         </div>
       </div>
@@ -165,7 +165,7 @@ function StoryDashboardCard({ story }: { story: Story }) {
               {story.tags && story.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1 shrink-0">
                   {story.tags.map((tag) => (
-                    <span key={tag} className="text-[9px] font-sans uppercase tracking-wider px-1.5 py-0.5 rounded border border-white/10 text-muted-foreground/30">
+                    <span key={tag} className="text-[9px] font-sans uppercase tracking-wider px-1.5 py-0.5 rounded border border-white/10 text-muted-foreground/50">
                       {tag}
                     </span>
                   ))}
@@ -185,7 +185,7 @@ function StoryDashboardCard({ story }: { story: Story }) {
               <div key={label} className="bg-white/[0.02] border border-white/[0.04] rounded-lg px-3 py-2 text-center">
                 <Icon className="h-3.5 w-3.5 mx-auto mb-1 opacity-30" />
                 <p className="text-sm font-mono font-bold text-amber-300/70">{value}</p>
-                <p className="text-[9px] font-sans text-muted-foreground/30 uppercase tracking-wider mt-0.5">{label}</p>
+                <p className="text-[9px] font-sans text-muted-foreground/50 uppercase tracking-wider mt-0.5">{label}</p>
               </div>
             ))}
           </div>
@@ -240,7 +240,7 @@ function StoryDashboardCard({ story }: { story: Story }) {
               ))}
             </div>
           ) : (
-            <p className="text-center text-xs text-muted-foreground/30 py-4 font-sans">
+            <p className="text-center text-xs text-muted-foreground/50 py-4 font-sans">
               No branches to display yet.
             </p>
           )}
@@ -311,7 +311,7 @@ export default function DashboardPage() {
           <div key={label} className="glass border-white/10 rounded-xl p-5 text-center space-y-1">
             <Icon className="h-4 w-4 text-amber-400/60 mx-auto mb-2" />
             <p className="text-2xl font-mono font-bold text-amber-300/80">{value}</p>
-            <p className="text-[10px] font-sans text-muted-foreground/35 uppercase tracking-wider">{label}</p>
+            <p className="text-[10px] font-sans text-muted-foreground/55 uppercase tracking-wider">{label}</p>
           </div>
         ))}
       </div>
@@ -321,7 +321,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-2 pb-1">
           <GitBranch className="h-4 w-4 text-amber-400/60" />
           <h2 className="text-base font-semibold text-amber-200/80">Your Stories</h2>
-          <span className="text-xs text-muted-foreground/30 font-sans ml-1">
+          <span className="text-xs text-muted-foreground/50 font-sans ml-1">
             Click &quot;Tree&quot; to explore branches
           </span>
         </div>

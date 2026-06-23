@@ -91,7 +91,7 @@ function WorldCard({ world }: { world: WorldWithCount }) {
         </p>
 
         {world.lore && (
-          <p className="text-xs text-muted-foreground/35 leading-relaxed line-clamp-2 border-l-2 border-white/10 pl-3 italic">
+          <p className="text-xs text-muted-foreground/55 leading-relaxed line-clamp-2 border-l-2 border-white/10 pl-3 italic">
             {truncateAtWord(world.lore, 140)}
           </p>
         )}
@@ -193,14 +193,14 @@ export function WorldsClient({ worlds }: Props) {
               placeholder="Search by name, description, lore…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-10 pl-10 pr-10 rounded-lg text-sm border border-white/10 bg-white/[0.04] text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500/25 transition-colors font-sans"
+              className="w-full h-10 pl-10 pr-10 rounded-lg text-sm border border-white/10 bg-white/[0.04] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-amber-500/40 focus:border-amber-500/25 transition-colors font-sans"
             />
             {search && (
               <button
                 type="button"
                 onClick={() => setSearch('')}
                 aria-label="Clear search"
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/30 hover:text-muted-foreground transition-colors"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -301,7 +301,7 @@ export function WorldsClient({ worlds }: Props) {
         </div>
       )}
 
-      <p className="text-center text-[11px] text-muted-foreground/20 font-sans">
+      <p className="text-center text-[11px] text-muted-foreground/45 font-sans">
         {filtered.length === worlds.length
           ? `${worlds.length} ${worlds.length === 1 ? 'world' : 'worlds'} in the Chronicle`
           : `${filtered.length} of ${worlds.length} worlds`}

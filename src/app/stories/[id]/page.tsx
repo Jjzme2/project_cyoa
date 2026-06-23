@@ -73,7 +73,7 @@ async function StoryContent({ params }: { params: Promise<{ id: string }> }) {
           <p className="text-muted-foreground/55 text-sm mt-2">{story.description}</p>
         )}
         <div className="flex items-center gap-2 flex-wrap pt-1">
-          <span className="text-xs text-muted-foreground/35 font-sans">by {story.authorName}</span>
+          <span className="text-xs text-muted-foreground/55 font-sans">by {story.authorName}</span>
           {story.seeded && <SeededBadge />}
           <StoryRatingControl storyId={story.id} authorId={story.authorId} rating={story.rating} />
           <ReadTogetherButton storyId={story.id} />
