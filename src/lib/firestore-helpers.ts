@@ -50,15 +50,29 @@ export async function getStories(limit = 20): Promise<Story[]> {
 
     return snap.docs
       .map((doc) => ({ id: doc.id, ...doc.data() } as Story))
-      .filter((s) => s.published !== false)
+      .filter((s) => s.published !== false && !s.unlisted)
   } catch (err) {
     console.error('[getStories] orderBy failed, falling back to scan:', (err as Error).message)
     const fallback = await adminDb.collection('stories').limit(limit).get()
     return fallback.docs
       .map((doc) => ({ id: doc.id, ...doc.data() } as Story))
-      .filter((s) => s.published !== false)
+      .filter((s) => s.published !== false && !s.unlisted)
       .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
   }
+}
+
+/** Recent shared "You" mode stories — the Personal Saga browse feed. */
+export async function getYouModeStories(limit = 60): Promise<Story[]> {
+  'use cache'
+  cacheLife('minutes')
+  cacheTag('stories')
+
+  // Scan recent stories and filter in memory to avoid a composite index.
+  const snap = await adminDb.collection('stories').orderBy('createdAt', 'desc').limit(300).get()
+  return snap.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() } as Story))
+    .filter((s) => s.youMode === true && s.published !== false && !s.unlisted)
+    .slice(0, limit)
 }
 
 export async function getStory(id: string): Promise<Story | null> {
@@ -87,6 +101,71 @@ export async function createStory(
 
 export async function incrementStoryViews(storyId: string) {
   await storyRef(storyId).update({ views: FieldValue.increment(1) })
+}
+
+// ─── "You" mode: per-reader, per-world reputation ─────────────────────────────
+
+function worldRepRef(userId: string, worldId: string) {
+  return adminDb.collection('worldReputation').doc(`${userId}__${worldId}`)
+}
+
+/** A world's memory of a reader fades toward neutral over time (~30-day half-life). */
+function decayStanding(standing: number, updatedAt?: string): number {
+  if (!standing || !updatedAt) return standing ?? 0
+  const days = (Date.now() - new Date(updatedAt).getTime()) / 86_400_000
+  if (days <= 0) return standing
+  return Math.round(standing * Math.pow(0.5, days / 30) * 100) / 100
+}
+
+/** A reader's (time-decayed) standing in a world (-1..1); 0 when a stranger here. */
+export async function getWorldStanding(userId: string, worldId: string): Promise<number> {
+  const doc = await worldRepRef(userId, worldId).get()
+  if (!doc.exists) return 0
+  return decayStanding((doc.data()?.standing as number) ?? 0, doc.data()?.updatedAt as string)
+}
+
+export type StandingTrend = 'rising' | 'falling' | 'steady'
+
+/** Decayed standing plus a recent trend, for the reader-facing badge. */
+export async function getWorldReputation(
+  userId: string,
+  worldId: string,
+): Promise<{ standing: number; trend: StandingTrend; samples: number }> {
+  const doc = await worldRepRef(userId, worldId).get()
+  if (!doc.exists) return { standing: 0, trend: 'steady', samples: 0 }
+  const data = doc.data() ?? {}
+  const standing = decayStanding((data.standing as number) ?? 0, data.updatedAt as string)
+  const history = (data.history as { standing: number; at: string }[] | undefined) ?? []
+  let trend: StandingTrend = 'steady'
+  if (history.length >= 2) {
+    const earlier = history[Math.max(0, history.length - 4)].standing
+    const latest = history[history.length - 1].standing
+    const delta = latest - earlier
+    trend = delta > 0.08 ? 'rising' : delta < -0.08 ? 'falling' : 'steady'
+  }
+  return { standing, trend, samples: history.length }
+}
+
+/**
+ * Nudge a reader's world standing toward the standing observed in the story they
+ * just played (EMA, after time-decay), so the world remembers them across
+ * stories — and keeps a short history for trend display.
+ */
+export async function updateWorldStanding(
+  userId: string,
+  worldId: string,
+  observed: number,
+): Promise<void> {
+  const ref = worldRepRef(userId, worldId)
+  const now = new Date().toISOString()
+  await adminDb.runTransaction(async (txn) => {
+    const doc = await txn.get(ref)
+    const data = doc.exists ? doc.data() ?? {} : {}
+    const prior = decayStanding((data.standing as number) ?? 0, data.updatedAt as string)
+    const next = Math.max(-1, Math.min(1, Math.round((prior + (observed - prior) * 0.3) * 100) / 100))
+    const history = [...(((data.history as { standing: number; at: string }[]) ?? [])), { standing: next, at: now }].slice(-12)
+    txn.set(ref, { userId, worldId, standing: next, updatedAt: now, history }, { merge: true })
+  })
 }
 
 /** Append emergent canon characters to a story, deduped by name (case-insensitive). */
@@ -821,7 +900,7 @@ export async function getStoriesByWorld(worldId: string, limit = 100): Promise<S
   const snap = await adminDb.collection('stories').where('worldId', '==', worldId).limit(limit).get()
   return snap.docs
     .map((d) => ({ id: d.id, ...d.data() } as Story))
-    .filter((s) => s.published !== false)
+    .filter((s) => s.published !== false && !s.unlisted)
     .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
 }
 

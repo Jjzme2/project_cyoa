@@ -591,6 +591,8 @@ export interface ContentJudgment {
   safety: ModerationResult
   /** Craft score 0-100 (informational — does not gate publication). */
   quality: { score: number; notes?: string }
+  /** How the protagonist's deeds this chapter reflect on them: -1 cruel/treacherous .. +1 kind/honorable. Drives "You" mode reputation. */
+  conduct: number
 }
 
 /**
@@ -623,11 +625,13 @@ Rating guide — Everyone: wholesome, no violence/profanity/sexual/frightening c
 
 2) QUALITY — score 0-100 for craft: coherence with the chosen path ("${choiceText.slice(0, 120)}"), vividness, tone consistency, and grammatical soundness. Informational only; it does not gate publication.
 
+3) CONDUCT — score -1.0 to 1.0 for how the PROTAGONIST's choice and actions in this chapter reflect on their character morally and socially: -1 cruel, treacherous, or villainous; 0 neutral or ambiguous; +1 kind, brave, or honorable. Judge the protagonist's deeds, not the events that befall them.
+
 Chapter:
 """${chapter.slice(0, 2000)}"""
 
 Respond with ONLY valid JSON, no markdown:
-{"safety":{"action":"allow|flag|refuse","reason":"short reason if flag/refuse, else empty"},"quality":{"score":0,"notes":"one short phrase"}}`
+{"safety":{"action":"allow|flag|refuse","reason":"short reason if flag/refuse, else empty"},"quality":{"score":0,"notes":"one short phrase"},"conduct":0}`
 
   const normalize = (data: Record<string, unknown>): ContentJudgment => {
     const s = (data.safety ?? {}) as Record<string, unknown>
@@ -637,6 +641,9 @@ Respond with ONLY valid JSON, no markdown:
     let score = Number(q.score)
     if (!Number.isFinite(score)) score = 0
     score = Math.max(0, Math.min(100, Math.round(score)))
+    let conduct = Number(data.conduct)
+    if (!Number.isFinite(conduct)) conduct = 0
+    conduct = Math.max(-1, Math.min(1, conduct))
     return {
       safety: {
         action,
@@ -647,6 +654,7 @@ Respond with ONLY valid JSON, no markdown:
             : String(s.reason ?? '').trim().slice(0, 200) || 'Flagged by the content judge.',
       },
       quality: { score, notes: String(q.notes ?? '').trim().slice(0, 120) || undefined },
+      conduct,
     }
   }
 

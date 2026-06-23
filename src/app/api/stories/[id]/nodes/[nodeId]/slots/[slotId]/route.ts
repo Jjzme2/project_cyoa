@@ -18,6 +18,8 @@ import {
   checkAndAwardAchievements,
   addStoryCharacters,
   settleBountyOnFill,
+  getWorldStanding,
+  updateWorldStanding,
 } from '@/lib/firestore-helpers'
 import { CreditManager } from '@/lib/credit-manager'
 import { generateStoryNode, generateStoryImage, reviewContribution, judgeContent, PromptRejectedError } from '@/lib/ai'
@@ -131,6 +133,12 @@ export async function POST(
 
     // The story's rating is the effective ceiling (it's clamped to its world).
     const effectiveRating = story.rating ?? world.rating ?? 'Mature'
+    // "You" mode: the reader is the protagonist, written by their own name.
+    const youMode = !!story.youMode
+    const protagonist =
+      youMode && displayName
+        ? { name: displayName, description: 'the reader, playing as themselves' }
+        : story.protagonist
     const worldCtx = {
       name: world.name,
       description: world.description,
@@ -138,7 +146,7 @@ export async function POST(
       rules: world.rules,
       tone: world.tone,
       rating: effectiveRating,
-      protagonist: story.protagonist,
+      protagonist,
       characters: story.characters,
       director: story.director,
     }
@@ -176,12 +184,15 @@ export async function POST(
       // the reader was away.
       const ageMs = Date.now() - new Date(parentNode.createdAt).getTime()
       const catchUpTicks = Math.min(10, Math.floor(ageMs / 3_600_000))
+      // "You" mode: seed NPC attitudes from the reader's standing in this world.
+      const readerStanding = youMode ? await getWorldStanding(uid, story.worldId) : 0
       const { context, updatedEngineState: nextState } = builder.buildContext(
         pathString,
         parentNode.depth + 1,
         effectiveWorldState,
         priorEngineState,
         catchUpTicks,
+        readerStanding,
       )
       systemNarrativeEvents = builder.formatForPrompt(context)
 
@@ -297,6 +308,18 @@ export async function POST(
       // Record any new canon characters the AI introduced this chapter.
       if (newCharacters && newCharacters.length > 0) {
         ops.push(addStoryCharacters(storyId, newCharacters))
+      }
+      // "You" mode: carry the world's regard for this reader forward so it
+      // persists into the next story here. Prefer the Content Judge's reading of
+      // the protagonist's CONDUCT this chapter (the reader's actual deeds); fall
+      // back to the cast's net regard if the judge was unavailable.
+      if (youMode) {
+        let observed: number | null = judgment ? judgment.conduct : null
+        if (observed === null && updatedEngineState?.relationships) {
+          const aff = Object.values(updatedEngineState.relationships.affinity)
+          if (aff.length > 0) observed = aff.reduce((s, v) => s + v, 0) / aff.length
+        }
+        if (observed !== null) ops.push(updateWorldStanding(uid, story.worldId, observed))
       }
       // Don't notify the author about a contribution that's hidden pending review.
       if (!pendingReview && story.authorId && story.authorId !== uid) {
