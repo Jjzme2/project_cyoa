@@ -10,7 +10,7 @@ import { BountyControl } from '@/components/book/BountyControl'
 import { useAuth } from '@/components/Providers'
 import { validatePromptLocal } from '@/lib/validate'
 import { CreatorResourceManager } from '@/lib/creator-resources'
-import type { ChoiceSlot, ResourceDefinition, ChoiceRequirement, ChoiceEffect, ChoiceMemoryEffect, StoryCharacter, Protagonist } from '@/types'
+import type { ChoiceSlot, ResourceDefinition, ChoiceRequirement, ChoiceEffect, StoryCharacter, Protagonist } from '@/types'
 
 interface Props {
   storyId: string
@@ -38,8 +38,6 @@ export function ChoiceSlots({
   onModerated,
   currentResources,
   storyResources,
-  storyCharacters,
-  protagonist,
 }: Props) {
   const { user, tier, isAdmin, openAuthModal, aiUsesRemaining, updateAiUses } = useAuth()
   const [inputs, setInputs] = useState<Record<string, string>>({})
@@ -92,15 +90,6 @@ export function ChoiceSlots({
   // Outer key: slotId, Inner key: resourceName
   const [slotReqs, setSlotReqs] = useState<Record<string, Record<string, { enabled: boolean; op: string; val: string }>>>({})
   const [slotEffs, setSlotEffs] = useState<Record<string, Record<string, { enabled: boolean; op: string; val: string }>>>({})
-  // Outer key: slotId, Inner key: characterName
-  const [slotMems, setSlotMems] = useState<Record<string, Record<string, { enabled: boolean; sentiment: ChoiceMemoryEffect['sentiment']; event: string }>>>({})
-
-  // All named characters for the memory effects panel
-  const allCharacters: string[] = [
-    ...(protagonist?.name ? [protagonist.name] : []),
-    ...(storyCharacters?.map((c) => c.name) ?? []),
-  ]
-
   const IMAGE_CREDITS = 3
 
   const aiLimit = tier === 'PREMIUM' ? 100 : 20
@@ -124,7 +113,6 @@ export function ChoiceSlots({
     // Build requirements and effects to send
     const reqsToSend: ChoiceRequirement[] = []
     const effsToSend: ChoiceEffect[] = []
-    const memsToSend: ChoiceMemoryEffect[] = []
 
     if (storyResources) {
       storyResources.forEach((res) => {
@@ -148,13 +136,6 @@ export function ChoiceSlots({
       })
     }
 
-    allCharacters.forEach((charName) => {
-      const mem = slotMems[slot.id]?.[charName]
-      if (mem?.enabled && mem.event.trim() !== '') {
-        memsToSend.push({ characterName: charName, sentiment: mem.sentiment, event: mem.event.trim() })
-      }
-    })
-
     setSubmitting(slot.id)
     try {
       const token = await user.getIdToken()
@@ -166,7 +147,6 @@ export function ChoiceSlots({
           includeImage: imageEnabled[slot.id] ?? false,
           requirements: reqsToSend,
           effects: effsToSend,
-          memoryEffects: memsToSend,
           worldState: currentResources ?? {},
         }),
       })
@@ -705,60 +685,6 @@ export function ChoiceSlots({
                                       </div>
                                     )}
                                   </div>
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
-                    {/* Character memory effects editor */}
-                    {allCharacters.length > 0 && (
-                      <div className="bg-white/[0.02] border border-white/[0.04] p-3 rounded-lg space-y-3 mt-1.5">
-                        <div className="text-[10px] uppercase tracking-wider text-violet-400/70 font-semibold font-sans">
-                          Character Memories
-                        </div>
-                        <div className="space-y-2">
-                          {allCharacters.map((charName) => {
-                            const mem = slotMems[slot.id]?.[charName] ?? { enabled: false, sentiment: 'neutral' as const, event: '' }
-                            function setMem(patch: Partial<typeof mem>) {
-                              setSlotMems((prev) => ({
-                                ...prev,
-                                [slot.id]: { ...(prev[slot.id] ?? {}), [charName]: { ...mem, ...patch } },
-                              }))
-                            }
-                            return (
-                              <div key={charName} className="flex items-start gap-2 border-b border-white/[0.04] pb-2 last:border-0 last:pb-0">
-                                <input
-                                  type="checkbox"
-                                  title={`Record memory for ${charName}`}
-                                  checked={mem.enabled}
-                                  onChange={(e) => setMem({ enabled: e.target.checked })}
-                                  className="mt-1.5 rounded bg-background border-input h-3 w-3 shrink-0"
-                                />
-                                <div className="flex-1 space-y-1.5">
-                                  <span className="text-[11px] font-sans font-medium text-foreground/75">{charName}</span>
-                                  {mem.enabled && (
-                                    <div className="flex gap-1.5 items-center">
-                                      <select
-                                        value={mem.sentiment}
-                                        title={`Memory sentiment for ${charName}`}
-                                        onChange={(e) => setMem({ sentiment: e.target.value as ChoiceMemoryEffect['sentiment'] })}
-                                        className="text-[9px] h-6 px-1 rounded border bg-background text-foreground focus:outline-none shrink-0"
-                                      >
-                                        <option value="positive">helped</option>
-                                        <option value="negative">harmed</option>
-                                        <option value="neutral">neutral</option>
-                                      </select>
-                                      <input
-                                        type="text"
-                                        value={mem.event}
-                                        placeholder="e.g. Chose to spare them"
-                                        onChange={(e) => setMem({ event: e.target.value })}
-                                        className="text-[9px] h-6 px-1.5 rounded border bg-background text-foreground w-full focus:outline-none"
-                                      />
-                                    </div>
-                                  )}
                                 </div>
                               </div>
                             )

@@ -604,6 +604,8 @@ export interface ContentJudgment {
   conduct: number
   /** A one-line in-world account of the deed, when it's notable enough to enter the world chronicle. */
   legend?: string
+  /** Inferred consequences: how named characters' regard for the protagonist shifted this chapter. */
+  relationshipShifts?: { name: string; delta: number }[]
 }
 
 /**
@@ -620,8 +622,10 @@ export async function judgeContent(
   choiceText: string,
   world: WorldContext,
   userId: string,
+  knownCharacters: string[] = [],
 ): Promise<ContentJudgment | null> {
   const rating = world.rating ?? 'Mature'
+  const castLine = knownCharacters.length > 0 ? `Established characters: ${knownCharacters.slice(0, 12).join(', ')}.` : ''
 
   const aiPrompt = `You are the Content Judge for "Chronicle", a collaborative storytelling platform. Evaluate ONE freshly generated chapter and respond with strict JSON.
 
@@ -640,11 +644,13 @@ Rating guide — Everyone: wholesome, no violence/profanity/sexual/frightening c
 
 4) LEGEND — ONLY if the protagonist's deed this chapter is genuinely notable (clearly heroic or villainous, not routine), write a single in-world sentence a chronicler might record about it (third person; name the protagonist if their name appears in the chapter). Otherwise return an empty string.
 
+5) RELATIONSHIPS — infer the likely consequences of the protagonist's actions on the established characters. ${castLine} For each established character whose feelings toward the protagonist would MEANINGFULLY change because of what happened in this chapter, output {"name": exact character name, "delta": -1.0..1.0} (negative = they now regard the protagonist worse; positive = better). Only include genuinely affected characters; return an empty array if none.
+
 Chapter:
 """${chapter.slice(0, 2000)}"""
 
 Respond with ONLY valid JSON, no markdown:
-{"safety":{"action":"allow|flag|refuse","reason":"short reason if flag/refuse, else empty"},"quality":{"score":0,"notes":"one short phrase"},"conduct":0,"legend":""}`
+{"safety":{"action":"allow|flag|refuse","reason":"short reason if flag/refuse, else empty"},"quality":{"score":0,"notes":"one short phrase"},"conduct":0,"legend":"","relationshipShifts":[]}`
 
   const normalize = (data: Record<string, unknown>): ContentJudgment => {
     const s = (data.safety ?? {}) as Record<string, unknown>
@@ -669,6 +675,12 @@ Respond with ONLY valid JSON, no markdown:
       quality: { score, notes: String(q.notes ?? '').trim().slice(0, 120) || undefined },
       conduct,
       legend: String(data.legend ?? '').trim().slice(0, 240) || undefined,
+      relationshipShifts: Array.isArray(data.relationshipShifts)
+        ? (data.relationshipShifts as Record<string, unknown>[])
+            .map((r) => ({ name: String(r?.name ?? '').trim().slice(0, 60), delta: Math.max(-1, Math.min(1, Number(r?.delta) || 0)) }))
+            .filter((r) => r.name && r.delta)
+            .slice(0, 8)
+        : [],
     }
   }
 
