@@ -480,6 +480,85 @@ ${worldSection}User's story idea: ${prompt}`
   }
 }
 
+/** Build the prompt that renders a single saga entry-point's opening chapter. */
+function buildSagaOpeningPrompt(
+  world: WorldContext,
+  sagaPremise: string,
+  entry: { label: string; premise: string },
+): string {
+  return `You are the opening storyteller for a "personal saga" on Chronicle — a Choose Your Own Adventure where THE READER plays as THEMSELVES. Write the opening chapter in SECOND PERSON ("you"). Never invent a name for the reader; they are themselves. Do not address the reader as a character with a fixed identity, gender, or backstory beyond what the entry premise states.
+
+WORLD: ${world.name}
+${world.description}
+
+LORE: ${world.lore}
+
+WORLD RULES: ${world.rules}
+
+TONE: ${world.tone}
+
+${ratingGuidance(world.rating)}
+${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${directorBlock(world.director)}${sagaPremise.trim() ? `\nSAGA PREMISE (the overall situation this saga drops the reader into — honor it):\n${sagaPremise.trim()}\n` : ''}
+THIS ENTRY POINT — one of several doorways into the saga the reader could have chosen:
+- How it was offered to the reader: "${entry.label}"
+- What this opening must establish: ${entry.premise}
+
+Write the opening chapter. It MUST:
+- Be written in second person ("you"), placing the reader inside this entry point's situation from the first sentence.
+- Establish the scene, the world's texture, and immediate stakes — hook the reader fast.
+- Stay strictly within the CONTENT RATING above and match the world's tone, lore, and rules.
+- Treat the reader as an outsider newly arriving here (no established standing yet) unless the entry premise says otherwise.
+- Never state how the reader feels — reveal mood through sensory detail and what's happening around them.
+- End at a genuine moment of decision or tension.
+- Be EXACTLY between 130 and 160 words (no more than 1100 characters). Do NOT truncate sentences.
+
+After the chapter, provide exactly 3 brief choice prompts for what the reader does next (10 words or less each):
+CHOICE_1: [choice text]
+CHOICE_2: [choice text]
+CHOICE_3: [choice text]
+
+Then, ONLY if this opening introduces a brand-new named character, add one line per new character (omit entirely if none):
+NEW_CHARACTER: [name] — [one-line description]
+
+Write only the chapter, the three choices, and any NEW_CHARACTER lines. No meta-commentary.`
+}
+
+/**
+ * Renders one entry-point opening chapter for a personal saga. Unlike a normal
+ * story node, there is no prior path — this IS the beginning — and it is always
+ * written in second person (the reader plays as themselves). Returns the prose,
+ * three onward choices, and any newly-introduced characters.
+ */
+export async function generateSagaOpening(
+  world: WorldContext,
+  sagaPremise: string,
+  entry: { label: string; premise: string },
+  userId: string,
+): Promise<{ content: string; choices: string[]; model: string; newCharacters: StoryCharacter[] }> {
+  const prompt = buildSagaOpeningPrompt(world, sagaPremise, entry)
+
+  try {
+    const result = await generateText({
+      model: PRIMARY_MODEL,
+      prompt,
+      maxOutputTokens: 600,
+      providerOptions: { gateway: { user: userId, tags: ['feature:saga-opening', 'env:production'] } },
+    })
+    return { ...parseAIResponse(result.text), model: PRIMARY_MODEL }
+  } catch (error) {
+    if (APICallError.isInstance(error) && error.statusCode === 402) {
+      throw new Error('AI budget limit reached. Please try again later.')
+    }
+    if (APICallError.isInstance(error) && error.statusCode === 429) {
+      throw new Error('Too many requests. Please slow down.')
+    }
+    if (!process.env.OPENROUTER_API_KEY) throw error
+    const openrouter = createOpenAI({ baseURL: 'https://openrouter.ai/api/v1', apiKey: process.env.OPENROUTER_API_KEY })
+    const result = await generateText({ model: openrouter(OPENROUTER_MODEL), prompt, maxOutputTokens: 600 })
+    return { ...parseAIResponse(result.text), model: `openrouter/${OPENROUTER_MODEL}` }
+  }
+}
+
 export async function generateStoryNode(
   world: WorldContext,
   storyPath: StoryPathSegment[],

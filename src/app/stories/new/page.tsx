@@ -51,7 +51,6 @@ export default function NewStoryPage() {
   const [rating, setRating] = useState<ContentRating>(DEFAULT_CONTENT_RATING)
   const [protagonistName, setProtagonistName] = useState('')
   const [protagonistDesc, setProtagonistDesc] = useState('')
-  const [youMode, setYouMode] = useState(false)
   const [shared, setShared] = useState(true)
   const [director, setDirector] = useState({ experimental: 0, intensity: 0, darkness: 0, pace: 0, vision: '' })
   const [opening, setOpening] = useState('')
@@ -108,7 +107,7 @@ export default function NewStoryPage() {
     resources: typeof resources
     goapEnabled: boolean; implementQuests: boolean
     director: typeof director
-    youMode: boolean; shared: boolean
+    shared: boolean
   }>('chronicle:draft:story')
 
   useEffect(() => {
@@ -141,7 +140,6 @@ export default function NewStoryPage() {
     setGoapEnabled(d.goapEnabled ?? false)
     setImplementQuests(d.implementQuests ?? false)
     if (d.director) setDirector(d.director)
-    setYouMode(d.youMode ?? false)
     setShared(d.shared ?? true)
     setHasDraft(false)
     toast.success('Draft restored')
@@ -225,9 +223,8 @@ export default function NewStoryPage() {
           worldId,
           worldName: selectedWorld.name,
           rating,
-          youMode,
           shared,
-          protagonist: !youMode && protagonistName.trim()
+          protagonist: protagonistName.trim()
             ? { name: protagonistName.trim(), description: protagonistDesc.trim() }
             : undefined,
           director:
@@ -271,7 +268,7 @@ export default function NewStoryPage() {
         protagonistName, protagonistDesc, opening,
         choice1, choice2, choice3, tags,
         coverTheme, readingTheme, resources,
-        goapEnabled, implementQuests, director, youMode, shared,
+        goapEnabled, implementQuests, director, shared,
       })
       toast.error(err instanceof Error ? err.message : 'Something went wrong')
       toast.info('Draft saved — your story is preserved for next time.')
@@ -498,46 +495,38 @@ export default function NewStoryPage() {
           </div>
 
           <div className="space-y-2 border-t border-white/[0.06] pt-5">
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={youMode}
-                onChange={(e) => setYouMode(e.target.checked)}
-                className="accent-amber-500"
+            <Label htmlFor="protagonist" className="block">
+              Protagonist{' '}
+              <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span>
+            </Label>
+            <Input
+              id="protagonist"
+              placeholder="Who does the reader play as? e.g. Elara, a cautious thief"
+              value={protagonistName}
+              onChange={(e) => setProtagonistName(e.target.value)}
+            />
+            {protagonistName.trim() && (
+              <Input
+                placeholder="A short description the AI should keep consistent (optional)"
+                value={protagonistDesc}
+                onChange={(e) => setProtagonistDesc(e.target.value)}
               />
-              <span className="text-sm">“You” mode — the reader is the protagonist</span>
-            </label>
-            {youMode ? (
-              <p className="text-[11px] text-muted-foreground/45">
-                Each reader plays as themselves, by name. Their standing carries across every story
-                in this world — the cast remembers how they’ve been treated. (Works best with AI
-                characters enabled.)
-              </p>
-            ) : (
-              <>
-                <Label htmlFor="protagonist" className="pt-1 block">
-                  Protagonist{' '}
-                  <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span>
-                </Label>
-                <Input
-                  id="protagonist"
-                  placeholder="Who does the reader play as? e.g. Elara, a cautious thief"
-                  value={protagonistName}
-                  onChange={(e) => setProtagonistName(e.target.value)}
-                />
-                {protagonistName.trim() && (
-                  <Input
-                    placeholder="A short description the AI should keep consistent (optional)"
-                    value={protagonistDesc}
-                    onChange={(e) => setProtagonistDesc(e.target.value)}
-                  />
-                )}
-                <p className="text-[11px] text-muted-foreground/45">
-                  The AI writes the story around this character by name. The rest of the cast emerges
-                  as your story grows.
-                </p>
-              </>
             )}
+            <p className="text-[11px] text-muted-foreground/45">
+              The AI writes the story around this character by name. The rest of the cast emerges
+              as your story grows.
+            </p>
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2.5">
+              <Sparkles className="h-3.5 w-3.5 text-amber-400/70 mt-0.5 shrink-0" />
+              <p className="text-[11px] text-muted-foreground/55 leading-relaxed">
+                Want the reader to play as <em>themselves</em>, with a reputation that follows them across the
+                world?{' '}
+                <Link href="/saga/new" className="text-amber-300/85 hover:underline font-medium">
+                  Create a Personal Saga
+                </Link>{' '}
+                instead — it’s built for that.
+              </p>
+            </div>
           </div>
 
           <div className="space-y-2 border-t border-white/[0.06] pt-5">
@@ -552,7 +541,7 @@ export default function NewStoryPage() {
             </label>
             <p className="text-[11px] text-muted-foreground/45">
               {shared
-                ? 'Listed in the library' + (youMode ? ' and the Personal Saga browse, for anyone to play.' : ' for anyone to read.')
+                ? 'Listed in the library for anyone to read.'
                 : 'Kept personal — hidden from public listings (still reachable by direct link and from your dashboard).'}
             </p>
           </div>
@@ -956,14 +945,13 @@ export default function NewStoryPage() {
               <input
                 type="checkbox"
                 id="goapEnabled"
-                checked={goapEnabled || youMode}
-                disabled={youMode}
+                checked={goapEnabled}
                 onChange={(e) => setGoapEnabled(e.target.checked)}
                 className="mt-1 h-4 w-4 rounded bg-background border-input text-amber-500 focus:ring-amber-500 disabled:opacity-60"
               />
               <div className="space-y-1">
                 <Label htmlFor="goapEnabled" className="text-sm cursor-pointer">
-                  Enable GOAP AI Characters{youMode && <span className="text-amber-400/70 text-xs font-normal"> · required for You mode</span>}
+                  Enable GOAP AI Characters
                 </Label>
                 <p className="text-[11px] text-muted-foreground/50 leading-relaxed">
                   Allows characters to autonomously form goals and execute plans behind the scenes based on the story&apos;s world state. 

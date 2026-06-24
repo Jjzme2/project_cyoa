@@ -829,6 +829,93 @@ export async function createStoryNode(
   return ref.id
 }
 
+/**
+ * Build a personal saga's opening tree in one shot.
+ *
+ * A saga has no single authored opening — instead the reader picks among several
+ * entry points (doorways into the world). This writes a depth-0 "threshold" node
+ * whose slots ARE those entry points: each slot is pre-filled and points to an
+ * already-rendered opening chapter (depth 1) with its own onward choices. The
+ * threshold has exactly as many slots as there are entry points (no empty
+ * "write path N" slots), so readers simply choose where their story begins.
+ *
+ * Returns the threshold node's id (the story's root).
+ */
+export async function createSagaTree(
+  storyId: string,
+  thresholdContent: string,
+  authorId: string,
+  authorName: string,
+  openings: { label: string; content: string; choices: string[]; aiModel: string }[],
+): Promise<{ rootNodeId: string; nodeCount: number }> {
+  const rootRef = nodesRef(storyId).doc()
+  const rootId = rootRef.id
+
+  // Render each entry point's opening as a depth-1 child with its own 3 onward
+  // choices, so the normal collaborative flow continues from there.
+  const childIds = await Promise.all(
+    openings.map((o) =>
+      createStoryNode(
+        {
+          storyId,
+          content: o.content,
+          depth: 1,
+          parentId: rootId,
+          choiceText: o.label,
+          authorId,
+          aiGenerated: true,
+          aiModel: o.aiModel,
+          imageUrl: null,
+        },
+        o.choices,
+      ),
+    ),
+  )
+
+  // The threshold node itself — short framing prose, no author choices to fill.
+  await rootRef.set({
+    storyId,
+    content: thresholdContent,
+    depth: 0,
+    parentId: null,
+    choiceText: null,
+    authorId,
+    aiGenerated: false,
+    aiModel: null,
+    imageUrl: null,
+    published: true,
+    moderation: { status: 'approved', reviewedBy: null, reviewedAt: null },
+    createdAt: new Date().toISOString(),
+  })
+
+  // One pre-filled slot per entry point, in author order.
+  const now = new Date().toISOString()
+  const batch = adminDb.batch()
+  openings.forEach((o, i) => {
+    const slot = slotsRef(storyId, rootId).doc()
+    batch.set(slot, {
+      nodeId: rootId,
+      storyId,
+      slotIndex: i,
+      promptText: o.label,
+      filled: true,
+      childNodeId: childIds[i],
+      submittedBy: authorId,
+      submitterName: authorName,
+      locked: false,
+      lockedBy: null,
+      lockedAt: null,
+      createdAt: now,
+    })
+  })
+  await batch.commit()
+
+  const nodeCount = openings.length + 1
+  await storyRef(storyId).update({ rootNodeId: rootId, nodeCount, updatedAt: now })
+
+  return { rootNodeId: rootId, nodeCount }
+}
+
 // ─── Choice Slots ─────────────────────────────────────────────────────────────
 
 export async function getChoiceSlot(
