@@ -70,6 +70,14 @@ export async function POST(req: NextRequest) {
   const world = await getWorld(worldId).catch(() => null)
   const safeRating = world?.rating ? clampRating(requestedRating, world.rating) : requestedRating
 
+  // Seed the opening cast from the world's genesis canon, so stories begin
+  // grounded in the world's real figures (emergent characters still grow on top).
+  const seededCast = (world?.genesis?.characters ?? []).slice(0, 5).map((c) => ({
+    name: c.name,
+    description: [c.role, c.faction ? `of ${c.faction}` : '', c.bio].filter(Boolean).join(' · ').slice(0, 200),
+    status: 'alive',
+  }))
+
   const id = await createStory({
     title,
     description: description?.trim() || '',
@@ -83,7 +91,7 @@ export async function POST(req: NextRequest) {
     rating: safeRating,
     ratingOverriddenBy: null,
     resources: resources ?? [],
-    characters: [],
+    characters: seededCast,
     youMode: !!youMode,
     // Default to shared/listed; only store `unlisted` when the author opts out.
     ...(shared === false ? { unlisted: true } : {}),

@@ -161,7 +161,14 @@ export class NarrativeBuilder {
     // has been away, "catch up" the world by ticking extra times so it feels
     // alive between sessions — alliances and markets move while you're gone.
     const baseSeed = this.world.seed ?? SeededRNG.hashString(this.story.title);
-    let factions = priorState?.factions ?? FactionManager.generateDefaultFactions(baseSeed, SeededRNG.deriveSeed(baseSeed, this.story.id));
+    // Prefer the world's genesis factions so the simulated powers are the same
+    // named factions shown in the world canon; else generate per-world defaults.
+    const dynamicsSeed = SeededRNG.deriveSeed(baseSeed, this.story.id);
+    let factions =
+      priorState?.factions ??
+      (this.world.genesis?.factions?.length
+        ? FactionManager.fromGenesis(this.world.genesis.factions, dynamicsSeed)
+        : FactionManager.generateDefaultFactions(baseSeed, dynamicsSeed));
     const economy = priorState?.economy ?? createDefaultEconomy();
 
     const totalTicks = 1 + Math.max(0, Math.min(catchUpTicks, 10));

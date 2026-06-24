@@ -9,6 +9,7 @@ import { SeededBadge } from '@/components/ContentBadges'
 import { WorldRatingControl } from '@/components/world/WorldRatingControl'
 import { WorldLore } from '@/components/world/WorldLore'
 import { WorldGenesis } from '@/components/world/WorldGenesis'
+import { GenerateGenesisButton } from '@/components/world/GenerateGenesisButton'
 import { getWorld, getStoriesByWorld, getWorldChronicle, getWorldLegends } from '@/lib/firestore-helpers'
 import { APP_CONFIG } from '@/lib/config'
 
@@ -141,7 +142,11 @@ async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
           <div className="flex-1 h-px bg-white/5" />
         </div>
 
-        {world.genesis && <WorldGenesis genesis={world.genesis} />}
+        {world.genesis ? (
+          <WorldGenesis genesis={world.genesis} />
+        ) : (
+          <GenerateGenesisButton worldId={world.id} authorId={world.authorId} />
+        )}
 
         <WorldLore chronicle={chronicle} legends={legends} />
 

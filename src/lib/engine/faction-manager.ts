@@ -1,7 +1,16 @@
 import { Faction, FactionAction, FactionActionContext, FactionRelationship } from '@/types/faction';
 import { EconomyState } from '@/types/economy';
+import type { GenesisFaction } from '@/types';
 import { SeededRNG } from './seed-rng';
 import { NameGenerator } from './name-gen';
+
+const ALIGN_BY_ARCHETYPE: Record<string, Faction['alignment']> = {
+  'martial order': 'lawful_neutral',
+  'arcane circle': 'true_neutral',
+  'merchant power': 'neutral_good',
+  'outlaw band': 'chaotic_neutral',
+  'zealous faith': 'lawful_neutral',
+};
 
 const pv = (state: FactionActionContext, arr: string[]): string => (state.pickVariant ? state.pickVariant(arr) : arr[0]);
 
@@ -211,6 +220,41 @@ export class FactionManager {
       };
     });
 
+    return factions;
+  }
+
+  /**
+   * Build the simulation's factions from a world's GENESIS bible, so the named
+   * powers (and their rivalries/alliances) are identical to the world canon
+   * end-to-end. Dynamics (stats, exact sentiment) come from the dynamics seed.
+   */
+  public static fromGenesis(genesisFactions: GenesisFaction[], dynamicsSeed: number): Record<string, Faction> {
+    const dynRng = new SeededRNG(dynamicsSeed);
+    const factions: Record<string, Faction> = {};
+    genesisFactions.forEach((g, i) => {
+      const relationships: FactionRelationship[] = [];
+      genesisFactions.forEach((other, j) => {
+        if (i === j) return;
+        let sentiment = dynRng.nextInt(-40, 40);
+        if (g.rivalOf === other.name) sentiment = dynRng.nextInt(-90, -55);
+        else if (g.allyOf === other.name) sentiment = dynRng.nextInt(55, 90);
+        relationships.push({ factionId: `faction_${j}`, sentiment });
+      });
+      factions[`faction_${i}`] = {
+        id: `faction_${i}`,
+        name: g.name,
+        description: g.archetype,
+        alignment: ALIGN_BY_ARCHETYPE[g.archetype] ?? 'true_neutral',
+        wealth: dynRng.nextInt(40, 80),
+        influence: dynRng.nextInt(30, 70),
+        resources: [
+          { commodityId: 'food', amount: dynRng.nextInt(20, 60) },
+          { commodityId: 'iron', amount: dynRng.nextInt(10, 50) },
+        ],
+        relationships,
+        traits: g.archetype.split(' '),
+      };
+    });
     return factions;
   }
 
