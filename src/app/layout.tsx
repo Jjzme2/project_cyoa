@@ -4,6 +4,7 @@ import './globals.css'
 import { Providers } from '@/components/Providers'
 import { Header } from '@/components/layout/Header'
 import { VerifyEmailBanner } from '@/components/auth/VerifyEmailBanner'
+import { TwoFactorGate } from '@/components/auth/TwoFactorGate'
 import { APP_CONFIG } from '@/lib/config'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
@@ -48,7 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           <Header />
           <VerifyEmailBanner />
-          {children}
+          <TwoFactorGate>{children}</TwoFactorGate>
         </Providers>
       </body>
     </html>
