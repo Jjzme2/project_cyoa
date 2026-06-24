@@ -10,7 +10,8 @@ import { WorldRatingControl } from '@/components/world/WorldRatingControl'
 import { WorldLore } from '@/components/world/WorldLore'
 import { WorldGenesis } from '@/components/world/WorldGenesis'
 import { GenerateGenesisButton } from '@/components/world/GenerateGenesisButton'
-import { getWorld, getStoriesByWorld, getWorldChronicle, getWorldLegends } from '@/lib/firestore-helpers'
+import { OutsiderRegard } from '@/components/world/OutsiderRegard'
+import { getWorld, getStoriesByWorld, getWorldChronicle, getWorldLegends, getWorldOutsiderRegard } from '@/lib/firestore-helpers'
 import { APP_CONFIG } from '@/lib/config'
 
 interface Props {
@@ -53,10 +54,11 @@ async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
   const world = await getWorld(id).catch(() => null)
   if (!world) notFound()
 
-  const [stories, chronicle, legends] = await Promise.all([
+  const [stories, chronicle, legends, outsiders] = await Promise.all([
     getStoriesByWorld(id).catch(() => []),
     getWorldChronicle(id).catch(() => []),
     getWorldLegends(id).catch(() => ({ revered: [], reviled: [] })),
+    getWorldOutsiderRegard(id).catch(() => null),
   ])
   const toneClass = TONE_COLORS[world.tone] ?? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
 
@@ -147,6 +149,8 @@ async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
         ) : (
           <GenerateGenesisButton worldId={world.id} authorId={world.authorId} />
         )}
+
+        {outsiders && <OutsiderRegard regard={outsiders} />}
 
         <WorldLore chronicle={chronicle} legends={legends} />
 
