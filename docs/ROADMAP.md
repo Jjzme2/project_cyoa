@@ -64,6 +64,9 @@ Most-loved / most-traveled paths and top writers. Needs denormalized aggregate c
 ### Global bounty board
 Discovery surface for open bounties across stories (currently bounties only appear inline on slots). Needs a collection-group query + index.
 
+### Saga draft persistence
+The story creator autosaves/restores a draft via `useDraft` (`chronicle:draft:story`); the Personal Saga creator (`/saga/new`) has no equivalent, so an interrupted saga is lost on reload. Wire the same draft restore/discard banner into the saga form (entry points, premise, director, cover/reading theme). Parked from the Director-UI work.
+
 ### Open product decision
 - Anonymous vs. named authorship policy (named authorship builds community).
 

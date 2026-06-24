@@ -61,11 +61,11 @@ export function Header() {
       )}
       {isAdmin && (
         <Link
-          href="/admin/moderation"
+          href="/admin"
           className="text-sm text-amber-400/70 hover:text-amber-300 transition-colors flex items-center gap-1"
         >
           <ShieldAlert className="h-3.5 w-3.5" />
-          Moderation
+          Admin
         </Link>
       )}
     </>
