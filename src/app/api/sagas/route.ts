@@ -11,6 +11,7 @@ import {
 import { CreditManager } from '@/lib/credit-manager'
 import { generateSagaOpening, PromptRejectedError } from '@/lib/ai'
 import { clampRating } from '@/lib/ratings'
+import { sanitizeDirector } from '@/lib/director'
 import { CONTENT_RATINGS, DEFAULT_CONTENT_RATING } from '@/types'
 import type { ContentRating } from '@/types'
 
@@ -76,20 +77,7 @@ export async function POST(req: NextRequest) {
   const sagaPremise = typeof premise === 'string' ? premise.trim().slice(0, 1000) : ''
 
   // Authored director persona (optional), clamped like the story route does.
-  const clampAxis = (v: unknown) => Math.max(-1, Math.min(1, Number(v) || 0))
-  const safeDirector =
-    director && typeof director === 'object'
-      ? (() => {
-          const d = {
-            experimental: clampAxis(director.experimental),
-            intensity: clampAxis(director.intensity),
-            darkness: clampAxis(director.darkness),
-            pace: clampAxis(director.pace),
-            vision: typeof director.vision === 'string' ? director.vision.trim().slice(0, 300) : '',
-          }
-          return d.experimental || d.intensity || d.darkness || d.pace || d.vision ? d : null
-        })()
-      : null
+  const safeDirector = sanitizeDirector(director)
 
   const requestedRating: ContentRating = CONTENT_RATINGS.includes(rating)
     ? (rating as ContentRating)

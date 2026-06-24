@@ -116,6 +116,12 @@ export interface DirectorPersona {
   darkness: number
   /** -1 slow-burn .. +1 propulsive */
   pace: number
+  /** -1 solemn/earnest .. +1 playful/witty */
+  levity?: number
+  /** -1 spare/plain .. +1 lyrical/ornate */
+  prose?: number
+  /** -1 intimate/character .. +1 epic/sweeping */
+  focus?: number
   /** Optional free-text directorial vision. */
   vision?: string
 }
