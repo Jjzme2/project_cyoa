@@ -75,7 +75,7 @@ async function StoryContent({ params }: { params: Promise<{ id: string }> }) {
         <div className="flex items-center gap-2 flex-wrap pt-1">
           <span className="text-xs text-muted-foreground/55 font-sans">by {story.authorName}</span>
           {story.seeded && <SeededBadge />}
-          <StoryRatingControl storyId={story.id} authorId={story.authorId} rating={story.rating} />
+          <StoryRatingControl storyId={story.id} authorId={story.authorId} rating={story.rating} nodeCount={story.nodeCount} />
           <ReadTogetherButton storyId={story.id} />
           {story.youMode && <WorldStandingBadge worldId={story.worldId} worldName={story.worldName} />}
         </div>

@@ -50,6 +50,17 @@ export async function PATCH(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  // Once a story is underway — it has grown past its opening chapter — its
+  // author can no longer change the rating, since doing so would retroactively
+  // re-label content others have already written under it. Admins may still
+  // override (the moderation escape hatch).
+  if (isOwner && !auth.isAdmin && (story.nodeCount ?? 0) > 1) {
+    return NextResponse.json(
+      { error: 'The rating is locked once a story is underway. Contact an admin if it needs changing.' },
+      { status: 409 },
+    )
+  }
+
   // A story can't be rated more mature than its world.
   const world = await getWorld(story.worldId).catch(() => null)
   const finalRating = world?.rating ? clampRating(rating, world.rating) : rating

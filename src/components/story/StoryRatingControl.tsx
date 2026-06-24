@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { ShieldCheck, Loader2 } from 'lucide-react'
+import { ShieldCheck, Loader2, Lock } from 'lucide-react'
 import { useAuth } from '@/components/Providers'
 import { RatingBadge } from '@/components/ContentBadges'
 import { CONTENT_RATINGS, DEFAULT_CONTENT_RATING } from '@/types'
@@ -12,19 +12,23 @@ interface Props {
   storyId: string
   authorId: string
   rating?: ContentRating
+  /** Number of chapters written. Past the opening, the author's rating locks. */
+  nodeCount?: number
 }
 
 /**
- * Shows a story's content rating. The author can set it; an admin can override
- * any story's rating (the server records the override).
+ * Shows a story's content rating. The author can set it while the story is just
+ * beginning; once it's underway the rating locks (admins can still override).
  */
-export function StoryRatingControl({ storyId, authorId, rating: initialRating }: Props) {
+export function StoryRatingControl({ storyId, authorId, rating: initialRating, nodeCount = 0 }: Props) {
   const { user, isAdmin } = useAuth()
   const [rating, setRating] = useState<ContentRating>(initialRating ?? DEFAULT_CONTENT_RATING)
   const [saving, setSaving] = useState(false)
 
   const isOwner = !!user && user.uid === authorId
-  const canEdit = isOwner || isAdmin
+  // Once the tale has grown past its opening chapter, only an admin may re-rate.
+  const lockedForOwner = isOwner && !isAdmin && nodeCount > 1
+  const canEdit = (isOwner || isAdmin) && !lockedForOwner
 
   async function change(next: ContentRating) {
     if (!user || next === rating) return
@@ -48,7 +52,19 @@ export function StoryRatingControl({ storyId, authorId, rating: initialRating }:
     }
   }
 
-  if (!canEdit) return <RatingBadge rating={rating} />
+  if (!canEdit) {
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <RatingBadge rating={rating} />
+        {lockedForOwner && (
+          <Lock
+            className="h-3 w-3 text-muted-foreground/50"
+            aria-label="Rating locked — the story is underway"
+          />
+        )}
+      </span>
+    )
+  }
 
   return (
     <span className="inline-flex items-center gap-1.5">
