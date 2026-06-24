@@ -8,6 +8,7 @@ import { AgeFilteredStoryGrid } from '@/components/library/AgeFilteredStoryGrid'
 import { SeededBadge } from '@/components/ContentBadges'
 import { WorldRatingControl } from '@/components/world/WorldRatingControl'
 import { WorldLore } from '@/components/world/WorldLore'
+import { WorldGenesis } from '@/components/world/WorldGenesis'
 import { getWorld, getStoriesByWorld, getWorldChronicle, getWorldLegends } from '@/lib/firestore-helpers'
 import { APP_CONFIG } from '@/lib/config'
 
@@ -139,6 +140,8 @@ async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
           </h2>
           <div className="flex-1 h-px bg-white/5" />
         </div>
+
+        {world.genesis && <WorldGenesis genesis={world.genesis} />}
 
         <WorldLore chronicle={chronicle} legends={legends} />
 
