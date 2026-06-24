@@ -845,7 +845,6 @@ export async function createSagaTree(
   storyId: string,
   thresholdContent: string,
   authorId: string,
-  authorName: string,
   openings: { label: string; content: string; choices: string[]; aiModel: string }[],
 ): Promise<{ rootNodeId: string; nodeCount: number }> {
   const rootRef = nodesRef(storyId).doc()
@@ -901,7 +900,9 @@ export async function createSagaTree(
       filled: true,
       childNodeId: childIds[i],
       submittedBy: authorId,
-      submitterName: authorName,
+      // Entry-point doorways are part of the saga's framing, not a community
+      // contribution — leave them unattributed so the threshold reads cleanly.
+      submitterName: null,
       locked: false,
       lockedBy: null,
       lockedAt: null,

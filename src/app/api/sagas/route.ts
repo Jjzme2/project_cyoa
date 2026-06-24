@@ -186,7 +186,6 @@ export async function POST(req: NextRequest) {
       storyId,
       thresholdContent,
       uid,
-      displayName ?? 'Anonymous',
       openings.map((o) => ({ label: o.label, content: o.content, choices: o.choices, aiModel: o.aiModel })),
     )
 
