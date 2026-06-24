@@ -2,7 +2,7 @@ import { generateText, APICallError } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { put } from '@vercel/blob'
 import { StoryPathSegment } from '@/types'
-import type { ContentRating, Protagonist, StoryCharacter, DirectorPersona } from '@/types'
+import type { ContentRating, Protagonist, StoryCharacter, DirectorPersona, WorldBible } from '@/types'
 import type { ModerationResult, ModerationAction } from './moderation'
 
 const PRIMARY_MODEL = 'google/gemini-2.5-pro'
@@ -21,6 +21,21 @@ interface WorldContext {
   director?: DirectorPersona
   /** Legendary deeds the world remembers (from past personal sagas) — shared lore. */
   chronicle?: string[]
+  /** The world's procedurally generated canon (factions, figures, history). */
+  genesis?: WorldBible
+}
+
+/** Injects the world's generated canon so stories draw on its powers, figures, and history. */
+function genesisBlock(g?: WorldBible): string {
+  if (!g) return ''
+  const parts: string[] = []
+  if (g.factions?.length)
+    parts.push('Powers: ' + g.factions.map((f) => `${f.name} (${f.archetype}${f.rivalOf ? `, rivals ${f.rivalOf}` : ''})`).join('; '))
+  if (g.characters?.length)
+    parts.push('Notable figures: ' + g.characters.slice(0, 6).map((c) => `${c.name} — ${c.role}${c.faction ? ` of ${c.faction}` : ''}`).join('; '))
+  if (g.history?.length) parts.push('History: ' + g.history.slice(0, 3).map((h) => h.title).join('; '))
+  if (parts.length === 0) return ''
+  return `\nWORLD CANON (established lore — keep it consistent; you may draw on these powers, figures, and events, but do not contradict them):\n${parts.map((p) => `- ${p}`).join('\n')}\n`
 }
 
 /** Injects the world's chronicle so characters can reference its legends. */
@@ -110,7 +125,7 @@ WORLD RULES: ${world.rules}
 TONE: ${world.tone}
 
 ${ratingGuidance(world.rating)}
-${castBlock(world)}${chronicleBlock(world.chronicle)}${directorBlock(world.director)}
+${castBlock(world)}${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${directorBlock(world.director)}
 STORY PATH SO FAR:
 ${pathContent}
 
@@ -703,6 +718,82 @@ Respond with ONLY valid JSON, no markdown:
       return normalize(tryParseJSON(result.text))
     } catch {
       return null
+    }
+  }
+}
+
+function pickStr(v: unknown, fallback: string, max: number): string {
+  const s = typeof v === 'string' ? v.trim() : ''
+  return (s || fallback).slice(0, max)
+}
+
+/**
+ * The ELABORATION half of hybrid world genesis. Takes the procedural skeleton
+ * (regions, factions, characters, history — already cross-referenced) and enriches
+ * its prose to fit the world's premise and tone, in ONE call. The skeleton stays
+ * authoritative for all names and relationships (merged back by index), so the
+ * LLM can't break the structure. Fails open to the skeleton.
+ */
+export async function elaborateWorldBible(
+  skeleton: WorldBible,
+  world: { name: string; lore: string; rules: string; tone: string },
+  userId: string,
+): Promise<WorldBible> {
+  const aiPrompt = `You are the loremaster for "Chronicle". Below is the STRUCTURAL SKELETON of a world's canon — regions, factions, characters, and history, already cross-referenced (rivalries, alliances, grudges). Elaborate it into vivid, coherent lore that fits the world's premise and tone.
+
+RULES:
+- PRESERVE every name and relationship exactly (regions, faction names, character names, who rivals/allies/serves whom). Do NOT rename or re-link anything.
+- Only enrich the prose: region descriptions, faction founding stories, character bios, and history accounts — make them specific, logical, and evocative of the tone.
+- Keep each text field to 1-2 sentences.
+
+WORLD: ${world.name}
+TONE: ${world.tone}
+LORE: ${(world.lore ?? '').slice(0, 800)}
+RULES: ${(world.rules ?? '').slice(0, 400)}
+
+SKELETON (JSON):
+${JSON.stringify({ regions: skeleton.regions, factions: skeleton.factions, characters: skeleton.characters, history: skeleton.history })}
+
+Respond with ONLY valid JSON in the same shape (no markdown):
+{"regions":[{"description":""}],"factions":[{"founding":""}],"characters":[{"bio":"","tie":""}],"history":[{"title":"","account":""}]}`
+
+  const merge = (data: Record<string, unknown>): WorldBible => {
+    const arr = (k: string) => (Array.isArray(data[k]) ? (data[k] as Record<string, unknown>[]) : [])
+    const lr = arr('regions'), lf = arr('factions'), lc = arr('characters'), lh = arr('history')
+    return {
+      regions: skeleton.regions.map((r, i) => ({ ...r, description: pickStr(lr[i]?.description, r.description, 280) })),
+      factions: skeleton.factions.map((f, i) => ({ ...f, founding: pickStr(lf[i]?.founding, f.founding, 280) })),
+      characters: skeleton.characters.map((c, i) => ({
+        ...c,
+        bio: pickStr(lc[i]?.bio, c.bio, 280),
+        tie: c.tie ? pickStr(lc[i]?.tie, c.tie, 220) : c.tie,
+      })),
+      history: skeleton.history.map((h, i) => ({
+        ...h,
+        title: pickStr(lh[i]?.title, h.title, 90),
+        account: pickStr(lh[i]?.account, h.account, 320),
+      })),
+      generatedAt: skeleton.generatedAt,
+    }
+  }
+
+  try {
+    const result = await generateText({
+      model: PRIMARY_MODEL,
+      prompt: aiPrompt,
+      maxOutputTokens: 900,
+      providerOptions: { gateway: { user: userId, tags: ['feature:world-genesis', 'env:production'] } },
+    })
+    return merge(tryParseJSON(result.text))
+  } catch (error) {
+    if (APICallError.isInstance(error) && (error.statusCode === 402 || error.statusCode === 429)) return skeleton
+    if (!process.env.OPENROUTER_API_KEY) return skeleton
+    try {
+      const openrouter = createOpenAI({ baseURL: 'https://openrouter.ai/api/v1', apiKey: process.env.OPENROUTER_API_KEY })
+      const result = await generateText({ model: openrouter(OPENROUTER_MODEL), prompt: aiPrompt, maxOutputTokens: 900 })
+      return merge(tryParseJSON(result.text))
+    } catch {
+      return skeleton
     }
   }
 }

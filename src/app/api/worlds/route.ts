@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { after } from 'next/server'
 import { revalidateTag } from 'next/cache'
 import { adminAuth } from '@/lib/firebase-admin'
-import { createWorld, getWorldsByAuthor, checkAndAwardAchievements } from '@/lib/firestore-helpers'
+import { createWorld, getWorldsByAuthor, checkAndAwardAchievements, setWorldGenesis } from '@/lib/firestore-helpers'
+import { buildGenesisSkeleton } from '@/lib/engine/world-genesis'
+import { SeededRNG } from '@/lib/engine/seed-rng'
+import { elaborateWorldBible } from '@/lib/ai'
 import { CONTENT_RATINGS, DEFAULT_CONTENT_RATING } from '@/types'
 import type { ContentRating } from '@/types'
 
@@ -47,22 +50,39 @@ export async function POST(req: NextRequest) {
     ? (rating as ContentRating)
     : DEFAULT_CONTENT_RATING
 
+  const effectiveTone = tone ?? 'Epic Fantasy'
+  // Every world gets a stable seed, so its genesis + simulation are reproducible.
+  const effectiveSeed = seed !== undefined && seed !== null ? Number(seed) : SeededRNG.hashString(name)
+
   const id = await createWorld({
     name,
     description,
     lore,
     rules,
-    tone: tone ?? 'epic fantasy',
+    tone: effectiveTone,
     authorId: uid,
     authorName: displayName ?? 'Anonymous',
     tags: Array.isArray(tags) ? tags.slice(0, 5) : [],
     rating: safeRating,
     ratingOverriddenBy: null,
-    ...(seed !== undefined && seed !== null ? { seed: Number(seed) } : {}),
+    seed: effectiveSeed,
   })
 
   revalidateTag('worlds', 'max')
-  after(() => checkAndAwardAchievements(uid, 'world_created').catch(() => {}))
+
+  after(async () => {
+    await checkAndAwardAchievements(uid, 'world_created').catch(() => {})
+    // Procedural world genesis: a seeded, cross-referenced canon skeleton,
+    // elaborated by one LLM call, persisted as the world's bible.
+    try {
+      const skeleton = buildGenesisSkeleton(effectiveSeed, effectiveTone)
+      const bible = await elaborateWorldBible(skeleton, { name, lore, rules, tone: effectiveTone }, uid)
+      await setWorldGenesis(id, bible)
+      revalidateTag(`world-${id}`, 'max')
+    } catch (e) {
+      console.error('[world genesis] failed:', e)
+    }
+  })
 
   return NextResponse.json({ id }, { status: 201 })
 }

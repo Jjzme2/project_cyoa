@@ -325,6 +325,11 @@ export async function getAuthoredPathStats(uid: string): Promise<AuthoredPathSta
 
 // ─── Worlds ──────────────────────────────────────────────────────────────────
 
+/** Store a world's generated canon (the "world bible"). */
+export async function setWorldGenesis(worldId: string, genesis: import('@/types').WorldBible): Promise<void> {
+  await adminDb.collection('worlds').doc(worldId).set({ genesis }, { merge: true })
+}
+
 export async function getWorld(id: string): Promise<World | null> {
   'use cache'
   cacheLife('hours')
