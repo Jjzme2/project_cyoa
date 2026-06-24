@@ -27,6 +27,7 @@ import { Label } from '@/components/ui/label'
 import { useAuth } from '@/components/Providers'
 import { APP_CONFIG } from '@/lib/config'
 import { AchievementDisplay } from '@/components/achievements/AchievementDisplay'
+import { TwoFactorSetup } from '@/components/auth/TwoFactorSetup'
 
 interface ProfileApiData {
   profile?: {
@@ -369,6 +370,8 @@ function ProfileContent() {
           </Button>
         )}
       </section>
+
+      <TwoFactorSetup />
 
       {/* Credits Meters Dashboard */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-5">
