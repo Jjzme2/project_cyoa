@@ -27,7 +27,7 @@ export default async function SagaPage() {
         </p>
         <div className="pt-1">
           <Link
-            href="/stories/new"
+            href="/saga/new"
             className="inline-flex items-center gap-1.5 text-[12px] font-sans px-3 py-1.5 rounded-full border border-amber-400/30 text-amber-300/85 hover:bg-amber-500/10 transition-colors"
           >
             <Feather className="h-3.5 w-3.5" /> Create a Personal Saga
@@ -38,7 +38,7 @@ export default async function SagaPage() {
       {stories.length === 0 ? (
         <p className="text-center py-16 text-muted-foreground/40 text-sm">
           No shared Personal Sagas yet — be the first to{' '}
-          <Link href="/stories/new" className="text-amber-300/80 hover:underline">create one</Link>.
+          <Link href="/saga/new" className="text-amber-300/80 hover:underline">create one</Link>.
         </p>
       ) : (
         <AgeFilteredStoryGrid stories={stories} />

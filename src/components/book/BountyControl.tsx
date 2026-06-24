@@ -129,7 +129,7 @@ export function BountyControl({ storyId, nodeId, slot, readOnly, onChange }: Pro
   ) : (
     <button
       onClick={() => setOpen(true)}
-      className="flex items-center gap-1 text-[10px] font-sans opacity-45 hover:opacity-80 transition-opacity"
+      className="flex items-center gap-1 text-[10px] font-sans opacity-65 hover:opacity-100 transition-opacity"
     >
       <Coins className="h-3 w-3" />
       Offer a bounty for this path

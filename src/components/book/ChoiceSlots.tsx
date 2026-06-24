@@ -214,7 +214,7 @@ export function ChoiceSlots({
   return (
     <div className="flex flex-col gap-3 h-full">
       <div className="flex items-center justify-between mb-1">
-        <p className="text-[9px] uppercase tracking-[0.25em] opacity-35 font-sans">
+        <p className="text-[9px] uppercase tracking-[0.25em] opacity-60 font-sans">
           Choose your path
         </p>
         {user && aiUsesRemaining !== null && (
@@ -409,7 +409,7 @@ export function ChoiceSlots({
                   borderStyle: 'dashed',
                 }}
               >
-                <div className="flex items-center gap-2.5 opacity-40">
+                <div className="flex items-center gap-2.5 opacity-65">
                   <PenLine className="h-3.5 w-3.5 shrink-0 animate-pulse" />
                   <span className="text-[12px] font-sans italic">
                     A storyteller is weaving path {i + 1}…
@@ -422,7 +422,7 @@ export function ChoiceSlots({
             ) : user ? (
               /* Logged-in: write the path */
               <div className="space-y-2">
-                <div className="flex items-center gap-1.5 text-[10px] font-sans opacity-35">
+                <div className="flex items-center gap-1.5 text-[10px] font-sans opacity-60">
                   <Scroll className="h-3 w-3" />
                   Path {i + 1} — awaiting a storyteller
                 </div>
@@ -447,12 +447,12 @@ export function ChoiceSlots({
                         if (errors[slot.id]) setErrors((prev) => { const n = { ...prev }; delete n[slot.id]; return n })
                       }}
                       disabled={submitting === slot.id}
-                      className="text-[13px] min-h-[68px] resize-none focus-visible:ring-1 placeholder:opacity-25"
+                      className="text-[13px] min-h-[68px] resize-none focus-visible:ring-1 placeholder:opacity-50"
                       style={{
-                        background: 'color-mix(in oklch, var(--page-text) 8%, transparent)',
+                        background: 'color-mix(in oklch, var(--page-text) 10%, transparent)',
                         borderColor: errors[slot.id]
                           ? 'oklch(0.55 0.18 25 / 60%)'
-                          : 'color-mix(in oklch, var(--page-text) 20%, transparent)',
+                          : 'color-mix(in oklch, var(--page-text) 32%, transparent)',
                         fontFamily: 'Georgia, serif',
                         color: 'var(--page-text)',
                       }}
@@ -708,13 +708,13 @@ export function ChoiceSlots({
                         style={{
                           opacity:
                             (aiUsesRemaining ?? 0) < IMAGE_CREDITS && !imageEnabled[slot.id]
-                              ? 0.3
+                              ? 0.4
                               : imageEnabled[slot.id]
                               ? 1
-                              : 0.5,
+                              : 0.7,
                           color: imageEnabled[slot.id]
-                            ? 'oklch(0.55 0.12 200)'
-                            : 'oklch(0.45 0.04 60)',
+                            ? 'oklch(0.62 0.13 200)'
+                            : 'var(--page-text)',
                         }}
                         title={`Generate an illustration (+${IMAGE_CREDITS - 1} extra credits)`}
                       >
@@ -729,11 +729,11 @@ export function ChoiceSlots({
                       size="sm"
                       onClick={() => handleSubmit(slot)}
                       disabled={!inputs[slot.id]?.trim() || submitting === slot.id}
-                      className="w-full text-xs gap-1.5 border"
+                      className="w-full text-xs gap-1.5 border font-medium"
                       style={{
-                        background: 'oklch(0.35 0.07 55 / 16%)',
-                        borderColor: 'oklch(0.40 0.07 55 / 28%)',
-                        color: 'oklch(0.28 0.07 40)',
+                        background: 'color-mix(in oklch, var(--page-text) 14%, transparent)',
+                        borderColor: 'color-mix(in oklch, var(--page-text) 34%, transparent)',
+                        color: 'var(--page-text)',
                       }}
                     >
                       {submitting === slot.id ? (
@@ -764,7 +764,7 @@ export function ChoiceSlots({
                   borderStyle: 'dashed',
                 }}
               >
-                <div className="flex items-center gap-2.5 opacity-40 group-hover:opacity-60 transition-opacity">
+                <div className="flex items-center gap-2.5 opacity-65 group-hover:opacity-90 transition-opacity">
                   <Lock className="h-3.5 w-3.5 shrink-0" />
                   <span className="text-[12px] font-sans italic">
                     Sign in to write path {i + 1}…

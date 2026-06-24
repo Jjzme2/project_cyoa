@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { BookOpen, Globe, Loader2, ChevronRight, Plus, Palette, Feather, Sparkles, RotateCcw } from 'lucide-react'
+import { BookOpen, Globe, Loader2, ChevronRight, Plus, Palette, Feather, Sparkles, RotateCcw, Clapperboard, Wand2 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,7 +13,16 @@ import { useAuth } from '@/components/Providers'
 import { STORY_TAGS, CONTENT_RATINGS, CONTENT_RATING_META, DEFAULT_CONTENT_RATING } from '@/types'
 import { ratingRank } from '@/lib/ratings'
 import { CoverDesigner, DEFAULT_COVER } from '@/components/book/CoverDesigner'
-import type { World, CoverTheme, ReadingTheme, PageStyle, AmbientEffect, ContentRating } from '@/types'
+import type { World, CoverTheme, ReadingTheme, PageStyle, AmbientEffect, ContentRating, DirectorPersona } from '@/types'
+import {
+  DIRECTOR_AXES,
+  DIRECTOR_ARCHETYPES,
+  describeDirector,
+  emptyDirector,
+  isDirectorMeaningful,
+  personaMatches,
+  type DirectorArchetype,
+} from '@/lib/director'
 import { AIAssistModal } from '@/components/ai/AIAssistModal'
 import type { StoryAssistResult } from '@/components/ai/AIAssistModal'
 import { useDraft } from '@/hooks/useDraft'
@@ -51,9 +60,8 @@ export default function NewStoryPage() {
   const [rating, setRating] = useState<ContentRating>(DEFAULT_CONTENT_RATING)
   const [protagonistName, setProtagonistName] = useState('')
   const [protagonistDesc, setProtagonistDesc] = useState('')
-  const [youMode, setYouMode] = useState(false)
   const [shared, setShared] = useState(true)
-  const [director, setDirector] = useState({ experimental: 0, intensity: 0, darkness: 0, pace: 0, vision: '' })
+  const [director, setDirector] = useState<DirectorPersona>(emptyDirector)
   const [opening, setOpening] = useState('')
   const [choice1, setChoice1] = useState('')
   const [choice2, setChoice2] = useState('')
@@ -108,7 +116,7 @@ export default function NewStoryPage() {
     resources: typeof resources
     goapEnabled: boolean; implementQuests: boolean
     director: typeof director
-    youMode: boolean; shared: boolean
+    shared: boolean
   }>('chronicle:draft:story')
 
   useEffect(() => {
@@ -140,8 +148,7 @@ export default function NewStoryPage() {
     setResources(d.resources)
     setGoapEnabled(d.goapEnabled ?? false)
     setImplementQuests(d.implementQuests ?? false)
-    if (d.director) setDirector(d.director)
-    setYouMode(d.youMode ?? false)
+    if (d.director) setDirector({ ...emptyDirector(), ...d.director })
     setShared(d.shared ?? true)
     setHasDraft(false)
     toast.success('Draft restored')
@@ -151,6 +158,18 @@ export default function NewStoryPage() {
     draft.clear()
     setHasDraft(false)
   }
+
+  function applyArchetype(a: DirectorArchetype) {
+    // If the preset is already active, toggle it off back to neutral.
+    setDirector((cur) => (personaMatches(cur, a.persona) ? emptyDirector() : { ...emptyDirector(), ...a.persona }))
+  }
+
+  function resetDirector() {
+    setDirector(emptyDirector())
+  }
+
+  const directorNotes = describeDirector(director)
+  const directorTouched = isDirectorMeaningful(director)
 
   useEffect(() => {
     if (!user) return
@@ -225,15 +244,13 @@ export default function NewStoryPage() {
           worldId,
           worldName: selectedWorld.name,
           rating,
-          youMode,
           shared,
-          protagonist: !youMode && protagonistName.trim()
+          protagonist: protagonistName.trim()
             ? { name: protagonistName.trim(), description: protagonistDesc.trim() }
             : undefined,
-          director:
-            director.experimental || director.intensity || director.darkness || director.pace || director.vision.trim()
-              ? { ...director, vision: director.vision.trim() }
-              : undefined,
+          director: isDirectorMeaningful(director)
+            ? { ...director, vision: (director.vision ?? '').trim() }
+            : undefined,
           published: true,
           coverGradient: null,
           resources: formattedResources,
@@ -271,7 +288,7 @@ export default function NewStoryPage() {
         protagonistName, protagonistDesc, opening,
         choice1, choice2, choice3, tags,
         coverTheme, readingTheme, resources,
-        goapEnabled, implementQuests, director, youMode, shared,
+        goapEnabled, implementQuests, director, shared,
       })
       toast.error(err instanceof Error ? err.message : 'Something went wrong')
       toast.info('Draft saved — your story is preserved for next time.')
@@ -498,46 +515,38 @@ export default function NewStoryPage() {
           </div>
 
           <div className="space-y-2 border-t border-white/[0.06] pt-5">
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={youMode}
-                onChange={(e) => setYouMode(e.target.checked)}
-                className="accent-amber-500"
+            <Label htmlFor="protagonist" className="block">
+              Protagonist{' '}
+              <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span>
+            </Label>
+            <Input
+              id="protagonist"
+              placeholder="Who does the reader play as? e.g. Elara, a cautious thief"
+              value={protagonistName}
+              onChange={(e) => setProtagonistName(e.target.value)}
+            />
+            {protagonistName.trim() && (
+              <Input
+                placeholder="A short description the AI should keep consistent (optional)"
+                value={protagonistDesc}
+                onChange={(e) => setProtagonistDesc(e.target.value)}
               />
-              <span className="text-sm">“You” mode — the reader is the protagonist</span>
-            </label>
-            {youMode ? (
-              <p className="text-[11px] text-muted-foreground/45">
-                Each reader plays as themselves, by name. Their standing carries across every story
-                in this world — the cast remembers how they’ve been treated. (Works best with AI
-                characters enabled.)
-              </p>
-            ) : (
-              <>
-                <Label htmlFor="protagonist" className="pt-1 block">
-                  Protagonist{' '}
-                  <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span>
-                </Label>
-                <Input
-                  id="protagonist"
-                  placeholder="Who does the reader play as? e.g. Elara, a cautious thief"
-                  value={protagonistName}
-                  onChange={(e) => setProtagonistName(e.target.value)}
-                />
-                {protagonistName.trim() && (
-                  <Input
-                    placeholder="A short description the AI should keep consistent (optional)"
-                    value={protagonistDesc}
-                    onChange={(e) => setProtagonistDesc(e.target.value)}
-                  />
-                )}
-                <p className="text-[11px] text-muted-foreground/45">
-                  The AI writes the story around this character by name. The rest of the cast emerges
-                  as your story grows.
-                </p>
-              </>
             )}
+            <p className="text-[11px] text-muted-foreground/45">
+              The AI writes the story around this character by name. The rest of the cast emerges
+              as your story grows.
+            </p>
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2.5">
+              <Sparkles className="h-3.5 w-3.5 text-amber-400/70 mt-0.5 shrink-0" />
+              <p className="text-[11px] text-muted-foreground/55 leading-relaxed">
+                Want the reader to play as <em>themselves</em>, with a reputation that follows them across the
+                world?{' '}
+                <Link href="/saga/new" className="text-amber-300/85 hover:underline font-medium">
+                  Create a Personal Saga
+                </Link>{' '}
+                instead — it’s built for that.
+              </p>
+            </div>
           </div>
 
           <div className="space-y-2 border-t border-white/[0.06] pt-5">
@@ -552,48 +561,123 @@ export default function NewStoryPage() {
             </label>
             <p className="text-[11px] text-muted-foreground/45">
               {shared
-                ? 'Listed in the library' + (youMode ? ' and the Personal Saga browse, for anyone to play.' : ' for anyone to read.')
+                ? 'Listed in the library for anyone to read.'
                 : 'Kept personal — hidden from public listings (still reachable by direct link and from your dashboard).'}
             </p>
           </div>
 
-          <div className="space-y-3 border-t border-white/[0.06] pt-5">
-            <Label>
-              Director{' '}
-              <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span>
-            </Label>
-            <p className="text-[11px] text-muted-foreground/45 -mt-1">
-              Sets the directorial sensibility — how chapters are directed, within your rating.
-            </p>
-            {([
-              { key: 'experimental', left: 'Traditional', right: 'Experimental' },
-              { key: 'intensity', left: 'Sensitive', right: 'Assertive' },
-              { key: 'darkness', left: 'Romantic', right: 'Scary' },
-              { key: 'pace', left: 'Slow-burn', right: 'Propulsive' },
-            ] as const).map(({ key, left, right }) => (
-              <div key={key} className="space-y-1">
-                <div className="flex items-center justify-between text-[11px] font-sans text-muted-foreground/55">
-                  <span>{left}</span>
-                  <span>{right}</span>
-                </div>
-                <input
-                  type="range"
-                  min={-1}
-                  max={1}
-                  step={0.1}
-                  value={director[key]}
-                  onChange={(e) => setDirector((d) => ({ ...d, [key]: Number(e.target.value) }))}
-                  className="w-full accent-amber-500"
-                  aria-label={`${left} to ${right}`}
-                />
+          <div className="space-y-4 border-t border-white/[0.06] pt-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <Label className="flex items-center gap-2">
+                  <Clapperboard className="h-4 w-4 text-amber-400/60" />
+                  Director{' '}
+                  <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span>
+                </Label>
+                <p className="text-[11px] text-muted-foreground/45 mt-1 max-w-md">
+                  Shape <em>how</em> each chapter is directed — its craft, mood, and pacing.
+                  Always stays within your content rating.
+                </p>
               </div>
-            ))}
+              {directorTouched && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={resetDirector}
+                  className="h-7 px-2 shrink-0 text-[11px] text-muted-foreground/50 hover:text-muted-foreground gap-1"
+                >
+                  <RotateCcw className="h-3 w-3" /> Reset
+                </Button>
+              )}
+            </div>
+
+            {/* Archetype presets — one click to a recognizable sensibility */}
+            <div className="space-y-2">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground/40 font-sans">
+                Start from a style
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {DIRECTOR_ARCHETYPES.map((a) => {
+                  const active = personaMatches(director, a.persona)
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => applyArchetype(a)}
+                      title={a.tagline}
+                      aria-pressed={active}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-sans border transition-all ${
+                        active
+                          ? 'bg-amber-500/20 border-amber-500/40 text-amber-200'
+                          : 'border-white/10 text-muted-foreground/55 hover:border-amber-500/25 hover:text-amber-200/80'
+                      }`}
+                    >
+                      <span>{a.emoji}</span>
+                      {a.name}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Fine-tune each axis */}
+            <div className="grid sm:grid-cols-2 gap-x-5 gap-y-3 pt-1">
+              {DIRECTOR_AXES.map((axis) => {
+                const v = director[axis.key] ?? 0
+                return (
+                  <div key={axis.key} className="space-y-1">
+                    <div className="flex items-center justify-between text-[11px] font-sans">
+                      <span className={v < -0.3 ? 'text-amber-300/80' : 'text-muted-foreground/55'}>
+                        {axis.left}
+                      </span>
+                      <span className={v > 0.3 ? 'text-amber-300/80' : 'text-muted-foreground/55'}>
+                        {axis.right}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={-1}
+                      max={1}
+                      step={0.1}
+                      value={v}
+                      onChange={(e) => setDirector((d) => ({ ...d, [axis.key]: Number(e.target.value) }))}
+                      className="w-full accent-amber-500"
+                      aria-label={`${axis.left} to ${axis.right}`}
+                    />
+                    <p className="text-[10px] text-muted-foreground/35">{axis.hint}</p>
+                  </div>
+                )
+              })}
+            </div>
+
             <Input
               placeholder="Optional: a one-line directorial vision (e.g. “a tender story about quiet courage”)"
-              value={director.vision}
+              value={director.vision ?? ''}
               onChange={(e) => setDirector((d) => ({ ...d, vision: e.target.value }))}
               maxLength={300}
             />
+
+            {/* Live preview — exactly the guidance the AI will receive */}
+            {directorNotes.length > 0 ? (
+              <div className="rounded-lg border border-amber-500/15 bg-amber-500/[0.04] px-3.5 py-3 space-y-1.5">
+                <p className="text-[10px] uppercase tracking-wider text-amber-400/60 font-sans flex items-center gap-1.5">
+                  <Wand2 className="h-3 w-3" /> How your director will shape each chapter
+                </p>
+                <ul className="space-y-1">
+                  {directorNotes.map((n, i) => (
+                    <li key={i} className="text-[11px] text-muted-foreground/65 leading-snug flex gap-1.5">
+                      <span className="text-amber-400/50 shrink-0">›</span>
+                      <span>{n}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="text-[11px] text-muted-foreground/35 italic">
+                Neutral — the AI directs with its own instincts. Pick a style above or nudge a slider to guide it.
+              </p>
+            )}
           </div>
 
           <div className="space-y-4 border-t border-white/[0.06] pt-5 mt-5">
@@ -956,14 +1040,13 @@ export default function NewStoryPage() {
               <input
                 type="checkbox"
                 id="goapEnabled"
-                checked={goapEnabled || youMode}
-                disabled={youMode}
+                checked={goapEnabled}
                 onChange={(e) => setGoapEnabled(e.target.checked)}
                 className="mt-1 h-4 w-4 rounded bg-background border-input text-amber-500 focus:ring-amber-500 disabled:opacity-60"
               />
               <div className="space-y-1">
                 <Label htmlFor="goapEnabled" className="text-sm cursor-pointer">
-                  Enable GOAP AI Characters{youMode && <span className="text-amber-400/70 text-xs font-normal"> · required for You mode</span>}
+                  Enable GOAP AI Characters
                 </Label>
                 <p className="text-[11px] text-muted-foreground/50 leading-relaxed">
                   Allows characters to autonomously form goals and execute plans behind the scenes based on the story&apos;s world state. 
