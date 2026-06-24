@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Globe, Loader2, ChevronRight, Plus, Palette, Feather, Sparkles, DoorOpen, Trash2 } from 'lucide-react'
+import { Globe, Loader2, ChevronRight, Plus, Palette, Feather, Sparkles, DoorOpen, Trash2, Clapperboard, Wand2, RotateCcw } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,7 +13,16 @@ import { useAuth } from '@/components/Providers'
 import { STORY_TAGS, CONTENT_RATINGS, CONTENT_RATING_META, DEFAULT_CONTENT_RATING } from '@/types'
 import { ratingRank } from '@/lib/ratings'
 import { CoverDesigner, DEFAULT_COVER } from '@/components/book/CoverDesigner'
-import type { World, CoverTheme, ReadingTheme, PageStyle, AmbientEffect, ContentRating } from '@/types'
+import type { World, CoverTheme, ReadingTheme, PageStyle, AmbientEffect, ContentRating, DirectorPersona } from '@/types'
+import {
+  DIRECTOR_AXES,
+  DIRECTOR_ARCHETYPES,
+  describeDirector,
+  emptyDirector,
+  isDirectorMeaningful,
+  personaMatches,
+  type DirectorArchetype,
+} from '@/lib/director'
 
 const PAGE_STYLES: { id: PageStyle; label: string; bg: string; text: string }[] = [
   { id: 'parchment', label: 'Parchment',    bg: '#f0e6d0', text: '#3d2b1f' },
@@ -61,7 +70,7 @@ export default function NewSagaPage() {
     { label: '', premise: '' },
   ])
   const [shared, setShared] = useState(true)
-  const [director, setDirector] = useState({ experimental: 0, intensity: 0, darkness: 0, pace: 0, vision: '' })
+  const [director, setDirector] = useState<DirectorPersona>(emptyDirector)
   const [coverTheme, setCoverTheme] = useState<CoverTheme>(DEFAULT_COVER)
   const [readingTheme, setReadingTheme] = useState<ReadingTheme>({ pageStyle: 'parchment', ambientEffect: 'none' })
 
@@ -99,6 +108,18 @@ export default function NewSagaPage() {
   const readyEntries = entryPoints.filter((e) => e.label.trim() && e.premise.trim())
   const canSubmit = !!title.trim() && !!worldId && readyEntries.length >= 1 && !submitting
 
+  function applyArchetype(a: DirectorArchetype) {
+    // If the preset is already active, toggle it off back to neutral.
+    setDirector((cur) => (personaMatches(cur, a.persona) ? emptyDirector() : { ...emptyDirector(), ...a.persona }))
+  }
+
+  function resetDirector() {
+    setDirector(emptyDirector())
+  }
+
+  const directorNotes = describeDirector(director)
+  const directorTouched = isDirectorMeaningful(director)
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!user || !canSubmit) return
@@ -123,10 +144,9 @@ export default function NewSagaPage() {
           shared,
           premise: premise.trim() || null,
           entryPoints: readyEntries.map((ep) => ({ label: ep.label.trim(), premise: ep.premise.trim() })),
-          director:
-            director.experimental || director.intensity || director.darkness || director.pace || director.vision.trim()
-              ? { ...director, vision: director.vision.trim() }
-              : undefined,
+          director: isDirectorMeaningful(director)
+            ? { ...director, vision: (director.vision ?? '').trim() }
+            : undefined,
         }),
       })
 
@@ -371,40 +391,117 @@ export default function NewSagaPage() {
         </div>
 
         {/* ── Director ── */}
-        <div className="glass-card rounded-xl p-6 space-y-3">
-          <Label>Director <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span></Label>
-          <p className="text-[11px] text-muted-foreground/45 -mt-1">
-            Sets the directorial sensibility — how every chapter is directed, within your rating.
-          </p>
-          {([
-            { key: 'experimental', left: 'Traditional', right: 'Experimental' },
-            { key: 'intensity', left: 'Sensitive', right: 'Assertive' },
-            { key: 'darkness', left: 'Romantic', right: 'Scary' },
-            { key: 'pace', left: 'Slow-burn', right: 'Propulsive' },
-          ] as const).map(({ key, left, right }) => (
-            <div key={key} className="space-y-1">
-              <div className="flex items-center justify-between text-[11px] font-sans text-muted-foreground/55">
-                <span>{left}</span>
-                <span>{right}</span>
-              </div>
-              <input
-                type="range"
-                min={-1}
-                max={1}
-                step={0.1}
-                value={director[key]}
-                onChange={(e) => setDirector((d) => ({ ...d, [key]: Number(e.target.value) }))}
-                className="w-full accent-amber-500"
-                aria-label={`${left} to ${right}`}
-              />
+        <div className="glass-card rounded-xl p-6 space-y-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <Label className="flex items-center gap-2">
+                <Clapperboard className="h-4 w-4 text-amber-400/60" />
+                Director <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span>
+              </Label>
+              <p className="text-[11px] text-muted-foreground/45 mt-1 max-w-md">
+                Shape <em>how</em> every chapter is directed — its craft, mood, and pacing.
+                Always stays within your content rating.
+              </p>
             </div>
-          ))}
+            {directorTouched && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={resetDirector}
+                className="h-7 px-2 shrink-0 text-[11px] text-muted-foreground/50 hover:text-muted-foreground gap-1"
+              >
+                <RotateCcw className="h-3 w-3" /> Reset
+              </Button>
+            )}
+          </div>
+
+          {/* Archetype presets — one click to a recognizable sensibility */}
+          <div className="space-y-2">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground/40 font-sans">
+              Start from a style
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {DIRECTOR_ARCHETYPES.map((a) => {
+                const active = personaMatches(director, a.persona)
+                return (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => applyArchetype(a)}
+                    title={a.tagline}
+                    aria-pressed={active}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-sans border transition-all ${
+                      active
+                        ? 'bg-amber-500/20 border-amber-500/40 text-amber-200'
+                        : 'border-white/10 text-muted-foreground/55 hover:border-amber-500/25 hover:text-amber-200/80'
+                    }`}
+                  >
+                    <span>{a.emoji}</span>
+                    {a.name}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Fine-tune each axis */}
+          <div className="grid sm:grid-cols-2 gap-x-5 gap-y-3 pt-1">
+            {DIRECTOR_AXES.map((axis) => {
+              const v = director[axis.key] ?? 0
+              return (
+                <div key={axis.key} className="space-y-1">
+                  <div className="flex items-center justify-between text-[11px] font-sans">
+                    <span className={v < -0.3 ? 'text-amber-300/80' : 'text-muted-foreground/55'}>
+                      {axis.left}
+                    </span>
+                    <span className={v > 0.3 ? 'text-amber-300/80' : 'text-muted-foreground/55'}>
+                      {axis.right}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={-1}
+                    max={1}
+                    step={0.1}
+                    value={v}
+                    onChange={(e) => setDirector((d) => ({ ...d, [axis.key]: Number(e.target.value) }))}
+                    className="w-full accent-amber-500"
+                    aria-label={`${axis.left} to ${axis.right}`}
+                  />
+                  <p className="text-[10px] text-muted-foreground/35">{axis.hint}</p>
+                </div>
+              )
+            })}
+          </div>
+
           <Input
             placeholder="Optional: a one-line directorial vision (e.g. “a tense saga about earning trust”)"
-            value={director.vision}
+            value={director.vision ?? ''}
             onChange={(e) => setDirector((d) => ({ ...d, vision: e.target.value }))}
             maxLength={300}
           />
+
+          {/* Live preview — exactly the guidance the AI will receive */}
+          {directorNotes.length > 0 ? (
+            <div className="rounded-lg border border-amber-500/15 bg-amber-500/[0.04] px-3.5 py-3 space-y-1.5">
+              <p className="text-[10px] uppercase tracking-wider text-amber-400/60 font-sans flex items-center gap-1.5">
+                <Wand2 className="h-3 w-3" /> How your director will shape each chapter
+              </p>
+              <ul className="space-y-1">
+                {directorNotes.map((n, i) => (
+                  <li key={i} className="text-[11px] text-muted-foreground/65 leading-snug flex gap-1.5">
+                    <span className="text-amber-400/50 shrink-0">›</span>
+                    <span>{n}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="text-[11px] text-muted-foreground/35 italic">
+              Neutral — the AI directs with its own instincts. Pick a style above or nudge a slider to guide it.
+            </p>
+          )}
         </div>
 
         {/* ── Share ── */}
