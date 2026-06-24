@@ -31,6 +31,7 @@ export interface NarrativeContext {
   plotDirective: string; // story-level through-line beat
   passageOfTime: string; // living-world catch-up note when the reader was away
   interludeDirective: string; // non-linear chapter framing (flashback/vision/dream)
+  outsiderDisposition: string; // how the world (collectively) regards outsiders — saga protagonists
 }
 
 /** How much a character's own action shifts their standing with the protagonist. */
@@ -102,7 +103,7 @@ export class NarrativeBuilder {
    * Runs one simulation tick (GOAP, factions, economy, procgen) and
    * returns both the AI-ready narrative context and the updated EngineState.
    */
-  public buildContext(nodePath: string, depth: number, currentState: WorldState, priorState?: EngineState, catchUpTicks: number = 0, readerStanding: number = 0): NarrativeBuildResult {
+  public buildContext(nodePath: string, depth: number, currentState: WorldState, priorState?: EngineState, catchUpTicks: number = 0, readerStanding: number = 0, outsiderRegard: number = 0): NarrativeBuildResult {
     const context: NarrativeContext = {
       environmentalContext: '',
       activeEncounters: [],
@@ -118,7 +119,15 @@ export class NarrativeBuilder {
       plotDirective: '',
       passageOfTime: '',
       interludeDirective: '',
+      outsiderDisposition: '',
     };
+
+    // The reader of a "You" mode saga is an OUTSIDER to this world. The world's
+    // collective regard for outsiders (earned by every saga played here) colours
+    // how its people first meet this one — until they make their own name.
+    if (this.story.youMode) {
+      context.outsiderDisposition = NarrativeBuilder.outsiderDispositionLine(outsiderRegard);
+    }
 
     // AI Director: decide this turn's pacing beat from carried-over tension.
     const dm = new DramaManager();
@@ -161,7 +170,14 @@ export class NarrativeBuilder {
     // has been away, "catch up" the world by ticking extra times so it feels
     // alive between sessions — alliances and markets move while you're gone.
     const baseSeed = this.world.seed ?? SeededRNG.hashString(this.story.title);
-    let factions = priorState?.factions ?? FactionManager.generateDefaultFactions(baseSeed, SeededRNG.deriveSeed(baseSeed, this.story.id));
+    // Prefer the world's genesis factions so the simulated powers are the same
+    // named factions shown in the world canon; else generate per-world defaults.
+    const dynamicsSeed = SeededRNG.deriveSeed(baseSeed, this.story.id);
+    let factions =
+      priorState?.factions ??
+      (this.world.genesis?.factions?.length
+        ? FactionManager.fromGenesis(this.world.genesis.factions, dynamicsSeed)
+        : FactionManager.generateDefaultFactions(baseSeed, dynamicsSeed));
     const economy = priorState?.economy ?? createDefaultEconomy();
 
     const totalTicks = 1 + Math.max(0, Math.min(catchUpTicks, 10));
@@ -204,8 +220,13 @@ export class NarrativeBuilder {
         .filter((c) => !(c.status && c.status.toLowerCase() === 'deceased'))
         .map((c) => c.name);
       // In "You" mode, the reader's standing in this world biases how
-      // not-yet-met characters first regard them.
-      relationships = RelationshipGraph.init(living, priorState?.relationships, readerStanding);
+      // not-yet-met characters first regard them. Where the reader has no
+      // personal name here yet, the world's collective regard for OUTSIDERS
+      // fills the gap — strangers lean on how outsiders-as-a-kind are seen.
+      const seedStanding = this.story.youMode
+        ? Math.max(-1, Math.min(1, readerStanding + (1 - Math.abs(readerStanding)) * outsiderRegard * 0.5))
+        : readerStanding;
+      relationships = RelationshipGraph.init(living, priorState?.relationships, seedStanding);
       // Characters act on PERCEIVED standing, which lags the truth — so gossip
       // changes behaviour gradually and the naive can be briefly deceived.
       belief = BeliefModel.update(living, relationships.affinity, priorState?.belief);
@@ -287,6 +308,23 @@ export class NarrativeBuilder {
     return { context, updatedEngineState };
   }
 
+  /**
+   * Turn a world's collective regard for outsiders (-1..1) into a directive for
+   * how its people meet the saga's outsider-protagonist before they prove
+   * themselves. This is the world's "vision of the outsiders" made narrative.
+   */
+  private static outsiderDispositionLine(regard: number): string {
+    if (regard <= -0.6)
+      return 'This world has been wronged by outsiders before. The protagonist is marked plainly as one of them — met with open suspicion, barred doors, and muttered grievance — and must earn every shred of trust.';
+    if (regard <= -0.2)
+      return 'Outsiders have left a sour mark on this world. The protagonist is watched warily, their motives doubted, welcomes given grudgingly.';
+    if (regard < 0.2)
+      return 'Outsiders are a rare novelty here, regarded with cautious curiosity — neither trusted nor feared, simply unknown.';
+    if (regard < 0.6)
+      return 'Outsiders have earned this world goodwill. The protagonist finds doors opening a little easier and the benefit of the doubt more readily given.';
+    return 'Outsiders are remembered as this world’s champions. The protagonist is met with hope and deference, the weight of great expectation riding on their arrival.';
+  }
+
   /** Formats a NarrativeContext into the markdown block injected into the AI prompt. */
   public formatForPrompt(context: NarrativeContext): string {
     const lines: string[] = [];
@@ -301,6 +339,7 @@ export class NarrativeBuilder {
     if (context.factionEvents.length > 0) lines.push(`**Faction Activity:** ${context.factionEvents.join(' ')}`);
     if (context.economySummary) lines.push(`**Economy:** ${context.economySummary}`);
     if (context.npcActions.length > 0) lines.push(`**Character Actions:** ${context.npcActions.join(' ')}`);
+    if (context.outsiderDisposition) lines.push(`**The world’s regard for outsiders:** ${context.outsiderDisposition}`);
     if (context.relationshipSummary) lines.push(`**Standing:** ${context.relationshipSummary}`);
     if (context.demeanour) lines.push(`**Demeanour:** ${context.demeanour}`);
 

@@ -9,7 +9,9 @@ import { SeededBadge } from '@/components/ContentBadges'
 import { WorldRatingControl } from '@/components/world/WorldRatingControl'
 import { WorldLore } from '@/components/world/WorldLore'
 import { WorldGenesis } from '@/components/world/WorldGenesis'
-import { getWorld, getStoriesByWorld, getWorldChronicle, getWorldLegends } from '@/lib/firestore-helpers'
+import { GenerateGenesisButton } from '@/components/world/GenerateGenesisButton'
+import { OutsiderRegard } from '@/components/world/OutsiderRegard'
+import { getWorld, getStoriesByWorld, getWorldChronicle, getWorldLegends, getWorldOutsiderRegard } from '@/lib/firestore-helpers'
 import { APP_CONFIG } from '@/lib/config'
 
 interface Props {
@@ -52,10 +54,11 @@ async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
   const world = await getWorld(id).catch(() => null)
   if (!world) notFound()
 
-  const [stories, chronicle, legends] = await Promise.all([
+  const [stories, chronicle, legends, outsiders] = await Promise.all([
     getStoriesByWorld(id).catch(() => []),
     getWorldChronicle(id).catch(() => []),
     getWorldLegends(id).catch(() => ({ revered: [], reviled: [] })),
+    getWorldOutsiderRegard(id).catch(() => null),
   ])
   const toneClass = TONE_COLORS[world.tone] ?? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
 
@@ -141,7 +144,13 @@ async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
           <div className="flex-1 h-px bg-white/5" />
         </div>
 
-        {world.genesis && <WorldGenesis genesis={world.genesis} />}
+        {world.genesis ? (
+          <WorldGenesis genesis={world.genesis} />
+        ) : (
+          <GenerateGenesisButton worldId={world.id} authorId={world.authorId} />
+        )}
+
+        {outsiders && <OutsiderRegard regard={outsiders} />}
 
         <WorldLore chronicle={chronicle} legends={legends} />
 

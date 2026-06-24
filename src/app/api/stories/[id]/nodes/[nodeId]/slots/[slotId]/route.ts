@@ -20,6 +20,8 @@ import {
   settleBountyOnFill,
   getWorldStanding,
   updateWorldStanding,
+  getWorldOutsiderRegard,
+  updateWorldOutsiderRegard,
   getWorldChronicle,
   appendWorldChronicle,
 } from '@/lib/firestore-helpers'
@@ -190,8 +192,14 @@ export async function POST(
       // the reader was away.
       const ageMs = Date.now() - new Date(parentNode.createdAt).getTime()
       const catchUpTicks = Math.min(10, Math.floor(ageMs / 3_600_000))
-      // "You" mode: seed NPC attitudes from the reader's standing in this world.
-      const readerStanding = youMode ? await getWorldStanding(uid, story.worldId) : 0
+      // "You" mode: seed NPC attitudes from the reader's personal standing here,
+      // and from the world's COLLECTIVE regard for outsiders (the reader is one).
+      const [readerStanding, outsiderRegard] = youMode
+        ? await Promise.all([
+            getWorldStanding(uid, story.worldId),
+            getWorldOutsiderRegard(story.worldId).then((r) => r.regard),
+          ])
+        : [0, 0]
       const { context, updatedEngineState: nextState } = builder.buildContext(
         pathString,
         parentNode.depth + 1,
@@ -199,6 +207,7 @@ export async function POST(
         priorEngineState,
         catchUpTicks,
         readerStanding,
+        outsiderRegard,
       )
       systemNarrativeEvents = builder.formatForPrompt(context)
       updatedEngineState = nextState
@@ -338,7 +347,17 @@ export async function POST(
           const aff = Object.values(updatedEngineState.relationships.affinity)
           if (aff.length > 0) observed = aff.reduce((s, v) => s + v, 0) / aff.length
         }
-        if (observed !== null) ops.push(updateWorldStanding(uid, story.worldId, observed, displayName ?? undefined))
+        if (observed !== null) {
+          ops.push(updateWorldStanding(uid, story.worldId, observed, displayName ?? undefined))
+          // The same deed also shifts the world's COLLECTIVE regard for outsiders
+          // (the reader is one) — slowly, so the whole people's opinion is the sum
+          // of many sagas, not any single one.
+          ops.push(
+            updateWorldOutsiderRegard(story.worldId, observed).then(() =>
+              revalidateTag(`world-outsiders-${story.worldId}`, 'max'),
+            ),
+          )
+        }
 
         // A genuinely notable deed enters the world chronicle — shared lore that
         // every future story (and its NPCs) in this world will know.
