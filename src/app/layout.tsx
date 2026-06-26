@@ -18,6 +18,18 @@ export const metadata: Metadata = {
   },
   description: APP_CONFIG.site.defaultDescription,
   applicationName: APP_CONFIG.site.name,
+  alternates: { canonical: '/' },
+  formatDetection: { telephone: false, address: false, email: false },
+  // Browser tab + bookmark icons. Points at the hosted brand logo (configurable
+  // via NEXT_PUBLIC_LOGO_URL); the bundled favicon.ico stays as a fallback.
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: APP_CONFIG.site.logoUrl, type: 'image/png' },
+    ],
+    shortcut: [APP_CONFIG.site.logoUrl],
+    apple: [APP_CONFIG.site.logoUrl],
+  },
   keywords: [
     'choose your own adventure',
     'CYOA',
@@ -31,6 +43,7 @@ export const metadata: Metadata = {
     description: APP_CONFIG.site.defaultDescription,
     type: 'website',
     siteName: APP_CONFIG.site.name,
+    locale: 'en_US',
     url: '/',
   },
   twitter: {
@@ -39,13 +52,46 @@ export const metadata: Metadata = {
     description: APP_CONFIG.site.defaultDescription,
     creator: APP_CONFIG.site.twitter.creator,
   },
-  robots: { index: true, follow: true },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 },
+  },
+}
+
+// Structured data so search engines can render rich results for the site and
+// its publisher. Kept in sync with APP_CONFIG (the single source of site truth).
+const STRUCTURED_DATA = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'WebSite',
+      '@id': `${APP_CONFIG.site.url}/#website`,
+      url: APP_CONFIG.site.url,
+      name: APP_CONFIG.site.name,
+      description: APP_CONFIG.site.defaultDescription,
+      inLanguage: 'en',
+      publisher: { '@id': `${APP_CONFIG.site.url}/#organization` },
+    },
+    {
+      '@type': 'Organization',
+      '@id': `${APP_CONFIG.site.url}/#organization`,
+      name: APP_CONFIG.site.name,
+      url: APP_CONFIG.site.url,
+      description: APP_CONFIG.site.defaultDescription,
+      logo: APP_CONFIG.site.logoUrl,
+    },
+  ],
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} dark`}>
       <body className="antialiased">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(STRUCTURED_DATA) }}
+        />
         <Providers>
           <Header />
           <VerifyEmailBanner />

@@ -9,9 +9,10 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
       // Keep authenticated / utility surfaces out of the index.
-      disallow: ["/api/", "/dashboard", "/profile"],
+      disallow: ["/api/", "/admin", "/dashboard", "/profile"],
     },
-    sitemap: `${BASE}/sitemap.ts`,
+    // Next serves the generated sitemap at /sitemap.xml (not the source path).
+    sitemap: `${BASE}/sitemap.xml`,
     host: BASE,
   };
 }

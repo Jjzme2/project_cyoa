@@ -5,6 +5,7 @@ import { adminAuth } from '@/lib/firebase-admin'
 import { getStories, createStory, getWorld, checkAndAwardAchievements } from '@/lib/firestore-helpers'
 import { clampRating } from '@/lib/ratings'
 import { sanitizeDirector } from '@/lib/director'
+import { analytics } from '@/lib/telemetry'
 import { CONTENT_RATINGS, DEFAULT_CONTENT_RATING } from '@/types'
 import type { ContentRating } from '@/types'
 
@@ -94,6 +95,12 @@ export async function POST(req: NextRequest) {
 
   revalidateTag('stories', 'max')
   after(() => checkAndAwardAchievements(uid, 'story_created').catch(() => {}))
+  after(() =>
+    analytics.track('story.created', {
+      uid,
+      props: { storyId: id, worldId, rating: safeRating, youMode: !!youMode, hasDirector: !!safeDirector },
+    }),
+  )
 
   return NextResponse.json({ id }, { status: 201 })
 }

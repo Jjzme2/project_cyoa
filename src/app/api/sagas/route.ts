@@ -12,6 +12,7 @@ import { CreditManager } from '@/lib/credit-manager'
 import { generateSagaOpening, PromptRejectedError } from '@/lib/ai'
 import { clampRating } from '@/lib/ratings'
 import { sanitizeDirector } from '@/lib/director'
+import { analytics } from '@/lib/telemetry'
 import { CONTENT_RATINGS, DEFAULT_CONTENT_RATING } from '@/types'
 import type { ContentRating } from '@/types'
 
@@ -181,6 +182,12 @@ export async function POST(req: NextRequest) {
     revalidateTag(`story-${storyId}`, 'max')
     revalidateTag(`story-tree-${storyId}`, 'max')
     after(() => checkAndAwardAchievements(uid, 'story_created').catch(() => {}))
+    after(() =>
+      analytics.track('saga.created', {
+        uid,
+        props: { storyId, worldId, rating: effectiveRating, entryPoints: entries.length },
+      }),
+    )
 
     return NextResponse.json({ id: storyId }, { status: 201 })
   } catch (error) {
