@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ShieldAlert, ShieldCheck, Loader2, ChevronRight, BookOpen, Globe, ClipboardList } from 'lucide-react'
+import { ShieldAlert, ShieldCheck, Loader2, ChevronRight, BookOpen, Globe, ClipboardList, Users, BarChart3, Sparkles } from 'lucide-react'
 import { useAuth } from '@/components/Providers'
 
 interface Overview {
@@ -71,7 +71,13 @@ export default function AdminDashboardPage() {
     { label: 'Public worlds', value: overview ? fmt(overview.worlds, overview.worldsCapped) : '—', icon: Globe },
   ]
 
-  const tools = [
+  const tools: {
+    title: string
+    description: string
+    href: string
+    icon: typeof ShieldAlert
+    badge?: string | null
+  }[] = [
     {
       title: 'Moderation queue',
       description: 'Review flagged routes — approve to publish, or remove to reopen the slot.',
@@ -80,6 +86,24 @@ export default function AdminDashboardPage() {
       badge: overview && overview.pendingModeration > 0
         ? fmt(overview.pendingModeration, overview.pendingModerationCapped)
         : null,
+    },
+    {
+      title: 'Users',
+      description: 'Manage roles and tiers, grant or set credits, and refresh daily allowances.',
+      href: '/admin/users',
+      icon: Users,
+    },
+    {
+      title: 'Analytics',
+      description: 'Tracked product events and daily volume across the platform.',
+      href: '/admin/analytics',
+      icon: BarChart3,
+    },
+    {
+      title: 'Insights',
+      description: 'A feed of notable signals — admin actions, milestones, and anomalies.',
+      href: '/admin/insights',
+      icon: Sparkles,
     },
   ]
 

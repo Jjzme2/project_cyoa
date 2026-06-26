@@ -60,6 +60,23 @@ export async function refundRateLimit(
   }
 }
 
+/**
+ * Clears a user's daily AI usage counter, restoring their full daily allowance
+ * immediately (used by admin "refresh credits"). Best-effort.
+ */
+export async function resetDailyUses(
+  userId: string,
+  tier: 'FREE' | 'PREMIUM' = 'FREE',
+): Promise<boolean> {
+  try {
+    const redis = getRedis()
+    await redis.del(dailyKey(userId, tier))
+    return true
+  } catch {
+    return false
+  }
+}
+
 export async function getRemainingUses(
   userId: string,
   tier: 'FREE' | 'PREMIUM' = 'FREE',

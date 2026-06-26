@@ -130,6 +130,19 @@ export class CreditManager {
   }
 
   /**
+   * Sets a user's purchased-credit balance to an exact amount (admin override).
+   * Returns the new balance. Negative inputs are floored to zero.
+   */
+  public static async setPurchasedCredits(userId: string, amount: number): Promise<number> {
+    const next = Math.max(0, Math.floor(amount))
+    await adminDb.collection('userSettings').doc(userId).set(
+      { purchasedCredits: next, updatedAt: new Date().toISOString() },
+      { merge: true },
+    )
+    return next
+  }
+
+  /**
    * Grants purchased credits WITHOUT counting them as a lifetime purchase.
    * Used for transfers (e.g. bounty payouts), so they don't inflate
    * purchase-based metrics.

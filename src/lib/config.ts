@@ -10,6 +10,9 @@ export const APP_CONFIG = {
     domain: 'chronicle.cyoa', // Placeholder domain
     // Absolute base URL used for metadataBase, OG image URLs, sitemap and robots.
     url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+    // Brand logo used for the browser tab icon, web manifest, and structured
+    // data. Overridable via env; defaults to the hosted Chronicle logo.
+    logoUrl: process.env.NEXT_PUBLIC_LOGO_URL || 'https://media.ilytat.com/chronicles-logo.png',
     titleTemplate: '%s — Chronicle',
     defaultTitle: 'Chronicle — Community CYOA',
     defaultDescription: 'Build worlds, write stories, shape destinies together. A community-built choose-your-own-adventure library.',

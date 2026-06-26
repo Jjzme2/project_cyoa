@@ -20,6 +20,16 @@ export const metadata: Metadata = {
   applicationName: APP_CONFIG.site.name,
   alternates: { canonical: '/' },
   formatDetection: { telephone: false, address: false, email: false },
+  // Browser tab + bookmark icons. Points at the hosted brand logo (configurable
+  // via NEXT_PUBLIC_LOGO_URL); the bundled favicon.ico stays as a fallback.
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: APP_CONFIG.site.logoUrl, type: 'image/png' },
+    ],
+    shortcut: [APP_CONFIG.site.logoUrl],
+    apple: [APP_CONFIG.site.logoUrl],
+  },
   keywords: [
     'choose your own adventure',
     'CYOA',
@@ -69,6 +79,7 @@ const STRUCTURED_DATA = {
       name: APP_CONFIG.site.name,
       url: APP_CONFIG.site.url,
       description: APP_CONFIG.site.defaultDescription,
+      logo: APP_CONFIG.site.logoUrl,
     },
   ],
 }
