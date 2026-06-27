@@ -57,13 +57,14 @@ the codebase alone).
   (once per open) and `ending.reached` (with `isNew`) via `POST /api/track`
   through the new `lib/track-client.ts` helper, so the dashboard reflects
   reading, not just authoring.
+- [x] **Admin hub live counts** — `/admin` overview now shows Events today and
+  Insights today (cheap per-day rollup reads), linking to the analytics and
+  insights pages.
 
 ---
 
 ## P0 — next up (engineering)
 
-- [ ] **Admin hub live counts** — surface today's analytics total + open
-  insights count on the `/admin` overview cards.
 - [ ] **Track group reads** — `RoomReader` (co-op) doesn't yet emit
   `story.opened`; extend reader analytics to cover it.
 
