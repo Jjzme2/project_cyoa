@@ -60,6 +60,10 @@ the codebase alone).
 - [x] **Admin hub live counts** — `/admin` overview now shows Events today and
   Insights today (cheap per-day rollup reads), linking to the analytics and
   insights pages.
+- [x] **In-app test runner** — `/admin/tests` runs the Vitest suite via an
+  admin-only API (fixed command, no shell), showing pass/fail per file,
+  failure messages, and raw logs. Gated off in production unless
+  `ENABLE_ADMIN_TEST_RUNNER=true`.
 - [x] **Track group reads** — `RoomReader` (co-op) now emits `story.opened`
   tagged `source:'room'`; solo opens are tagged `source:'solo'`, so reads are
   attributable by mode.
