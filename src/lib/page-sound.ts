@@ -159,6 +159,27 @@ export function startAmbient(effect: AmbientEffect): void {
       filter.Q.value = 0.7
       gain.gain.value = 0.025
       break
+    case 'mist':
+      filter.type = 'lowpass'
+      filter.frequency.value = 320
+      gain.gain.value = 0.045
+      break
+    case 'fireflies':
+      filter.type = 'bandpass'
+      filter.frequency.value = 2600
+      filter.Q.value = 0.4
+      gain.gain.value = 0.02
+      break
+    case 'petals':
+      filter.type = 'highpass'
+      filter.frequency.value = 900
+      gain.gain.value = 0.025
+      break
+    case 'motes':
+      filter.type = 'lowpass'
+      filter.frequency.value = 700
+      gain.gain.value = 0.022
+      break
     default:
       gain.gain.value = 0.03
   }

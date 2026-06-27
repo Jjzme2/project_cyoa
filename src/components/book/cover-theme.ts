@@ -1,5 +1,5 @@
 import type React from 'react'
-import type { CoverTheme, CoverPattern, CoverFontStyle } from '@/types'
+import type { CoverTheme, CoverPattern, CoverFontStyle, CoverBorderFrame } from '@/types'
 
 export const DEFAULT_COVER: CoverTheme = {
   fromColor: '#1e0840',
@@ -107,6 +107,36 @@ export function patternStyle(pattern: CoverPattern): React.CSSProperties {
       }
     default:
       return { backgroundImage: 'none' }
+  }
+}
+
+// ── Surprise me ────────────────────────────────────────────────────────────────
+
+const BORDER_IDS: CoverBorderFrame[] = [
+  'none', 'single', 'double', 'ornate', 'runic', 'thorn', 'celestial', 'vine',
+]
+
+function pick<T>(arr: readonly T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)]
+}
+
+/**
+ * Roll a fresh, coherent cover: a random palette, accent, emblem, pattern, font
+ * and frame. Preserves an AI-generated cover image if one is already set, and
+ * biases lightly toward "no border" so frames stay a deliberate-feeling choice.
+ */
+export function rollCover(prev: CoverTheme): CoverTheme {
+  const palette = pick(COLOR_PRESETS)
+  const frame = pick([...BORDER_IDS, 'none', 'none'] as CoverBorderFrame[])
+  return {
+    ...prev,
+    fromColor: palette.from,
+    toColor: palette.to,
+    accentColor: pick(ACCENT_PRESETS).color,
+    icon: pick(COVER_ICONS),
+    pattern: pick(PATTERNS).id,
+    fontStyle: pick(FONT_STYLES).id,
+    borderFrame: frame,
   }
 }
 

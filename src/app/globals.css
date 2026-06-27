@@ -218,6 +218,52 @@
   100% { transform: translateY(110vh) translateX(20px); opacity: 0; }
 }
 
+@keyframes firefly-drift {
+  0%   { transform: translate(0, 0) scale(0.7);        opacity: 0.1; }
+  25%  { transform: translate(14px, -10px) scale(1);   opacity: 0.95; }
+  50%  { transform: translate(-8px, -22px) scale(0.85); opacity: 0.4; }
+  75%  { transform: translate(10px, -34px) scale(1.05); opacity: 0.9; }
+  100% { transform: translate(0, -46px) scale(0.7);    opacity: 0.1; }
+}
+
+@keyframes petal-fall {
+  0%   { transform: translateY(-10px) translateX(0) rotate(0deg);     opacity: 0; }
+  10%  { opacity: 0.85; }
+  50%  { transform: translateY(48vh) translateX(28px) rotate(180deg); }
+  90%  { opacity: 0.5; }
+  100% { transform: translateY(108vh) translateX(-18px) rotate(360deg); opacity: 0; }
+}
+
+@keyframes mist-drift {
+  0%   { transform: translateX(0) translateY(0);     opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateX(60px) translateY(-12px); opacity: 0; }
+}
+
+@keyframes mote-float {
+  0%   { transform: translate(0, 0) scale(0.8);      opacity: 0; }
+  15%  { opacity: 0.8; }
+  50%  { transform: translate(-12px, -18px) scale(1); }
+  85%  { opacity: 0.5; }
+  100% { transform: translate(8px, -34px) scale(0.8); opacity: 0; }
+}
+
+/* Container-scoped falls/rises for the in-card atmosphere preview (the
+   full-screen effects use vh and overshoot a small box). */
+@keyframes mini-fall {
+  0%   { transform: translateY(-15%); opacity: 0; }
+  10%  { opacity: 0.85; }
+  90%  { opacity: 0.5; }
+  100% { transform: translateY(115%); opacity: 0; }
+}
+
+@keyframes mini-rise {
+  0%   { transform: translateY(15%) scale(1);   opacity: 0; }
+  15%  { opacity: 0.9; }
+  100% { transform: translateY(-115%) scale(0.3); opacity: 0; }
+}
+
 /* Book page theme variables — overridden inline by ReadingTheme */
 .book-page {
   --page-bg:   oklch(0.94 0.03 80);

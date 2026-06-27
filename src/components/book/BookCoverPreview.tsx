@@ -1,5 +1,6 @@
 import type { CoverTheme } from '@/types'
 import { coverFontFamily, patternStyle } from './cover-theme'
+import { CoverBorder } from './cover-border'
 
 interface PreviewProps {
   theme: CoverTheme
@@ -65,6 +66,8 @@ export function BookCoverPreview({ theme, title, size = 'md' }: PreviewProps) {
           <div className="absolute inset-0 pointer-events-none" style={patternStyle(theme.pattern)} />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent pointer-events-none" />
+
+        <CoverBorder frame={theme.borderFrame} accent={accent} corner={isSmall ? 0 : 9} />
 
         <h3
           className={`${titleSz} leading-snug line-clamp-3 relative z-10`}

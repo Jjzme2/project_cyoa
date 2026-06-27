@@ -3,16 +3,18 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Globe, Loader2, ChevronRight, Sparkles, RotateCcw } from 'lucide-react'
+import { Globe, Loader2, ChevronRight, Sparkles, RotateCcw, Palette } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/components/Providers'
 import { CONTENT_RATINGS, CONTENT_RATING_META, DEFAULT_CONTENT_RATING } from '@/types'
-import type { ContentRating } from '@/types'
+import type { ContentRating, WorldTheme } from '@/types'
 import { AIAssistModal } from '@/components/ai/AIAssistModal'
 import type { WorldAssistResult } from '@/components/ai/AIAssistModal'
+import { WorldThemeDesigner } from '@/components/world/WorldThemeDesigner'
+import { DEFAULT_WORLD_THEME, themeForTone } from '@/components/world/world-theme'
 import { useDraft } from '@/hooks/useDraft'
 
 const TONE_OPTIONS = [
@@ -48,6 +50,7 @@ interface WorldDraft {
   tone: string
   rating: ContentRating
   seed: string
+  theme: WorldTheme
 }
 
 export default function NewWorldPage() {
@@ -64,6 +67,7 @@ export default function NewWorldPage() {
   const [tone, setTone] = useState('Epic Fantasy')
   const [rating, setRating] = useState<ContentRating>(DEFAULT_CONTENT_RATING)
   const [seed, setSeed] = useState('')
+  const [theme, setTheme] = useState<WorldTheme>(() => themeForTone('Epic Fantasy', DEFAULT_WORLD_THEME))
 
   const draft = useDraft<WorldDraft>('chronicle:draft:world')
 
@@ -91,6 +95,7 @@ export default function NewWorldPage() {
     setTone(d.tone)
     setRating(d.rating)
     setSeed(d.seed || '')
+    if (d.theme) setTheme({ ...DEFAULT_WORLD_THEME, ...d.theme })
     setHasDraft(false)
     toast.success('Draft restored')
   }
@@ -118,6 +123,7 @@ export default function NewWorldPage() {
           tone,
           rating,
           seed: seed.trim() ? parseInt(seed.trim(), 10) : undefined,
+          theme,
         }),
       })
       if (!res.ok) throw new Error((await res.json()).error ?? 'Failed to create world')
@@ -125,7 +131,7 @@ export default function NewWorldPage() {
       toast.success(`"${name}" has been forged into existence!`)
       router.push('/stories/new')
     } catch (err) {
-      draft.save({ name, description, lore, rules, tone, rating, seed })
+      draft.save({ name, description, lore, rules, tone, rating, seed, theme })
       toast.error(err instanceof Error ? err.message : 'Something went wrong')
       toast.info('Draft saved — your world is preserved for next time.')
     } finally {
@@ -202,6 +208,8 @@ export default function NewWorldPage() {
           setRules(result.rules)
           setTone(result.tone)
           setRating(result.rating)
+          // Auto-tune the world's atmosphere to match the AI's chosen tone.
+          setTheme((prev) => themeForTone(result.tone, prev))
         }}
       />
 
@@ -282,6 +290,15 @@ export default function NewWorldPage() {
               Used for deterministic procedural generation. Leave blank to let the system generate one.
             </p>
           </div>
+        </div>
+
+        <div className="glass-card rounded-xl p-6 space-y-5">
+          <h2 className="text-sm font-medium text-foreground/65 flex items-center gap-2">
+            <Palette className="h-4 w-4 text-amber-400/55" />
+            World Portal
+            <span className="text-muted-foreground/55 font-normal text-xs">(its face across the Chronicle)</span>
+          </h2>
+          <WorldThemeDesigner value={theme} onChange={setTheme} name={name} tone={tone} />
         </div>
 
         <div className="glass-card rounded-xl p-6 space-y-3">

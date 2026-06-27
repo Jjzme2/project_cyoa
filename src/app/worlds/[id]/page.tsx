@@ -11,6 +11,8 @@ import { WorldLore } from '@/components/world/WorldLore'
 import { WorldGenesis } from '@/components/world/WorldGenesis'
 import { GenerateGenesisButton } from '@/components/world/GenerateGenesisButton'
 import { OutsiderRegard } from '@/components/world/OutsiderRegard'
+import { WorldPortal } from '@/components/world/WorldPortal'
+import { themeForTone, DEFAULT_WORLD_THEME } from '@/components/world/world-theme'
 import { getWorld, getStoriesByWorld, getWorldChronicle, getWorldLegends, getWorldOutsiderRegard } from '@/lib/firestore-helpers'
 import { APP_CONFIG } from '@/lib/config'
 
@@ -61,6 +63,8 @@ async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
     getWorldOutsiderRegard(id).catch(() => null),
   ])
   const toneClass = TONE_COLORS[world.tone] ?? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+  // Legacy worlds (no saved theme) get a coherent look derived from their tone.
+  const theme = world.theme ?? themeForTone(world.tone, DEFAULT_WORLD_THEME)
 
   return (
     <>
@@ -72,6 +76,8 @@ async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
           <ArrowLeft className="h-3.5 w-3.5" />
           All worlds
         </Link>
+
+        <WorldPortal theme={theme} variant="banner" />
 
         <div className="space-y-4">
           <div className="flex items-start justify-between gap-4 flex-wrap">

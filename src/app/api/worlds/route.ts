@@ -10,6 +10,7 @@ import { buildGenesisSkeleton } from '@/lib/engine/world-genesis'
 import { SeededRNG } from '@/lib/engine/seed-rng'
 import { elaborateWorldBible } from '@/lib/ai'
 import { CONTENT_RATINGS, DEFAULT_CONTENT_RATING } from '@/types'
+import type { WorldTheme } from '@/types'
 
 const CreateWorldSchema = z.object({
   name: z.string().min(1),
@@ -21,6 +22,7 @@ const CreateWorldSchema = z.object({
   // Invalid/absent ratings fall back to the default, as before.
   rating: z.enum(CONTENT_RATINGS).catch(DEFAULT_CONTENT_RATING),
   seed: z.union([z.number(), z.string()]).nullish(),
+  theme: z.custom<WorldTheme>().optional(),
 })
 
 export async function GET(req: NextRequest) {
@@ -55,7 +57,7 @@ export async function POST(req: NextRequest) {
 
   const parsed = await parseJson(req, CreateWorldSchema)
   if (!parsed.ok) return parsed.response
-  const { name, description, lore, rules, tone, tags, rating: safeRating, seed } = parsed.data
+  const { name, description, lore, rules, tone, tags, rating: safeRating, seed, theme } = parsed.data
 
   const effectiveTone = tone ?? 'Epic Fantasy'
   // Every world gets a stable seed, so its genesis + simulation are reproducible.
@@ -73,6 +75,7 @@ export async function POST(req: NextRequest) {
     rating: safeRating,
     ratingOverriddenBy: null,
     seed: effectiveSeed,
+    ...(theme ? { theme } : {}),
   })
 
   revalidateTag('worlds', 'max')

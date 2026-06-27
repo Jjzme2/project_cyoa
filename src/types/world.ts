@@ -1,4 +1,5 @@
 import type { ContentRating } from './content'
+import type { WorldTheme } from './themes'
 
 export interface World {
   id: string
@@ -10,6 +11,8 @@ export interface World {
   authorId: string
   authorName: string
   tags?: string[]
+  /** The world's visual identity (gradient, emblem, atmosphere) shown on cards & detail pages. */
+  theme?: WorldTheme
   /** Content rating set by the creator; admins may override it. */
   rating?: ContentRating
   /** uid of the admin who last overrode the rating, if any. */
