@@ -114,8 +114,10 @@ validation, lint-debt cleanup)._
   the API does exact email/uid lookups plus a bounded substring scan
   (capped, with a "narrow your search" notice). Pure matcher in
   `lib/admin-user-search.ts`, unit-tested.
-- [ ] **Telemetry retention** — periodic prune of raw `*Events` docs (keep the
-  daily rollups). Needs a scheduled job.
+- [x] **Telemetry retention** — daily Vercel Cron (`vercel.json` →
+  `/api/cron/telemetry-retention`, CRON_SECRET-gated) prunes raw `*Events`
+  older than `TELEMETRY_RETENTION_DAYS` (30) in bounded batches, keeping the
+  daily rollups. Logic in `lib/telemetry-retention.ts`, unit-tested.
 
 ## P2 — planned features (see `docs/ROADMAP.md`)
 
