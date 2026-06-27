@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Loader2, Users, Share2, SkipForward, Check, Crown, BookOpen, Feather, X } from 'lucide-react'
 import { db } from '@/lib/firebase-client'
 import { useAuth } from '@/components/Providers'
+import { trackEvent } from '@/lib/track-client'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { StoryContent } from '@/components/book/StoryContent'
@@ -34,6 +35,16 @@ export function RoomReader({ roomId }: { roomId: string }) {
   const joinedRef = useRef(false)
   const resolvedRoundRef = useRef(-1)
   const fetchedNodeRef = useRef('')
+  const openedTrackedRef = useRef<string | null>(null)
+
+  // Analytics: a reader opened this story in a co-op room. Fire once per story,
+  // tagged source:'room' to distinguish it from a solo read.
+  useEffect(() => {
+    const storyId = room?.storyId
+    if (!user || !storyId || openedTrackedRef.current === storyId) return
+    openedTrackedRef.current = storyId
+    void trackEvent(user, 'story.opened', { props: { storyId, source: 'room', roomId } })
+  }, [user, room?.storyId, roomId])
 
   const api = useCallback(
     async (path: string, body?: object) => {

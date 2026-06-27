@@ -149,7 +149,7 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
     if (!user || openedTrackedRef.current === story.id) return
     openedTrackedRef.current = story.id
     void trackEvent(user, 'story.opened', {
-      props: { storyId: story.id, worldId: story.worldId },
+      props: { storyId: story.id, worldId: story.worldId, source: 'solo' },
     })
   }, [user, story.id, story.worldId])
 

@@ -60,13 +60,16 @@ the codebase alone).
 - [x] **Admin hub live counts** — `/admin` overview now shows Events today and
   Insights today (cheap per-day rollup reads), linking to the analytics and
   insights pages.
+- [x] **Track group reads** — `RoomReader` (co-op) now emits `story.opened`
+  tagged `source:'room'`; solo opens are tagged `source:'solo'`, so reads are
+  attributable by mode.
 
 ---
 
 ## P0 — next up (engineering)
 
-- [ ] **Track group reads** — `RoomReader` (co-op) doesn't yet emit
-  `story.opened`; extend reader analytics to cover it.
+_All cleared — see P1 for the next wave (broader test coverage, zod
+validation, lint-debt cleanup)._
 
 ## P1
 
