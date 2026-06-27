@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { StripeService, stripe } from '@/lib/stripe'
 import { adminDb } from '@/lib/firebase-admin'
 import { CreditManager } from '@/lib/credit-manager'
+import { analytics, insights } from '@/lib/telemetry'
 import type Stripe from 'stripe'
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || ''
@@ -59,8 +60,10 @@ export async function POST(req: NextRequest) {
               subscription.current_period_end
             )
           }
+          await insights.track('subscription.checkout', { uid: userId, props: { type } })
         } else if (type === 'credits' && creditsAmount > 0) {
           await CreditManager.addCredits(userId, creditsAmount)
+          await analytics.track('purchase.completed', { uid: userId, props: { credits: creditsAmount } })
         }
         break
       }

@@ -3,6 +3,7 @@ import { after } from 'next/server'
 import { revalidateTag } from 'next/cache'
 import { adminAuth } from '@/lib/firebase-admin'
 import { createWorld, getWorldsByAuthor, checkAndAwardAchievements, setWorldGenesis } from '@/lib/firestore-helpers'
+import { analytics } from '@/lib/telemetry'
 import { buildGenesisSkeleton } from '@/lib/engine/world-genesis'
 import { SeededRNG } from '@/lib/engine/seed-rng'
 import { elaborateWorldBible } from '@/lib/ai'
@@ -72,6 +73,7 @@ export async function POST(req: NextRequest) {
 
   after(async () => {
     await checkAndAwardAchievements(uid, 'world_created').catch(() => {})
+    await analytics.track('world.created', { uid, props: { worldId: id, rating: safeRating } })
     // Procedural world genesis: a seeded, cross-referenced canon skeleton,
     // elaborated by one LLM call, persisted as the world's bible.
     try {
