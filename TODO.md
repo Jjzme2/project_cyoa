@@ -32,10 +32,28 @@ the codebase alone).
   insight (in addition to `story.created` / `saga.created`).
 - [x] **Saga draft persistence** — `useDraft` restore/discard banner on
   `/saga/new`, mirroring the story creator.
+- [x] **🔴 Stripe webhook idempotency** — claim each `event.id` in a
+  `stripeEvents` collection before processing; no more double-credit on
+  Stripe's redeliveries.
+- [x] **🔴 AI input bounds** — cap the assist prompt (4k chars) before it costs
+  a credit; coerce `worldContext` into a bounded shape; wrap user text in
+  `<user_input>` delimiters as a prompt-injection guard.
+- [x] **🟠 Rate-limiter observability** — log loudly when Redis is unreachable
+  instead of silently failing open.
+- [x] **🟠 Test runner + first tests** — Vitest with the `@` alias; 28 tests
+  over the highest-risk pure logic (ratings/age-gating, moderation, director).
+- [x] **🟠 CI** — `.github/workflows/ci.yml`: typecheck + tests as hard gates,
+  lint informational (pending debt cleanup).
+- [x] **🟠 App Router error/loading UI** — root `error.tsx`,
+  `global-error.tsx`, `not-found.tsx`, `loading.tsx`.
 
 ---
 
 ## P0 — next up (engineering)
+
+- [ ] **🟠 Fail closed for paid generation** (review #6) — when Redis is down,
+  the paid path currently still grants free generations. Decide policy and, for
+  purchased-credit generation, fail closed rather than open.
 
 - [ ] **Client-side reader analytics** — emit `story.opened` and
   `ending.reached` via `POST /api/track` so the dashboard reflects reading,
@@ -45,6 +63,19 @@ the codebase alone).
 
 ## P1
 
+- [ ] **🟠 Expand test coverage** (review #4) — `CreditManager`, `rate-limit`,
+  and the engine's deterministic pieces (seed-rng, goap-planner,
+  faction-manager). Firestore/Redis-backed bits need light mocking.
+- [ ] **🟡 Schema validation layer** (review #8) — adopt zod (or extend
+  `lib/validate.ts`) so the ~52 API routes parse request bodies uniformly
+  instead of ad-hoc `req.json()` handling.
+- [ ] **🟠 Clear lint debt → make CI lint blocking** — 12 pre-existing errors
+  across 8 files (`react-hooks/*`, `no-explicit-any`); fix, then drop
+  `continue-on-error` from the CI lint step.
+- [ ] **🟢 Generation observability** (review, green) — track AI generation
+  failures, credit cost, and reader drop-off via the telemetry channels so we
+  can answer "how many failed / how much did they cost / where do readers
+  leave" before adding engine depth.
 - [ ] **Reconcile `docs/ROADMAP.md`** once this branch merges (move the
   shipped items into its ✅ section).
 - [ ] **Admin Users search/filter** — by email/uid; the list is currently
@@ -54,6 +85,10 @@ the codebase alone).
 
 ## P2 — planned features (see `docs/ROADMAP.md`)
 
+- [ ] **🟡 Split oversized files** (review #9) — `firestore-helpers.ts` (~1451)
+  by domain (stories/rooms/users), extract the story-creator form
+  (`stories/new/page.tsx` ~1251) into sub-components; also `BookViewer.tsx`,
+  `ai.ts`. Mechanical but wide — do as focused, test-backed passes.
 - [ ] Co-op reading rooms **PR 2** (frontier write-pause, host kick, ended
   summary, stale-room cleanup).
 - [ ] Global leaderboards (denormalized aggregate counters).
