@@ -5,8 +5,9 @@ import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
 import { getAuthContext } from '@/lib/auth'
 
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
+// Route handlers run on the Node.js runtime by default (needed for
+// child_process/fs here), and a POST handler is inherently dynamic — so no
+// `runtime`/`dynamic` exports, which are incompatible with cacheComponents.
 export const maxDuration = 120
 
 const RUN_TIMEOUT_MS = 90_000
