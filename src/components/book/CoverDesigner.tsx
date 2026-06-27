@@ -1,11 +1,12 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Sparkles, X, Loader2, ImageOff } from 'lucide-react'
+import { Sparkles, X, Loader2, ImageOff, Dices } from 'lucide-react'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import type { CoverTheme } from '@/types'
-import { COLOR_PRESETS, ACCENT_PRESETS, COVER_ICONS, PATTERNS, FONT_STYLES, coverFontFamily } from './cover-theme'
+import { COLOR_PRESETS, ACCENT_PRESETS, COVER_ICONS, PATTERNS, FONT_STYLES, coverFontFamily, rollCover } from './cover-theme'
+import { BORDER_FRAMES, CoverBorder } from './cover-border'
 import { BookCoverPreview, SpinePreview } from './BookCoverPreview'
 
 // Re-exported for backward compatibility with existing import sites.
@@ -62,6 +63,19 @@ export function CoverDesigner({ value, onChange, title, onGenerateImage }: Props
     <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-6 items-start">
       {/* ── Controls ── */}
       <div className="space-y-5">
+
+        {/* Surprise me */}
+        <button
+          type="button"
+          onClick={() => {
+            onChange(rollCover(value))
+            toast.success('Cover rerolled — feeling lucky?')
+          }}
+          className="group flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] border border-violet-500/30 bg-violet-500/10 text-violet-200 hover:bg-violet-500/20 transition-all"
+        >
+          <Dices className="h-3.5 w-3.5 transition-transform group-hover:rotate-[20deg]" />
+          Surprise me
+        </button>
 
         {/* AI Cover Image */}
         {onGenerateImage && (
@@ -345,6 +359,42 @@ export function CoverDesigner({ value, onChange, title, onGenerateImage }: Props
                 {f.label}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Border frame */}
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground/60 uppercase tracking-wider">
+            Border Frame
+          </Label>
+          <div className="grid grid-cols-4 gap-1.5">
+            {BORDER_FRAMES.map((b) => {
+              const active = (value.borderFrame ?? 'none') === b.id
+              return (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => update({ borderFrame: b.id })}
+                  title={b.label}
+                  className={`relative h-12 rounded-lg border transition-all flex items-center justify-center overflow-hidden ${
+                    active
+                      ? 'border-amber-500/50 bg-amber-500/10'
+                      : 'border-white/10 hover:border-white/20'
+                  }`}
+                >
+                  {/* Tiny swatch showing the frame over the current gradient */}
+                  <div
+                    className="absolute inset-1.5 rounded-[3px]"
+                    style={{ background: `linear-gradient(135deg, ${value.fromColor}, ${value.toColor})` }}
+                  >
+                    <CoverBorder frame={b.id} accent={accent} insetPct={10} corner={b.corner ? 7 : 0} />
+                  </div>
+                  <span className="absolute bottom-0.5 inset-x-0 text-center text-[7px] uppercase tracking-wider font-sans text-white/55">
+                    {b.label}
+                  </span>
+                </button>
+              )
+            })}
           </div>
         </div>
       </div>

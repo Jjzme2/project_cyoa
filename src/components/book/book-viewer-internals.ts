@@ -30,6 +30,9 @@ export const PAGE_PALETTES: Record<string, { bg: string; text: string; spine: st
   forest:    { bg: '#e8f0e0', text: '#1a2d15', spine: 'rgba(26,45,21,0.12)' },
   ocean:     { bg: '#e0eef0', text: '#0d2535', spine: 'rgba(13,37,53,0.12)' },
   rose:      { bg: '#f0e0e4', text: '#2d1518', spine: 'rgba(45,21,24,0.12)' },
+  papyrus:   { bg: '#e6dcc0', text: '#43331b', spine: 'rgba(67,51,27,0.14)' },
+  dusk:      { bg: '#2a2440', text: '#d8d2ea', spine: 'rgba(216,210,234,0.10)' },
+  slate:     { bg: '#222831', text: '#cfd6df', spine: 'rgba(207,214,223,0.10)' },
 }
 
 export function saveDiscoveredEndings(storyId: string, endings: DiscoveredEnding[]) {

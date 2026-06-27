@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { coverFontFamily, patternStyle } from '@/components/book/CoverDesigner'
+import { CoverBorder } from '@/components/book/cover-border'
 import type { Story, CoverTheme } from '@/types'
 
 // Fallback covers for stories that predate the cover designer
@@ -59,6 +60,8 @@ function CoverPopup({
       )}
 
       <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/5 to-black/20 pointer-events-none" />
+
+      <CoverBorder frame={theme.borderFrame} accent={accent} corner={8} />
 
       <div className="absolute inset-x-2 bottom-2 space-y-0.5">
         <h3

@@ -6,6 +6,8 @@ import { Search, X, Globe, BookOpen, Feather, SlidersHorizontal } from 'lucide-r
 import { CONTENT_RATING_META } from '@/types'
 import { SeededBadge } from '@/components/ContentBadges'
 import { truncateAtWord } from '@/lib/utils'
+import { WorldPortal } from '@/components/world/WorldPortal'
+import { themeForTone, DEFAULT_WORLD_THEME } from '@/components/world/world-theme'
 import type { World } from '@/types'
 
 // ── Tone color map (mirrors worlds/page.tsx server copy) ──────────────────────
@@ -59,9 +61,14 @@ interface Props {
 
 function WorldCard({ world }: { world: WorldWithCount }) {
   const toneClass = TONE_COLORS[world.tone] ?? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+  // Legacy worlds (no saved theme) get a coherent look derived from their tone.
+  const theme = world.theme ?? themeForTone(world.tone, DEFAULT_WORLD_THEME)
   return (
-    <div className="glass-card rounded-xl p-5 space-y-3 flex flex-col justify-between group hover:border-white/15 transition-colors border border-white/[0.07]">
-      <div className="space-y-2.5">
+    <div className="glass-card rounded-xl overflow-hidden flex flex-col justify-between group hover:border-white/15 transition-colors border border-white/[0.07]">
+      <Link href={`/worlds/${world.id}`} className="block">
+        <WorldPortal theme={theme} variant="card" animate={false} className="rounded-none" />
+      </Link>
+      <div className="px-5 pt-5 space-y-2.5 flex-1">
         <div className="flex items-start justify-between gap-2">
           <h2
             className="text-lg font-semibold leading-snug text-foreground/90 group-hover:text-amber-200 transition-colors"
@@ -107,7 +114,7 @@ function WorldCard({ world }: { world: WorldWithCount }) {
         )}
       </div>
 
-      <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
+      <div className="flex items-center justify-between mx-5 mb-5 pt-3 border-t border-white/[0.06]">
         <div className="space-y-0.5">
           <div className="flex items-center gap-2 text-xs text-muted-foreground/45 font-sans">
             <span className="flex items-center gap-1.5">
