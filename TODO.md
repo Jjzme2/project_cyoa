@@ -114,15 +114,28 @@ validation, lint-debt cleanup)._
   the API does exact email/uid lookups plus a bounded substring scan
   (capped, with a "narrow your search" notice). Pure matcher in
   `lib/admin-user-search.ts`, unit-tested.
-- [ ] **Telemetry retention** — periodic prune of raw `*Events` docs (keep the
-  daily rollups). Needs a scheduled job.
+- [x] **Telemetry retention** — daily Vercel Cron (`vercel.json` →
+  `/api/cron/telemetry-retention`, CRON_SECRET-gated) prunes raw `*Events`
+  older than `TELEMETRY_RETENTION_DAYS` (30) in bounded batches, keeping the
+  daily rollups. Logic in `lib/telemetry-retention.ts`, unit-tested.
 
 ## P2 — planned features (see `docs/ROADMAP.md`)
 
-- [ ] **🟡 Split oversized files** (review #9) — `firestore-helpers.ts` (~1451)
-  by domain (stories/rooms/users), extract the story-creator form
-  (`stories/new/page.tsx` ~1251) into sub-components; also `BookViewer.tsx`,
-  `ai.ts`. Mechanical but wide — do as focused, test-backed passes.
+- [x] **🟡 Split oversized files** (review #9) — target ~500 LOC/file, SRP.
+  - [x] `firestore-helpers.ts` 1451 → 15 domain modules (barrel; all <336).
+  - [x] `ai.ts` 884 → 5 modules (prompts/shared/images/content/review; <255).
+  - [x] `types/index.ts` 615 → 8 domain modules (barrel).
+  - [x] `CoverDesigner.tsx` 640 → editor 387 + cover-theme + BookCoverPreview.
+  - [x] `stories/new/page.tsx` 1255 → 624 (4 SRP sub-components, 2 shared).
+  - [x] `saga/new/page.tsx` 698 → 504 (reuses the shared creator components).
+  - [x] `profile/page.tsx` 741 → 607 (self-contained ApiKeySettings).
+  - [x] `ChoiceSlots.tsx` 782 → 554 (SlotRequirementsEditor).
+  - [x] `BookViewer.tsx` 977 → 823 (internals + dialogs extracted).
+  - _Note: the lib/type files are fully <500. The reader-heavy component pages
+    (stories/new 624, profile 607, ChoiceSlots 554, BookViewer 823) sit above
+    target — the remainder is irreducible form/reader orchestration. Further
+    splitting needs deep render extraction (risky prop-drilling) — left as a
+    focused follow-up rather than forcing it._
 - [ ] Co-op reading rooms **PR 2** (frontier write-pause, host kick, ended
   summary, stale-room cleanup).
 - [ ] Global leaderboards (denormalized aggregate counters).

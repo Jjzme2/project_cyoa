@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Globe, Loader2, ChevronRight, Plus, Palette, Feather, Sparkles, DoorOpen, Trash2, Clapperboard, Wand2, RotateCcw } from 'lucide-react'
+import { Globe, Loader2, ChevronRight, Plus, Palette, Feather, Sparkles, DoorOpen, Trash2, RotateCcw } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,33 +14,10 @@ import { STORY_TAGS, CONTENT_RATINGS, CONTENT_RATING_META, DEFAULT_CONTENT_RATIN
 import { ratingRank } from '@/lib/ratings'
 import { CoverDesigner, DEFAULT_COVER } from '@/components/book/CoverDesigner'
 import { useDraft } from '@/hooks/useDraft'
-import type { World, CoverTheme, ReadingTheme, PageStyle, AmbientEffect, ContentRating, DirectorPersona } from '@/types'
-import {
-  DIRECTOR_AXES,
-  DIRECTOR_ARCHETYPES,
-  describeDirector,
-  emptyDirector,
-  isDirectorMeaningful,
-  personaMatches,
-  type DirectorArchetype,
-} from '@/lib/director'
-
-const PAGE_STYLES: { id: PageStyle; label: string; bg: string; text: string }[] = [
-  { id: 'parchment', label: 'Parchment',    bg: '#f0e6d0', text: '#3d2b1f' },
-  { id: 'sepia',     label: 'Sepia',        bg: '#d4b896', text: '#2d1a0e' },
-  { id: 'night',     label: 'Night Scroll', bg: '#1a1a2e', text: '#c0c8e0' },
-  { id: 'forest',    label: 'Forest',       bg: '#e8f0e0', text: '#1a2d15' },
-  { id: 'ocean',     label: 'Ocean',        bg: '#e0eef0', text: '#0d2535' },
-  { id: 'rose',      label: 'Rose',         bg: '#f0e0e4', text: '#2d1518' },
-]
-
-const AMBIENT_EFFECTS: { id: AmbientEffect; label: string; emoji: string }[] = [
-  { id: 'none',   label: 'None',      emoji: '—'  },
-  { id: 'rain',   label: 'Rain',      emoji: '🌧️' },
-  { id: 'embers', label: 'Embers',    emoji: '🔥' },
-  { id: 'stars',  label: 'Starfall',  emoji: '✨' },
-  { id: 'snow',   label: 'Snow',      emoji: '❄️' },
-]
+import type { World, CoverTheme, ReadingTheme, ContentRating, DirectorPersona } from '@/types'
+import { emptyDirector, isDirectorMeaningful } from '@/lib/director'
+import { DirectorControls } from '@/components/story/DirectorControls'
+import { ReadingThemePicker } from '@/components/book/ReadingThemePicker'
 
 const MAX_ENTRY_POINTS = 4
 
@@ -148,18 +125,6 @@ export default function NewSagaPage() {
 
   const readyEntries = entryPoints.filter((e) => e.label.trim() && e.premise.trim())
   const canSubmit = !!title.trim() && !!worldId && readyEntries.length >= 1 && !submitting
-
-  function applyArchetype(a: DirectorArchetype) {
-    // If the preset is already active, toggle it off back to neutral.
-    setDirector((cur) => (personaMatches(cur, a.persona) ? emptyDirector() : { ...emptyDirector(), ...a.persona }))
-  }
-
-  function resetDirector() {
-    setDirector(emptyDirector())
-  }
-
-  const directorNotes = describeDirector(director)
-  const directorTouched = isDirectorMeaningful(director)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -467,116 +432,7 @@ export default function NewSagaPage() {
 
         {/* ── Director ── */}
         <div className="glass-card rounded-xl p-6 space-y-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <Label className="flex items-center gap-2">
-                <Clapperboard className="h-4 w-4 text-amber-400/60" />
-                Director <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span>
-              </Label>
-              <p className="text-[11px] text-muted-foreground/45 mt-1 max-w-md">
-                Shape <em>how</em> every chapter is directed — its craft, mood, and pacing.
-                Always stays within your content rating.
-              </p>
-            </div>
-            {directorTouched && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={resetDirector}
-                className="h-7 px-2 shrink-0 text-[11px] text-muted-foreground/50 hover:text-muted-foreground gap-1"
-              >
-                <RotateCcw className="h-3 w-3" /> Reset
-              </Button>
-            )}
-          </div>
-
-          {/* Archetype presets — one click to a recognizable sensibility */}
-          <div className="space-y-2">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground/40 font-sans">
-              Start from a style
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {DIRECTOR_ARCHETYPES.map((a) => {
-                const active = personaMatches(director, a.persona)
-                return (
-                  <button
-                    key={a.id}
-                    type="button"
-                    onClick={() => applyArchetype(a)}
-                    title={a.tagline}
-                    aria-pressed={active}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-sans border transition-all ${
-                      active
-                        ? 'bg-amber-500/20 border-amber-500/40 text-amber-200'
-                        : 'border-white/10 text-muted-foreground/55 hover:border-amber-500/25 hover:text-amber-200/80'
-                    }`}
-                  >
-                    <span>{a.emoji}</span>
-                    {a.name}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Fine-tune each axis */}
-          <div className="grid sm:grid-cols-2 gap-x-5 gap-y-3 pt-1">
-            {DIRECTOR_AXES.map((axis) => {
-              const v = director[axis.key] ?? 0
-              return (
-                <div key={axis.key} className="space-y-1">
-                  <div className="flex items-center justify-between text-[11px] font-sans">
-                    <span className={v < -0.3 ? 'text-amber-300/80' : 'text-muted-foreground/55'}>
-                      {axis.left}
-                    </span>
-                    <span className={v > 0.3 ? 'text-amber-300/80' : 'text-muted-foreground/55'}>
-                      {axis.right}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={-1}
-                    max={1}
-                    step={0.1}
-                    value={v}
-                    onChange={(e) => setDirector((d) => ({ ...d, [axis.key]: Number(e.target.value) }))}
-                    className="w-full accent-amber-500"
-                    aria-label={`${axis.left} to ${axis.right}`}
-                  />
-                  <p className="text-[10px] text-muted-foreground/35">{axis.hint}</p>
-                </div>
-              )
-            })}
-          </div>
-
-          <Input
-            placeholder="Optional: a one-line directorial vision (e.g. “a tense saga about earning trust”)"
-            value={director.vision ?? ''}
-            onChange={(e) => setDirector((d) => ({ ...d, vision: e.target.value }))}
-            maxLength={300}
-          />
-
-          {/* Live preview — exactly the guidance the AI will receive */}
-          {directorNotes.length > 0 ? (
-            <div className="rounded-lg border border-amber-500/15 bg-amber-500/[0.04] px-3.5 py-3 space-y-1.5">
-              <p className="text-[10px] uppercase tracking-wider text-amber-400/60 font-sans flex items-center gap-1.5">
-                <Wand2 className="h-3 w-3" /> How your director will shape each chapter
-              </p>
-              <ul className="space-y-1">
-                {directorNotes.map((n, i) => (
-                  <li key={i} className="text-[11px] text-muted-foreground/65 leading-snug flex gap-1.5">
-                    <span className="text-amber-400/50 shrink-0">›</span>
-                    <span>{n}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : (
-            <p className="text-[11px] text-muted-foreground/35 italic">
-              Neutral — the AI directs with its own instincts. Pick a style above or nudge a slider to guide it.
-            </p>
-          )}
+          <DirectorControls value={director} onChange={setDirector} />
         </div>
 
         {/* ── Share ── */}
@@ -623,57 +479,7 @@ export default function NewSagaPage() {
           />
         </div>
 
-        {/* ── Reading atmosphere ── */}
-        <div className="glass-card rounded-xl p-6 space-y-5">
-          <h2 className="text-sm font-medium text-foreground/65 flex items-center gap-2">
-            <Feather className="h-4 w-4 text-amber-400/55" /> Reading Atmosphere
-            <span className="text-muted-foreground/55 font-normal text-xs">(readers will see this)</span>
-          </h2>
-          <div className="space-y-3">
-            <Label className="text-xs text-muted-foreground/60 uppercase tracking-wider">Page Style</Label>
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-              {PAGE_STYLES.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setReadingTheme((t) => ({ ...t, pageStyle: s.id }))}
-                  className={`flex flex-col items-center gap-1.5 p-2 rounded-lg border transition-all ${
-                    readingTheme.pageStyle === s.id ? 'border-amber-500/50 bg-amber-500/10' : 'border-white/10 hover:border-white/20'
-                  }`}
-                >
-                  <div className="w-8 h-10 rounded-sm shadow-inner" style={{ background: s.bg }}>
-                    <div className="w-full h-full flex flex-col justify-end p-1 gap-0.5">
-                      {[...Array(3)].map((_, i) => (
-                        <div key={i} className="h-px rounded-full opacity-30" style={{ background: s.text }} />
-                      ))}
-                    </div>
-                  </div>
-                  <span className="text-[9px] font-sans text-muted-foreground/50">{s.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-3">
-            <Label className="text-xs text-muted-foreground/60 uppercase tracking-wider">Ambient Effect</Label>
-            <div className="flex flex-wrap gap-2">
-              {AMBIENT_EFFECTS.map((e) => (
-                <button
-                  key={e.id}
-                  type="button"
-                  onClick={() => setReadingTheme((t) => ({ ...t, ambientEffect: e.id }))}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-sans border transition-all ${
-                    readingTheme.ambientEffect === e.id
-                      ? 'bg-violet-500/20 border-violet-500/40 text-violet-300'
-                      : 'border-white/10 text-muted-foreground/40 hover:border-white/20'
-                  }`}
-                >
-                  <span>{e.emoji}</span>
-                  {e.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+        <ReadingThemePicker value={readingTheme} onChange={setReadingTheme} />
 
         <Button
           type="submit"

@@ -22,6 +22,8 @@ import { FieldValue } from 'firebase-admin/firestore'
 
 export type TelemetryChannel = 'analytics' | 'insights'
 
+export const TELEMETRY_CHANNELS: readonly TelemetryChannel[] = ['analytics', 'insights']
+
 export interface TrackOptions {
   /** Associate the event with a user, when known. */
   uid?: string | null
@@ -48,7 +50,8 @@ export interface TelemetryEvent {
 const MAX_NAME = 120
 const MAX_STRING_PROP = 500
 
-function eventsCollection(channel: TelemetryChannel): string {
+/** Firestore collection holding a channel's raw events. */
+export function eventsCollectionName(channel: TelemetryChannel): string {
   return `${channel}Events`
 }
 
@@ -87,7 +90,7 @@ async function track(channel: TelemetryChannel, name: string, opts: TrackOptions
       ts: FieldValue.serverTimestamp(),
     }
 
-    const appendEvent = adminDb.collection(eventsCollection(channel)).add(event)
+    const appendEvent = adminDb.collection(eventsCollectionName(channel)).add(event)
     // Merge into a per-channel, per-day rollup. Nested `events` map keeps a
     // per-event-name tally; `total` is the day's count for the channel.
     const bumpDaily = adminDb
@@ -163,7 +166,7 @@ export async function getRecentEvents(
 ): Promise<TelemetryEvent[]> {
   try {
     const snap = await adminDb
-      .collection(eventsCollection(channel))
+      .collection(eventsCollectionName(channel))
       .orderBy('createdAt', 'desc')
       .limit(Math.min(Math.max(limit, 1), 200))
       .get()

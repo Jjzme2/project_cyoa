@@ -14,7 +14,6 @@ import { GalleryButton } from './GalleryButton'
 import { AmbientBackground } from './AmbientBackground'
 import { JourneyMap } from './JourneyMap'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useAuth } from '@/components/Providers'
 import { trackEvent } from '@/lib/track-client'
 import { CreatorResourceManager } from '@/lib/creator-resources'
@@ -29,36 +28,19 @@ import {
   setAmbientOn,
 } from '@/lib/page-sound'
 import type { Story, StoryNode, ChoiceSlot, ChoiceEffect, SaveSlot } from '@/types'
-
-interface DiscoveredEnding {
-  id: string
-  excerpt: string
-}
-
-const ENDINGS_KEY = (storyId: string) => `cyoa:endings:${storyId}`
-
-function loadDiscoveredEndings(storyId: string): DiscoveredEnding[] {
-  try {
-    return JSON.parse(localStorage.getItem(ENDINGS_KEY(storyId)) || '[]')
-  } catch {
-    return []
-  }
-}
-
-// A page with no onward navigable path is an ending / story frontier.
-function isEndingNode(n: StoryNode): boolean {
-  return !n.slots.some((s) => s.filled && s.childNodeId)
-}
-
-// ── Page theme palette ─────────────────────────────────────────────────────────
-const PAGE_PALETTES: Record<string, { bg: string; text: string; spine: string }> = {
-  parchment: { bg: '#f0e6d0', text: '#3d2b1f', spine: 'rgba(61,43,31,0.15)' },
-  sepia:     { bg: '#d4b896', text: '#2d1a0e', spine: 'rgba(45,26,14,0.15)' },
-  night:     { bg: '#1a1a2e', text: '#c0c8e0', spine: 'rgba(192,200,224,0.10)' },
-  forest:    { bg: '#e8f0e0', text: '#1a2d15', spine: 'rgba(26,45,21,0.12)' },
-  ocean:     { bg: '#e0eef0', text: '#0d2535', spine: 'rgba(13,37,53,0.12)' },
-  rose:      { bg: '#f0e0e4', text: '#2d1518', spine: 'rgba(45,21,24,0.12)' },
-}
+import {
+  type DiscoveredEnding,
+  type Direction,
+  loadDiscoveredEndings,
+  saveDiscoveredEndings,
+  isEndingNode,
+  PAGE_PALETTES,
+  pageVariants,
+  pageTransition,
+  loadLocalProgress,
+  saveLocalProgress,
+} from './book-viewer-internals'
+import { CastDialog, EndingsDialog } from './ReaderDialogs'
 
 interface Props {
   story: Story
@@ -66,59 +48,6 @@ interface Props {
   endingCount?: number
 }
 
-type Direction = 'forward' | 'back'
-
-const pageVariants = {
-  enter: (dir: Direction) => ({
-    rotateY: dir === 'forward' ? 32 : -32,
-    x: dir === 'forward' ? '7%' : '-7%',
-    opacity: 0,
-    scale: 0.955,
-  }),
-  center: { rotateY: 0, x: 0, opacity: 1, scale: 1 },
-  exit: (dir: Direction) => ({
-    rotateY: dir === 'forward' ? -32 : 32,
-    x: dir === 'forward' ? '-7%' : '7%',
-    opacity: 0,
-    scale: 0.955,
-  }),
-}
-
-const pageTransition = {
-  duration: 0.54,
-  ease: [0.25, 0.46, 0.45, 0.94] as const,
-}
-
-const LOCAL_KEY = (storyId: string) => `cyoa:progress:${storyId}`
-
-function loadLocalProgress(storyId: string): {
-  currentNodeId: string
-  nodeHistory: string[]
-  resources?: Record<string, number | string | string[] | number[]>
-  resourcesHistory?: Record<string, number | string | string[] | number[]>[]
-} | null {
-  try {
-    const raw = localStorage.getItem(LOCAL_KEY(storyId))
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
-}
-
-function saveLocalProgress(
-  storyId: string,
-  currentNodeId: string,
-  nodeHistory: string[],
-  resources?: Record<string, number | string | string[] | number[]>,
-  resourcesHistory?: Record<string, number | string | string[] | number[]>[],
-) {
-  try {
-    localStorage.setItem(
-      LOCAL_KEY(storyId),
-      JSON.stringify({ currentNodeId, nodeHistory, resources, resourcesHistory }),
-    )
-  } catch {}
-}
 
 export function BookViewer({ story, initialNode, endingCount }: Props) {
   const { user } = useAuth()
@@ -203,9 +132,7 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
     })
     if (!isNew) return
     const next = [...prev, { id: n.id, excerpt: (n.content || '').slice(0, 140) }]
-    try {
-      localStorage.setItem(ENDINGS_KEY(story.id), JSON.stringify(next))
-    } catch {}
+    saveDiscoveredEndings(story.id, next)
     setDiscoveredEndings(next)
     toast.success(endingCount ? `Ending discovered! (${next.length}/${endingCount})` : 'Ending discovered!')
   }
@@ -888,90 +815,9 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
         {story.protagonist?.name ? ` · playing as ${story.protagonist.name}` : ''}
       </p>
 
-      <Dialog open={castOpen} onOpenChange={setCastOpen}>
-        <DialogContent className="glass-strong border-white/15 sm:max-w-[460px] max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="gold-text text-lg flex items-center gap-2">
-              <Users className="h-4 w-4 text-amber-400" />
-              Cast
-            </DialogTitle>
-          </DialogHeader>
-          {story.protagonist?.name && (
-            <div className="glass-card rounded-lg p-3 border border-amber-500/20">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] uppercase tracking-widest text-amber-400/55 font-sans">
-                  Protagonist
-                </span>
-                <span className="text-sm font-semibold text-foreground/85">
-                  {story.protagonist.name}
-                </span>
-              </div>
-              {story.protagonist.description && (
-                <p className="text-xs text-muted-foreground/55 mt-1">{story.protagonist.description}</p>
-              )}
-            </div>
-          )}
-          {story.characters && story.characters.length > 0 ? (
-            <ul className="space-y-2">
-              {story.characters.map((c) => (
-                <li key={c.name} className="glass-card rounded-lg p-3 border border-white/[0.07]">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium text-foreground/80">{c.name}</span>
-                    {c.status && c.status !== 'alive' && (
-                      <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded border border-white/10 text-muted-foreground/45">
-                        {c.status}
-                      </span>
-                    )}
-                  </div>
-                  {c.description && (
-                    <p className="text-xs text-muted-foreground/55 mt-1">{c.description}</p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-muted-foreground/50 py-2">
-              The cast will grow here as the story introduces new characters.
-            </p>
-          )}
-        </DialogContent>
-      </Dialog>
+      <CastDialog open={castOpen} onOpenChange={setCastOpen} story={story} />
 
-      <Dialog open={endingsOpen} onOpenChange={setEndingsOpen}>
-        <DialogContent className="glass-strong border-white/15 sm:max-w-[480px] max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="gold-text text-lg flex items-center gap-2">
-              <Trophy className="h-4 w-4 text-amber-400" />
-              Endings discovered
-              {endingCount ? ` — ${discoveredEndings.length}/${endingCount}` : ''}
-            </DialogTitle>
-          </DialogHeader>
-
-          {discoveredEndings.length === 0 ? (
-            <p className="text-sm text-muted-foreground/55 py-4">
-              You haven&apos;t reached an ending yet. Follow the paths to their conclusions — each
-              one you find is recorded here.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {discoveredEndings.map((e, i) => (
-                <li key={e.id} className="glass-card rounded-lg p-3 border border-white/[0.07]">
-                  <span className="text-[10px] uppercase tracking-widest text-amber-400/45 font-sans">
-                    Ending {i + 1}
-                  </span>
-                  <p className="text-sm text-foreground/75 leading-snug mt-1">{e.excerpt}…</p>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {endingCount != null && endingCount > discoveredEndings.length && (
-            <p className="text-[11px] text-muted-foreground/40 font-sans text-center pt-1">
-              {endingCount - discoveredEndings.length} more waiting to be found.
-            </p>
-          )}
-        </DialogContent>
-      </Dialog>
+      <EndingsDialog open={endingsOpen} onOpenChange={setEndingsOpen} discoveredEndings={discoveredEndings} endingCount={endingCount} />
     </div>
   )
 }
