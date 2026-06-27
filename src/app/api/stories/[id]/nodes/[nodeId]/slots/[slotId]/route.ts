@@ -26,6 +26,7 @@ import {
   appendWorldChronicle,
 } from '@/lib/firestore-helpers'
 import { CreditManager } from '@/lib/credit-manager'
+import { creditFailureResponse } from '@/lib/credit-response'
 import { generateStoryNode, generateStoryImage, reviewContribution, judgeContent, PromptRejectedError } from '@/lib/ai'
 import type { ModerationResult } from '@/lib/moderation'
 import { validatePromptLocal } from '@/lib/validate'
@@ -97,14 +98,11 @@ export async function POST(
       const limitMsg = includeImage
         ? `Not enough credits for text+image (need ${credits}). Purchase more or try again tomorrow!`
         : 'Daily AI limit reached. Purchase more credits or try again tomorrow!'
-      return NextResponse.json(
-        { error: limitMsg, remaining: 0, reset: consumeResult.reset },
-        { status: 429, headers: { 'Retry-After': String(Math.ceil((consumeResult.reset - Date.now()) / 1000)) } },
-      )
+      return creditFailureResponse(consumeResult, { insufficientMessage: limitMsg, extra: { remaining: 0 } })
     }
     source = consumeResult.source
     consumed = true
-    const { remaining, reset } = consumeResult
+    const { remaining } = consumeResult
 
     // These were previously unprotected — any throw here escaped to Next.js's
     // error boundary and returned HTML, causing the lock to never be released.

@@ -17,7 +17,7 @@ export class CreditManager {
     userId: string,
     tier: 'FREE' | 'PREMIUM',
     amount: number
-  ): Promise<{ success: boolean; remaining: number; reset: number; source: 'daily' | 'purchased' }> {
+  ): Promise<{ success: boolean; remaining: number; reset: number; source: 'daily' | 'purchased'; degraded?: boolean }> {
     // 1. Try checking daily rate limit first
     const dailyResult = await checkRateLimit(userId, tier, amount)
     if (dailyResult.success) {
@@ -84,6 +84,9 @@ export class CreditManager {
       remaining: 0,
       reset: dailyResult.reset,
       source: 'daily',
+      // Distinguish "couldn't serve because the limiter is down" from a genuine
+      // "out of credits", so callers can message a temporary outage vs a paywall.
+      degraded: !!dailyResult.degraded,
     }
   }
 
