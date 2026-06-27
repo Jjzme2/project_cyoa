@@ -121,10 +121,14 @@ validation, lint-debt cleanup)._
 
 ## P2 — planned features (see `docs/ROADMAP.md`)
 
-- [ ] **🟡 Split oversized files** (review #9) — `firestore-helpers.ts` (~1451)
-  by domain (stories/rooms/users), extract the story-creator form
-  (`stories/new/page.tsx` ~1251) into sub-components; also `BookViewer.tsx`,
-  `ai.ts`. Mechanical but wide — do as focused, test-backed passes.
+- [ ] **🟡 Split oversized files** (review #9) — target ~500 LOC/file, SRP.
+  - [x] `firestore-helpers.ts` (1451) → 15 domain modules under `lib/firestore/`
+    (largest 336 LOC) behind a barrel re-export; all 72 exports and 39 call
+    sites unchanged, 114 tests green.
+  - [ ] `stories/new/page.tsx` (~1255) → extract the creator form into
+    sub-components.
+  - [ ] `BookViewer.tsx` (~977), `ai.ts` (884), `ChoiceSlots.tsx` (782),
+    `profile/page.tsx` (741), `CoverDesigner.tsx` (640).
 - [ ] Co-op reading rooms **PR 2** (frontier write-pause, host kick, ended
   summary, stale-room cleanup).
 - [ ] Global leaderboards (denormalized aggregate counters).
