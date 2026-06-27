@@ -16,6 +16,7 @@ import { JourneyMap } from './JourneyMap'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useAuth } from '@/components/Providers'
+import { trackEvent } from '@/lib/track-client'
 import { CreatorResourceManager } from '@/lib/creator-resources'
 import { EconomyManager } from '@/lib/engine/economy-manager'
 import {
@@ -140,6 +141,17 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
   const [showInitialChoices, setShowInitialChoices] = useState(false)
   const [pendingChoices, setPendingChoices] = useState<Record<string, string>>({})
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const openedTrackedRef = useRef<string | null>(null)
+
+  // Analytics: a reader opened this story. Fire once per story id, once we have
+  // an authenticated user (the track endpoint requires auth).
+  useEffect(() => {
+    if (!user || openedTrackedRef.current === story.id) return
+    openedTrackedRef.current = story.id
+    void trackEvent(user, 'story.opened', {
+      props: { storyId: story.id, worldId: story.worldId },
+    })
+  }, [user, story.id, story.worldId])
 
   const hasCast = !!story.protagonist?.name || (story.characters?.length ?? 0) > 0
 
@@ -163,7 +175,13 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
   function recordEnding(n: StoryNode) {
     if (!isEndingNode(n)) return
     const prev = loadDiscoveredEndings(story.id)
-    if (prev.some((e) => e.id === n.id)) return
+    const isNew = !prev.some((e) => e.id === n.id)
+    // Analytics: track every ending reached (with whether it's a first discovery),
+    // so we can see completion vs where readers drop off.
+    void trackEvent(user, 'ending.reached', {
+      props: { storyId: story.id, nodeId: n.id, isNew },
+    })
+    if (!isNew) return
     const next = [...prev, { id: n.id, excerpt: (n.content || '').slice(0, 140) }]
     try {
       localStorage.setItem(ENDINGS_KEY(story.id), JSON.stringify(next))
