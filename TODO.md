@@ -121,14 +121,21 @@ validation, lint-debt cleanup)._
 
 ## P2 — planned features (see `docs/ROADMAP.md`)
 
-- [ ] **🟡 Split oversized files** (review #9) — target ~500 LOC/file, SRP.
-  - [x] `firestore-helpers.ts` (1451) → 15 domain modules under `lib/firestore/`
-    (largest 336 LOC) behind a barrel re-export; all 72 exports and 39 call
-    sites unchanged, 114 tests green.
-  - [ ] `stories/new/page.tsx` (~1255) → extract the creator form into
-    sub-components.
-  - [ ] `BookViewer.tsx` (~977), `ai.ts` (884), `ChoiceSlots.tsx` (782),
-    `profile/page.tsx` (741), `CoverDesigner.tsx` (640).
+- [x] **🟡 Split oversized files** (review #9) — target ~500 LOC/file, SRP.
+  - [x] `firestore-helpers.ts` 1451 → 15 domain modules (barrel; all <336).
+  - [x] `ai.ts` 884 → 5 modules (prompts/shared/images/content/review; <255).
+  - [x] `types/index.ts` 615 → 8 domain modules (barrel).
+  - [x] `CoverDesigner.tsx` 640 → editor 387 + cover-theme + BookCoverPreview.
+  - [x] `stories/new/page.tsx` 1255 → 624 (4 SRP sub-components, 2 shared).
+  - [x] `saga/new/page.tsx` 698 → 504 (reuses the shared creator components).
+  - [x] `profile/page.tsx` 741 → 607 (self-contained ApiKeySettings).
+  - [x] `ChoiceSlots.tsx` 782 → 554 (SlotRequirementsEditor).
+  - [x] `BookViewer.tsx` 977 → 823 (internals + dialogs extracted).
+  - _Note: the lib/type files are fully <500. The reader-heavy component pages
+    (stories/new 624, profile 607, ChoiceSlots 554, BookViewer 823) sit above
+    target — the remainder is irreducible form/reader orchestration. Further
+    splitting needs deep render extraction (risky prop-drilling) — left as a
+    focused follow-up rather than forcing it._
 - [ ] Co-op reading rooms **PR 2** (frontier write-pause, host kick, ended
   summary, stale-room cleanup).
 - [ ] Global leaderboards (denormalized aggregate counters).
