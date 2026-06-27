@@ -10,12 +10,10 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
 const RUN_TIMEOUT_MS = 90_000
-const MAX_LOG_CHARS = 100_000
 
 interface AssertionResult {
   title: string
   status: string
-  duration?: number | null
   failureMessages?: string[]
 }
 interface FileResult {
@@ -32,10 +30,41 @@ function runnerEnabled(): boolean {
 }
 
 function stripAnsi(s: string): string {
-  return s.replace(/\[[0-9;]*m/g, '')
+  return s.replace(/\[[0-9;]*m/g, '')
 }
 
-/** Admin-only: run the Vitest suite and return structured results + logs. */
+/** Build the structured summary + per-file results from Vitest's JSON report. */
+function summarize(report: Record<string, unknown>, cwd: string) {
+  const testResults = (report.testResults as FileResult[] | undefined) ?? []
+  const summary = {
+    success: !!report.success,
+    totalFiles: testResults.length,
+    totalTests: (report.numTotalTests as number) ?? 0,
+    passed: (report.numPassedTests as number) ?? 0,
+    failed: (report.numFailedTests as number) ?? 0,
+  }
+  const files = testResults.map((f) => {
+    const assertions = f.assertionResults ?? []
+    return {
+      file: relative(cwd, f.name),
+      status: f.status,
+      total: assertions.length,
+      passed: assertions.filter((a) => a.status === 'passed').length,
+      failed: assertions.filter((a) => a.status === 'failed').length,
+      durationMs: f.startTime && f.endTime ? f.endTime - f.startTime : null,
+      failures: assertions
+        .filter((a) => a.status === 'failed')
+        .map((a) => ({ title: a.title, message: stripAnsi((a.failureMessages ?? []).join('\n')).slice(0, 4000) })),
+    }
+  })
+  return { summary, files }
+}
+
+/**
+ * Admin-only: run the Vitest suite, streaming log output live as NDJSON
+ * (`{type:'log'}` chunks, then a final `{type:'done'}` with the structured
+ * summary). Auth/gating failures return a normal JSON error before the stream.
+ */
 export async function POST(req: NextRequest) {
   const auth = await getAuthContext(req)
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -52,70 +81,69 @@ export async function POST(req: NextRequest) {
   const tmp = await mkdtemp(join(tmpdir(), 'admin-vitest-'))
   const outFile = join(tmp, 'results.json')
   const startedAt = Date.now()
+  const bin = join(cwd, 'node_modules', '.bin', 'vitest')
 
-  try {
-    // Fixed command — no user input reaches the args, and no shell is used.
-    const bin = join(cwd, 'node_modules', '.bin', 'vitest')
-    const child = spawn(
-      bin,
-      ['run', '--reporter=default', '--reporter=json', `--outputFile.json=${outFile}`],
-      { cwd, env: { ...process.env, CI: 'true', NO_COLOR: '1', FORCE_COLOR: '0' } },
-    )
-
-    let logs = ''
-    const append = (d: Buffer) => {
-      if (logs.length < MAX_LOG_CHARS) logs += d.toString()
-    }
-    child.stdout.on('data', append)
-    child.stderr.on('data', append)
-
-    const timer = setTimeout(() => child.kill('SIGKILL'), RUN_TIMEOUT_MS)
-    const exitCode: number = await new Promise((resolve) => {
-      child.on('close', (code) => resolve(code ?? 1))
-      child.on('error', () => resolve(1))
-    })
-    clearTimeout(timer)
-
-    const durationMs = Date.now() - startedAt
-    logs = stripAnsi(logs).slice(0, MAX_LOG_CHARS)
-
-    // Parse the structured report; degrade gracefully if it wasn't written.
-    let summary: Record<string, unknown> = { success: exitCode === 0 }
-    let files: unknown[] = []
-    try {
-      const report = JSON.parse(await readFile(outFile, 'utf8'))
-      summary = {
-        success: !!report.success,
-        // numTotalTestSuites counts describe blocks; the real file count is the
-        // length of testResults.
-        totalFiles: (report.testResults ?? []).length,
-        totalTests: report.numTotalTests ?? 0,
-        passed: report.numPassedTests ?? 0,
-        failed: report.numFailedTests ?? 0,
+  const stream = new ReadableStream({
+    start(controller) {
+      const enc = new TextEncoder()
+      let closed = false
+      const send = (obj: unknown) => {
+        if (!closed) controller.enqueue(enc.encode(JSON.stringify(obj) + '\n'))
       }
-      files = (report.testResults ?? []).map((f: FileResult) => {
-        const assertions = f.assertionResults ?? []
-        return {
-          file: relative(cwd, f.name),
-          status: f.status,
-          total: assertions.length,
-          passed: assertions.filter((a) => a.status === 'passed').length,
-          failed: assertions.filter((a) => a.status === 'failed').length,
-          durationMs: f.startTime && f.endTime ? f.endTime - f.startTime : null,
-          failures: assertions
-            .filter((a) => a.status === 'failed')
-            .map((a) => ({ title: a.title, message: stripAnsi((a.failureMessages ?? []).join('\n')).slice(0, 4000) })),
-        }
-      })
-    } catch {
-      // No JSON report (crash/timeout) — the logs still tell the story.
-    }
+      const close = async () => {
+        if (closed) return
+        closed = true
+        controller.close()
+        await rm(tmp, { recursive: true, force: true }).catch(() => {})
+      }
 
-    return NextResponse.json({ summary, files, logs, exitCode, durationMs })
-  } catch (err) {
-    console.error('[admin/tests] run failed:', err)
-    return NextResponse.json({ error: 'Failed to run tests' }, { status: 500 })
-  } finally {
-    await rm(tmp, { recursive: true, force: true }).catch(() => {})
-  }
+      let child
+      try {
+        // Fixed command — no user input reaches the args, and no shell is used.
+        child = spawn(
+          bin,
+          ['run', '--reporter=default', '--reporter=json', `--outputFile.json=${outFile}`],
+          { cwd, env: { ...process.env, CI: 'true', NO_COLOR: '1', FORCE_COLOR: '0' } },
+        )
+      } catch (err) {
+        console.error('[admin/tests] spawn failed:', err)
+        send({ type: 'error', error: 'Failed to start the test runner' })
+        void close()
+        return
+      }
+
+      const timer = setTimeout(() => child.kill('SIGKILL'), RUN_TIMEOUT_MS)
+      const onChunk = (d: Buffer) => send({ type: 'log', chunk: stripAnsi(d.toString()) })
+      child.stdout.on('data', onChunk)
+      child.stderr.on('data', onChunk)
+
+      child.on('error', () => {
+        clearTimeout(timer)
+        send({ type: 'error', error: 'The test runner failed to execute' })
+        void close()
+      })
+
+      child.on('close', async (code) => {
+        clearTimeout(timer)
+        const exitCode = code ?? 1
+        const durationMs = Date.now() - startedAt
+        let payload: Record<string, unknown> = { summary: { success: exitCode === 0 }, files: [] }
+        try {
+          payload = summarize(JSON.parse(await readFile(outFile, 'utf8')), cwd)
+        } catch {
+          // No JSON report (crash/timeout) — the streamed logs still tell the story.
+        }
+        send({ type: 'done', ...payload, exitCode, durationMs })
+        void close()
+      })
+    },
+  })
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'application/x-ndjson; charset=utf-8',
+      'Cache-Control': 'no-store, no-transform',
+      'X-Accel-Buffering': 'no',
+    },
+  })
 }
