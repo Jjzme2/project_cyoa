@@ -71,8 +71,12 @@ export default function NewWorldPage() {
     if (!loading && !user) router.replace('/')
   }, [user, loading, router])
 
+  // Read draft availability once after mount (not during render) so the server
+  // and client agree on first paint; the banner then appears if a draft exists.
+  // The flag stays dismissable via setHasDraft(false) in the handlers below.
   useEffect(() => {
     const saved = draft.load()
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional post-mount external-store read; see note above
     if (saved && (saved.data.name || saved.data.lore)) setHasDraft(true)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 

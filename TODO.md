@@ -82,9 +82,15 @@ validation, lint-debt cleanup)._
 - [ ] **🟡 Schema validation layer** (review #8) — adopt zod (or extend
   `lib/validate.ts`) so the ~52 API routes parse request bodies uniformly
   instead of ad-hoc `req.json()` handling.
-- [ ] **🟠 Clear lint debt → make CI lint blocking** — 12 pre-existing errors
+- [x] **🟠 Clear lint debt → make CI lint blocking** — 12 pre-existing errors
   across 8 files (`react-hooks/*`, `no-explicit-any`); fix, then drop
   `continue-on-error` from the CI lint step.
+  _Done: all 12 errors fixed (typed Stripe/Firestore `any`s — incidentally
+  correcting `current_period_end`, which now reads from the subscription
+  item; derived the library world filter from the URL; moved external-store
+  reads to lazy init / event handlers; two justified `set-state-in-effect`
+  disables for the hydration-safe draft banner). Lint is now a hard CI gate;
+  5 unused-var/exhaustive-deps warnings remain (non-blocking)._
 - [ ] **🟢 Generation observability** (review, green) — track AI generation
   failures, credit cost, and reader drop-off via the telemetry channels so we
   can answer "how many failed / how much did they cost / where do readers

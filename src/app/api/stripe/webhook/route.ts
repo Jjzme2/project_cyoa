@@ -77,14 +77,17 @@ export async function POST(req: NextRequest) {
         if (type === 'subscription') {
           const subscriptionId = session.subscription as string
           if (subscriptionId) {
-            const subscription = (await stripe.subscriptions.retrieve(subscriptionId)) as any
-            const priceId = subscription.items.data[0]?.price.id ?? null
+            const subscription = (await stripe.subscriptions.retrieve(subscriptionId)) as Stripe.Subscription
+            // In the pinned API version, the billing period lives on the
+            // subscription item, not the subscription itself.
+            const item = subscription.items.data[0]
+            const priceId = item?.price.id ?? null
             await StripeService.syncSubscriptionStatus(
               userId,
               subscription.id,
               subscription.status,
               priceId,
-              subscription.current_period_end
+              item?.current_period_end ?? null
             )
           }
           await insights.track('subscription.checkout', { uid: userId, props: { type } })
@@ -97,7 +100,7 @@ export async function POST(req: NextRequest) {
 
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted': {
-        const subscription = event.data.object as any
+        const subscription = event.data.object as Stripe.Subscription
         const customerId = subscription.customer as string
 
         // Find the user mapped to this Stripe customer ID in our flattened Firestore schema
@@ -113,13 +116,14 @@ export async function POST(req: NextRequest) {
         }
 
         const userId = snap.docs[0].id
-        const priceId = subscription.items.data[0]?.price.id ?? null
+        const item = subscription.items.data[0]
+        const priceId = item?.price.id ?? null
         await StripeService.syncSubscriptionStatus(
           userId,
           subscription.id,
           subscription.status,
           priceId,
-          subscription.current_period_end
+          item?.current_period_end ?? null
         )
         break
       }
