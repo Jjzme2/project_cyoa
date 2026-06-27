@@ -13,6 +13,8 @@ interface Overview {
   storiesCapped: boolean
   worlds: number
   worldsCapped: boolean
+  eventsToday: number
+  insightsToday: number
 }
 
 function fmt(n: number, capped: boolean): string {
@@ -66,6 +68,18 @@ export default function AdminDashboardPage() {
       value: overview ? fmt(overview.pendingModeration, overview.pendingModerationCapped) : '—',
       icon: ClipboardList,
       href: '/admin/moderation',
+    },
+    {
+      label: 'Events today',
+      value: overview ? `${overview.eventsToday}` : '—',
+      icon: BarChart3,
+      href: '/admin/analytics',
+    },
+    {
+      label: 'Insights today',
+      value: overview ? `${overview.insightsToday}` : '—',
+      icon: Sparkles,
+      href: '/admin/insights',
     },
     { label: 'Stories', value: overview ? fmt(overview.stories, overview.storiesCapped) : '—', icon: BookOpen },
     { label: 'Public worlds', value: overview ? fmt(overview.worlds, overview.worldsCapped) : '—', icon: Globe },

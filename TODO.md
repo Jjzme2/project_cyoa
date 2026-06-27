@@ -50,16 +50,26 @@ the codebase alone).
   the daily/free path now denies free generations and falls through to
   purchased credits (Firestore), closing the cost leak while keeping the paid
   path open. Covered by `rate-limit.test.ts`.
+- [x] **Degraded vs out-of-credits messaging** — AI routes return a 503
+  "temporarily unavailable" on a degraded limiter instead of a misleading 429
+  "insufficient credits" (shared `lib/credit-response.ts`).
+- [x] **Client-side reader analytics** — `BookViewer` emits `story.opened`
+  (once per open) and `ending.reached` (with `isNew`) via `POST /api/track`
+  through the new `lib/track-client.ts` helper, so the dashboard reflects
+  reading, not just authoring.
+- [x] **Admin hub live counts** — `/admin` overview now shows Events today and
+  Insights today (cheap per-day rollup reads), linking to the analytics and
+  insights pages.
+- [x] **Track group reads** — `RoomReader` (co-op) now emits `story.opened`
+  tagged `source:'room'`; solo opens are tagged `source:'solo'`, so reads are
+  attributable by mode.
 
 ---
 
 ## P0 — next up (engineering)
 
-- [ ] **Client-side reader analytics** — emit `story.opened` and
-  `ending.reached` via `POST /api/track` so the dashboard reflects reading,
-  not just authoring.
-- [ ] **Admin hub live counts** — surface today's analytics total + open
-  insights count on the `/admin` overview cards.
+_All cleared — see P1 for the next wave (broader test coverage, zod
+validation, lint-debt cleanup)._
 
 ## P1
 
