@@ -17,7 +17,7 @@ export class CreditManager {
     userId: string,
     tier: 'FREE' | 'PREMIUM',
     amount: number
-  ): Promise<{ success: boolean; remaining: number; reset: number; source: 'daily' | 'purchased' }> {
+  ): Promise<{ success: boolean; remaining: number; reset: number; source: 'daily' | 'purchased'; degraded?: boolean }> {
     // 1. Try checking daily rate limit first
     const dailyResult = await checkRateLimit(userId, tier, amount)
     if (dailyResult.success) {
@@ -29,7 +29,14 @@ export class CreditManager {
       }
     }
 
-    // 2. Daily limit exhausted. Check purchased credits in Firestore
+    if (dailyResult.degraded) {
+      // Rate limiter is down (fails closed). We won't grant a free generation;
+      // fall through to purchased credits so paying users keep working, and
+      // deny if they have none.
+      console.warn('[CreditManager] rate limiter degraded — falling back to purchased credits only')
+    }
+
+    // 2. Daily limit exhausted (or unavailable). Check purchased credits in Firestore
     const userSettingsRef = adminDb.collection('userSettings').doc(userId)
     
     try {
@@ -77,6 +84,9 @@ export class CreditManager {
       remaining: 0,
       reset: dailyResult.reset,
       source: 'daily',
+      // Distinguish "couldn't serve because the limiter is down" from a genuine
+      // "out of credits", so callers can message a temporary outage vs a paywall.
+      degraded: !!dailyResult.degraded,
     }
   }
 

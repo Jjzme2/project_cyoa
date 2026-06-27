@@ -13,6 +13,7 @@ import { useAuth } from '@/components/Providers'
 import { STORY_TAGS, CONTENT_RATINGS, CONTENT_RATING_META, DEFAULT_CONTENT_RATING } from '@/types'
 import { ratingRank } from '@/lib/ratings'
 import { CoverDesigner, DEFAULT_COVER } from '@/components/book/CoverDesigner'
+import { useDraft } from '@/hooks/useDraft'
 import type { World, CoverTheme, ReadingTheme, PageStyle, AmbientEffect, ContentRating, DirectorPersona } from '@/types'
 import {
   DIRECTOR_AXES,
@@ -73,10 +74,50 @@ export default function NewSagaPage() {
   const [director, setDirector] = useState<DirectorPersona>(emptyDirector)
   const [coverTheme, setCoverTheme] = useState<CoverTheme>(DEFAULT_COVER)
   const [readingTheme, setReadingTheme] = useState<ReadingTheme>({ pageStyle: 'parchment', ambientEffect: 'none' })
+  const [hasDraft, setHasDraft] = useState(false)
+
+  const draft = useDraft<{
+    title: string; description: string; worldId: string; rating: ContentRating
+    tags: string[]; premise: string; entryPoints: EntryPoint[]; shared: boolean
+    director: DirectorPersona; coverTheme: CoverTheme; readingTheme: ReadingTheme
+  }>('chronicle:draft:saga')
 
   useEffect(() => {
     if (!loading && !user) router.replace('/')
   }, [user, loading, router])
+
+  useEffect(() => {
+    const saved = draft.load()
+    if (saved && (saved.data.title || saved.data.premise || saved.data.entryPoints?.some((e) => e.label || e.premise))) {
+      // One-time read of a persisted draft on mount; not reactive state sync.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setHasDraft(true)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function restoreDraft() {
+    const saved = draft.load()
+    if (!saved) return
+    const d = saved.data
+    setTitle(d.title)
+    setDescription(d.description)
+    if (d.worldId) setWorldId(d.worldId)
+    setRating(d.rating)
+    setTags(d.tags)
+    setPremise(d.premise)
+    if (d.entryPoints?.length) setEntryPoints(d.entryPoints)
+    setShared(d.shared ?? true)
+    if (d.director) setDirector({ ...emptyDirector(), ...d.director })
+    setCoverTheme(d.coverTheme)
+    setReadingTheme(d.readingTheme)
+    setHasDraft(false)
+    toast.success('Draft restored')
+  }
+
+  function discardDraft() {
+    draft.clear()
+    setHasDraft(false)
+  }
 
   useEffect(() => {
     if (!user) return
@@ -153,10 +194,16 @@ export default function NewSagaPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Failed to create saga')
 
+      draft.clear()
       toast.success('Your saga awaits its first traveller!')
       router.push(`/stories/${data.id}`)
     } catch (err) {
+      draft.save({
+        title, description, worldId, rating, tags, premise, entryPoints,
+        shared, director, coverTheme, readingTheme,
+      })
       toast.error(err instanceof Error ? err.message : 'Something went wrong')
+      toast.info('Draft saved — your saga is preserved for next time.')
     } finally {
       setSubmitting(false)
     }
@@ -209,6 +256,34 @@ export default function NewSagaPage() {
           in, and the storyteller renders each opening for you.
         </p>
       </div>
+
+      {hasDraft && (
+        <div className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+          <div className="flex items-center gap-2 text-sm text-amber-300/80">
+            <RotateCcw className="h-3.5 w-3.5 shrink-0" />
+            You have an unsaved saga draft.
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={discardDraft}
+              className="h-7 px-2.5 text-xs text-muted-foreground/50 hover:text-muted-foreground"
+            >
+              Discard
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={restoreDraft}
+              className="h-7 px-2.5 text-xs bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300"
+            >
+              Restore
+            </Button>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* ── Saga details ── */}

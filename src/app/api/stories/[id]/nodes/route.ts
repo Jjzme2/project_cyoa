@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { revalidateTag } from 'next/cache'
 import { adminAuth } from '@/lib/firebase-admin'
 import { getAuthContext } from '@/lib/auth'
@@ -6,6 +6,7 @@ import { moderateText, moderationToNodeFields } from '@/lib/moderation'
 import { ratingRank } from '@/lib/ratings'
 import { getStory, getStoryNode, createStoryNode } from '@/lib/firestore-helpers'
 import { adminDb } from '@/lib/firebase-admin'
+import { analytics } from '@/lib/telemetry'
 
 export async function GET(
   req: NextRequest,
@@ -92,6 +93,15 @@ export async function POST(
     await adminDb.collection('stories').doc(storyId).update({ rootNodeId: nodeId })
     revalidateTag(`story-${storyId}`, 'max')
     revalidateTag(`story-tree-${storyId}`, 'max')
+  } else {
+    // A community contribution onto an existing chapter (the root node is the
+    // opening, already counted by story.created).
+    after(() =>
+      analytics.track('route.contributed', {
+        uid,
+        props: { storyId, depth: depth ?? 0, aiGenerated: aiGenerated ?? false, flagged: moderationFields.published === false },
+      }),
+    )
   }
 
   return NextResponse.json({ nodeId }, { status: 201 })

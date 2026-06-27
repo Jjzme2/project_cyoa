@@ -9,6 +9,7 @@ import {
   checkAndAwardAchievements,
 } from '@/lib/firestore-helpers'
 import { CreditManager } from '@/lib/credit-manager'
+import { creditFailureResponse } from '@/lib/credit-response'
 import { generateSagaOpening, PromptRejectedError } from '@/lib/ai'
 import { clampRating } from '@/lib/ratings'
 import { sanitizeDirector } from '@/lib/director'
@@ -92,13 +93,9 @@ export async function POST(req: NextRequest) {
   const cost = entries.length
   const credit = await CreditManager.consume(uid, tier, cost)
   if (!credit.success) {
-    return NextResponse.json(
-      {
-        error: `Rendering this saga needs ${cost} credit${cost === 1 ? '' : 's'} (one per entry point). Purchase more or try again tomorrow.`,
-        reset: credit.reset,
-      },
-      { status: 429 },
-    )
+    return creditFailureResponse(credit, {
+      insufficientMessage: `Rendering this saga needs ${cost} credit${cost === 1 ? '' : 's'} (one per entry point). Purchase more or try again tomorrow.`,
+    })
   }
 
   let storyId: string | null = null

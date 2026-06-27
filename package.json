@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "migrate:subcollections": "tsx scripts/migrate-to-subcollections.ts",
     "migrate:subcollections:dry": "tsx scripts/migrate-to-subcollections.ts --dry-run",
     "set-admin": "tsx scripts/set-admin.ts",
@@ -50,6 +53,7 @@
     "eslint-config-next": "16.2.7",
     "tailwindcss": "^4",
     "tsx": "^4.0.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.9"
   }
 }

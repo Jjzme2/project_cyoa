@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminAuth } from '@/lib/firebase-admin'
 import { CreditManager } from '@/lib/credit-manager'
+import { creditFailureResponse } from '@/lib/credit-response'
 import { generateCoverImage } from '@/lib/ai'
 
 export async function POST(req: NextRequest) {
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
 
   const credit = await CreditManager.consume(uid, tier, 3)
   if (!credit.success) {
-    return NextResponse.json({ error: 'Insufficient credits', reset: credit.reset }, { status: 429 })
+    return creditFailureResponse(credit)
   }
 
   const blobKey = `${uid}-${Date.now()}`
