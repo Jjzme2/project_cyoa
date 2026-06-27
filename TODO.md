@@ -73,9 +73,12 @@ validation, lint-debt cleanup)._
 
 ## P1
 
-- [ ] **🟠 Expand test coverage** (review #4) — `CreditManager`, `rate-limit`,
+- [x] **🟠 Expand test coverage** (review #4) — `CreditManager`, `rate-limit`,
   and the engine's deterministic pieces (seed-rng, goap-planner,
   faction-manager). Firestore/Redis-backed bits need light mocking.
+  _Done: `rate-limit` covered in P0; added `credit-manager`, `seed-rng`,
+  `goap-planner`, and `faction-manager` suites (+58 tests, in-memory
+  Firestore + rate-limit fakes for the I/O-backed paths)._
 - [ ] **🟡 Schema validation layer** (review #8) — adopt zod (or extend
   `lib/validate.ts`) so the ~52 API routes parse request bodies uniformly
   instead of ad-hoc `req.json()` handling.
