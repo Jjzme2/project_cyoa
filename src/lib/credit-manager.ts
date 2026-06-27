@@ -29,7 +29,14 @@ export class CreditManager {
       }
     }
 
-    // 2. Daily limit exhausted. Check purchased credits in Firestore
+    if (dailyResult.degraded) {
+      // Rate limiter is down (fails closed). We won't grant a free generation;
+      // fall through to purchased credits so paying users keep working, and
+      // deny if they have none.
+      console.warn('[CreditManager] rate limiter degraded — falling back to purchased credits only')
+    }
+
+    // 2. Daily limit exhausted (or unavailable). Check purchased credits in Firestore
     const userSettingsRef = adminDb.collection('userSettings').doc(userId)
     
     try {

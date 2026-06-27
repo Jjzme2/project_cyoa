@@ -26,7 +26,7 @@ export async function checkRateLimit(
   userId: string,
   tier: 'FREE' | 'PREMIUM' = 'FREE',
   credits = 1,
-): Promise<{ success: boolean; remaining: number; reset: number }> {
+): Promise<{ success: boolean; remaining: number; reset: number; degraded?: boolean }> {
   try {
     const redis = getRedis()
     const key = dailyKey(userId, tier)
@@ -41,11 +41,12 @@ export async function checkRateLimit(
     const remaining = Math.max(0, limit - count)
     return { success: count <= limit, remaining, reset: endOfDayUTC() }
   } catch (err) {
-    // Redis is unreachable. We FAIL OPEN so a Redis outage doesn't take down all
-    // AI generation — but that means generations are briefly uncredited, so log
-    // loudly for alerting. (TODO: fail closed for the paid-generation path.)
-    console.error('[rate-limit] checkRateLimit failed open (Redis unreachable):', err)
-    return { success: true, remaining: FREE_DAILY_LIMIT, reset: endOfDayUTC() }
+    // Redis is unreachable, so we can't verify or decrement the daily allowance.
+    // FAIL CLOSED for the free/daily path: do NOT grant a free generation (each
+    // one costs real money). `degraded` lets CreditManager fall through to
+    // purchased credits — the paid path stays open — and denies otherwise.
+    console.error('[rate-limit] checkRateLimit failed closed (Redis unreachable):', err)
+    return { success: false, remaining: 0, reset: endOfDayUTC(), degraded: true }
   }
 }
 

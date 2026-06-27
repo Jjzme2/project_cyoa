@@ -46,14 +46,14 @@ the codebase alone).
   lint informational (pending debt cleanup).
 - [x] **🟠 App Router error/loading UI** — root `error.tsx`,
   `global-error.tsx`, `not-found.tsx`, `loading.tsx`.
+- [x] **🟠 Rate limiter fails closed** (review #6) — when Redis is unreachable
+  the daily/free path now denies free generations and falls through to
+  purchased credits (Firestore), closing the cost leak while keeping the paid
+  path open. Covered by `rate-limit.test.ts`.
 
 ---
 
 ## P0 — next up (engineering)
-
-- [ ] **🟠 Fail closed for paid generation** (review #6) — when Redis is down,
-  the paid path currently still grants free generations. Decide policy and, for
-  purchased-credit generation, fail closed rather than open.
 
 - [ ] **Client-side reader analytics** — emit `story.opened` and
   `ending.reached` via `POST /api/track` so the dashboard reflects reading,
