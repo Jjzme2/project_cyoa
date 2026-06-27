@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { after } from 'next/server'
 import { revalidateTag } from 'next/cache'
+import { z } from 'zod'
+import { parseJson } from '@/lib/api-validation'
 import { adminAuth } from '@/lib/firebase-admin'
 import {
   createStory,
@@ -15,11 +17,29 @@ import { clampRating } from '@/lib/ratings'
 import { sanitizeDirector } from '@/lib/director'
 import { analytics } from '@/lib/telemetry'
 import { CONTENT_RATINGS, DEFAULT_CONTENT_RATING } from '@/types'
-import type { ContentRating } from '@/types'
+import type { CoverTheme, ReadingTheme } from '@/types'
 
 const MAX_ENTRY_POINTS = 4
 
 type EntryInput = { label: string; premise: string }
+
+const SagaSchema = z.object({
+  title: z.string().trim().min(1, 'Missing required fields'),
+  worldId: z.string().min(1, 'Missing required fields'),
+  worldName: z.string().min(1, 'Missing required fields'),
+  description: z.string().optional(),
+  // Invalid/absent ratings fall back to the default, as before.
+  rating: z.enum(CONTENT_RATINGS).catch(DEFAULT_CONTENT_RATING),
+  tags: z.array(z.string()).optional(),
+  coverTheme: z.custom<CoverTheme>().optional(),
+  readingTheme: z.custom<ReadingTheme>().optional(),
+  director: z.unknown().optional(),
+  shared: z.boolean().optional(),
+  premise: z.string().optional(),
+  entryPoints: z
+    .array(z.object({ label: z.string().optional(), premise: z.string().optional() }).loose())
+    .optional(),
+})
 
 export async function POST(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
@@ -37,7 +57,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
   }
 
-  const body = await req.json()
+  const parsed = await parseJson(req, SagaSchema)
+  if (!parsed.ok) return parsed.response
   const {
     title,
     description,
@@ -51,11 +72,7 @@ export async function POST(req: NextRequest) {
     shared,
     premise,
     entryPoints,
-  } = body
-
-  if (!title?.trim() || !worldId || !worldName) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-  }
+  } = parsed.data
 
   // Sanitise the entry points — each is a doorway into the saga: a short label
   // the reader picks, plus a premise the AI renders the opening from.
@@ -81,13 +98,9 @@ export async function POST(req: NextRequest) {
   // Authored director persona (optional), clamped like the story route does.
   const safeDirector = sanitizeDirector(director)
 
-  const requestedRating: ContentRating = CONTENT_RATINGS.includes(rating)
-    ? (rating as ContentRating)
-    : DEFAULT_CONTENT_RATING
-
   const world = await getWorld(worldId).catch(() => null)
   if (!world) return NextResponse.json({ error: 'World not found' }, { status: 404 })
-  const effectiveRating = world.rating ? clampRating(requestedRating, world.rating) : requestedRating
+  const effectiveRating = world.rating ? clampRating(rating, world.rating) : rating
 
   // One credit per opening we render. Reserve up front; refund on any failure.
   const cost = entries.length

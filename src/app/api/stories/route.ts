@@ -1,13 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { after } from 'next/server'
 import { revalidateTag } from 'next/cache'
+import { z } from 'zod'
+import { parseJson } from '@/lib/api-validation'
 import { adminAuth } from '@/lib/firebase-admin'
 import { getStories, createStory, getWorld, checkAndAwardAchievements } from '@/lib/firestore-helpers'
 import { clampRating } from '@/lib/ratings'
 import { sanitizeDirector } from '@/lib/director'
 import { analytics } from '@/lib/telemetry'
 import { CONTENT_RATINGS, DEFAULT_CONTENT_RATING } from '@/types'
-import type { ContentRating } from '@/types'
+import type { CoverTheme, ReadingTheme, ResourceDefinition } from '@/types'
+
+// Opaque, author-supplied structures (resources, themes, director) were never
+// validated field-by-field here; `z.custom`/`z.unknown` preserve that
+// pass-through while the fields the handler actually reads are checked.
+const CreateStorySchema = z.object({
+  title: z.string().min(1),
+  worldId: z.string().min(1),
+  worldName: z.string().min(1),
+  description: z.string().optional(),
+  coverGradient: z.string().optional(),
+  resources: z.custom<ResourceDefinition[]>().optional(),
+  tags: z.array(z.string()).optional(),
+  coverTheme: z.custom<CoverTheme>().optional(),
+  readingTheme: z.custom<ReadingTheme>().optional(),
+  // Invalid/absent ratings fall back to the default (previously a manual check).
+  rating: z.enum(CONTENT_RATINGS).catch(DEFAULT_CONTENT_RATING),
+  protagonist: z
+    .object({ name: z.string().optional(), description: z.string().optional() })
+    .loose()
+    .optional(),
+  director: z.unknown().optional(),
+  youMode: z.boolean().optional(),
+  shared: z.boolean().optional(),
+  goapEnabled: z.boolean().optional(),
+  implementQuests: z.boolean().optional(),
+})
 
 export async function GET(req: NextRequest) {
   const limit = Number(req.nextUrl.searchParams.get('limit') ?? 20)
@@ -29,12 +57,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
   }
 
-  const body = await req.json()
-  const { title, description, worldId, worldName, coverGradient, resources, tags, coverTheme, readingTheme, rating, protagonist, director, youMode, shared, goapEnabled, implementQuests } = body
-
-  if (!title || !worldId || !worldName) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-  }
+  const parsed = await parseJson(req, CreateStorySchema)
+  if (!parsed.ok) return parsed.response
+  const { title, description, worldId, worldName, coverGradient, resources, tags, coverTheme, readingTheme, rating, protagonist, director, youMode, shared, goapEnabled, implementQuests } = parsed.data
 
   // Authored director persona (optional). Axes are clamped to [-1, 1]; only kept
   // if the author actually set something.
@@ -50,13 +75,9 @@ export async function POST(req: NextRequest) {
       }
     : null
 
-  const requestedRating: ContentRating = CONTENT_RATINGS.includes(rating)
-    ? (rating as ContentRating)
-    : DEFAULT_CONTENT_RATING
-
   // A story can never be rated more mature than the world that contains it.
   const world = await getWorld(worldId).catch(() => null)
-  const safeRating = world?.rating ? clampRating(requestedRating, world.rating) : requestedRating
+  const safeRating = world?.rating ? clampRating(rating, world.rating) : rating
 
   // Seed the opening cast from the world's genesis canon, so stories begin
   // grounded in the world's real figures (emergent characters still grow on top).

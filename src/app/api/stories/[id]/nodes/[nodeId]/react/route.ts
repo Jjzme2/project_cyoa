@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { parseJson } from '@/lib/api-validation'
 import { adminAuth } from '@/lib/firebase-admin'
 import { toggleNodeReaction, getNodeReactions } from '@/lib/firestore-helpers'
-import type { ReactionType } from '@/types'
 
-const VALID_REACTIONS: ReactionType[] = ['👏', '✨', '😮', '😂']
+const ReactSchema = z.object({
+  reaction: z.enum(['👏', '✨', '😮', '😂'], { message: 'Invalid reaction type' }),
+})
 
 export async function GET(
   req: NextRequest,
@@ -40,12 +43,9 @@ export async function POST(
   }
 
   const { id: storyId, nodeId } = await params
-  const { reaction } = await req.json()
+  const parsed = await parseJson(req, ReactSchema)
+  if (!parsed.ok) return parsed.response
 
-  if (!VALID_REACTIONS.includes(reaction)) {
-    return NextResponse.json({ error: 'Invalid reaction type' }, { status: 400 })
-  }
-
-  const result = await toggleNodeReaction(uid, storyId, nodeId, reaction as ReactionType)
+  const result = await toggleNodeReaction(uid, storyId, nodeId, parsed.data.reaction)
   return NextResponse.json(result)
 }

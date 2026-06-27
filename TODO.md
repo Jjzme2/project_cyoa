@@ -79,9 +79,12 @@ validation, lint-debt cleanup)._
   _Done: `rate-limit` covered in P0; added `credit-manager`, `seed-rng`,
   `goap-planner`, and `faction-manager` suites (+58 tests, in-memory
   Firestore + rate-limit fakes for the I/O-backed paths)._
-- [ ] **🟡 Schema validation layer** (review #8) — adopt zod (or extend
-  `lib/validate.ts`) so the ~52 API routes parse request bodies uniformly
-  instead of ad-hoc `req.json()` handling.
+- [x] **🟡 Schema validation layer** (review #8) — adopted zod via a shared
+  `parseJson(req, schema)` helper (`src/lib/api-validation.ts`) returning a
+  typed `{ ok, data }` / 400-response union. Migrated every body-parsing API
+  route (~30) off ad-hoc `req.json()` to co-located zod schemas; malformed JSON
+  and validation failures now return uniform 400s. Covered by
+  `api-validation.test.ts` (+9 tests).
 - [x] **🟠 Clear lint debt → make CI lint blocking** — 12 pre-existing errors
   across 8 files (`react-hooks/*`, `no-explicit-any`); fix, then drop
   `continue-on-error` from the CI lint step.

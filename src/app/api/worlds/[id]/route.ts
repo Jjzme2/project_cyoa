@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidateTag } from 'next/cache'
+import { z } from 'zod'
+import { parseJson } from '@/lib/api-validation'
 import { getAuthContext } from '@/lib/auth'
 import { getWorld, updateWorldRating, clampStoriesToWorldRating } from '@/lib/firestore-helpers'
 import { CONTENT_RATINGS } from '@/types'
-import type { ContentRating } from '@/types'
+
+const RatingSchema = z.object({
+  rating: z.enum(CONTENT_RATINGS, { message: 'Invalid rating' }),
+})
 
 /**
  * Update a world's content rating. The creator may set their own world's
@@ -18,11 +23,9 @@ export async function PATCH(
   const auth = await getAuthContext(req)
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await req.json().catch(() => ({}))
-  const rating = body.rating as ContentRating
-  if (!CONTENT_RATINGS.includes(rating)) {
-    return NextResponse.json({ error: 'Invalid rating' }, { status: 400 })
-  }
+  const parsed = await parseJson(req, RatingSchema)
+  if (!parsed.ok) return parsed.response
+  const { rating } = parsed.data
 
   const world = await getWorld(id)
   if (!world) return NextResponse.json({ error: 'World not found' }, { status: 404 })

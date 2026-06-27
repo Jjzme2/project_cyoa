@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { parseJson } from '@/lib/api-validation'
 import { adminAuth } from '@/lib/firebase-admin'
 import {
   getStory,
@@ -31,8 +33,9 @@ export async function POST(req: NextRequest) {
   const decoded = await verifyUser(req)
   if (!decoded) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { storyId } = await req.json()
-  if (!storyId) return NextResponse.json({ error: 'storyId required' }, { status: 400 })
+  const parsed = await parseJson(req, z.object({ storyId: z.string().min(1, 'storyId required') }))
+  if (!parsed.ok) return parsed.response
+  const { storyId } = parsed.data
 
   const story = await getStory(storyId)
   if (!story) return NextResponse.json({ error: 'Story not found' }, { status: 404 })

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { after } from 'next/server'
 import { revalidateTag } from 'next/cache'
+import { z } from 'zod'
+import { parseJson } from '@/lib/api-validation'
 import { adminAuth, adminDb } from '@/lib/firebase-admin'
 import {
   getChoiceSlot,
@@ -34,8 +36,20 @@ import { moderateText, moderationToNodeFields } from '@/lib/moderation'
 import { NarrativeBuilder } from '@/lib/engine/narrative-builder'
 import type { WorldState } from '@/types/goap'
 import type { AgentMemory } from '@/types/goap'
+import type { ChoiceRequirement, ChoiceEffect } from '@/types'
 
 const IMAGE_CREDIT_COST = 3 // total credits when image is requested
+
+// requirements/effects/worldState were passed through untyped; `z.custom`
+// preserves that while the fields the handler reads are validated and defaulted.
+const FillSlotSchema = z.object({
+  promptText: z.string().default(''),
+  // Any non-`true` value (or absence) means "no image", as before.
+  includeImage: z.boolean().catch(false),
+  requirements: z.custom<ChoiceRequirement[]>().optional(),
+  effects: z.custom<ChoiceEffect[]>().optional(),
+  worldState: z.custom<WorldState>().optional(),
+})
 
 export async function POST(
   req: NextRequest,
@@ -58,12 +72,12 @@ export async function POST(
   }
 
   // Read and locally validate the prompt before acquiring any lock or consuming credits
-  const body = await req.json()
-  const promptText: string = body.promptText ?? ''
-  const includeImage: boolean = body.includeImage === true
-  const requirements = body.requirements ?? []
-  const effects = body.effects ?? []
-  const worldState: WorldState = body.worldState ?? {}
+  const parsed = await parseJson(req, FillSlotSchema)
+  if (!parsed.ok) return parsed.response
+  const { promptText, includeImage } = parsed.data
+  const requirements = parsed.data.requirements ?? []
+  const effects = parsed.data.effects ?? []
+  const worldState: WorldState = parsed.data.worldState ?? {}
   const credits = includeImage ? IMAGE_CREDIT_COST : 1
 
   if (!promptText.trim()) {

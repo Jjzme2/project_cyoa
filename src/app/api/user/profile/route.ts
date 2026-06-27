@@ -1,10 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { parseJson } from '@/lib/api-validation'
 import { adminAuth, adminDb } from '@/lib/firebase-admin'
 import { CreditManager } from '@/lib/credit-manager'
 import { StripeService, isStripeMocked } from '@/lib/stripe'
 import { ageFromDob, MIN_SITE_AGE } from '@/lib/ratings'
 import { getAuthoredPathStats } from '@/lib/firestore-helpers'
 import { UserProfile } from '@/types'
+
+// One envelope covers the action-dispatched body; each branch reads the fields
+// relevant to its action (validated for presence at the point of use).
+const ProfileActionSchema = z.object({
+  action: z.string(),
+  dateOfBirth: z.string().optional(),
+  attestation: z.boolean().optional(),
+  type: z.enum(['subscription', 'credits']).optional(),
+  creditsAmount: z.coerce.number().optional(),
+})
 
 /**
  * User Profile & Billing API
@@ -87,11 +99,12 @@ export async function POST(req: NextRequest) {
     const decoded = await adminAuth.verifyIdToken(token)
     const uid = decoded.uid
 
-    const body = await req.json()
-    const { action } = body
+    const parsed = await parseJson(req, ProfileActionSchema)
+    if (!parsed.ok) return parsed.response
+    const { action } = parsed.data
 
     if (action === 'set_dob') {
-      const { dateOfBirth, attestation } = body
+      const { dateOfBirth, attestation } = parsed.data
       if (attestation !== true) {
         return NextResponse.json(
           { error: 'Please confirm your date of birth is accurate.' },
@@ -123,7 +136,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'mock_checkout' && isStripeMocked) {
-      const { type, creditsAmount } = body
+      const { type, creditsAmount } = parsed.data
+      if (!type) return NextResponse.json({ error: 'type required' }, { status: 400 })
       await StripeService.processMockCheckout({
         userId: uid,
         type,

@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidateTag } from 'next/cache'
+import { z } from 'zod'
+import { parseJson } from '@/lib/api-validation'
 import { getAuthContext } from '@/lib/auth'
 import { postBounty, cancelBounty } from '@/lib/firestore-helpers'
+
+const BountySchema = z.object({
+  reward: z.coerce.number(),
+  promptHint: z.string().optional(),
+})
 
 /** Place a credit bounty on an empty slot (escrowed from purchased credits). */
 export async function POST(
@@ -12,17 +19,16 @@ export async function POST(
   const auth = await getAuthContext(req)
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await req.json().catch(() => ({}))
-  const reward = Number(body.reward)
-  const promptHint = typeof body.promptHint === 'string' ? body.promptHint : undefined
+  const parsed = await parseJson(req, BountySchema)
+  if (!parsed.ok) return parsed.response
 
   const result = await postBounty(
     storyId,
     nodeId,
     slotId,
     { uid: auth.uid, name: auth.name ?? 'Anonymous' },
-    reward,
-    promptHint,
+    parsed.data.reward,
+    parsed.data.promptHint,
   )
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 })
 

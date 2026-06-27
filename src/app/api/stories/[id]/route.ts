@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidateTag } from 'next/cache'
+import { z } from 'zod'
+import { parseJson } from '@/lib/api-validation'
 import { getAuthContext } from '@/lib/auth'
 import { ratingRank, clampRating } from '@/lib/ratings'
 import { getStory, getStoryNode, getWorld, incrementStoryViews, updateStoryRating } from '@/lib/firestore-helpers'
 import { CONTENT_RATINGS } from '@/types'
-import type { ContentRating } from '@/types'
+
+const RatingSchema = z.object({
+  rating: z.enum(CONTENT_RATINGS, { message: 'Invalid rating' }),
+})
 
 export async function GET(
   req: NextRequest,
@@ -36,11 +41,9 @@ export async function PATCH(
   const auth = await getAuthContext(req)
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await req.json().catch(() => ({}))
-  const rating = body.rating as ContentRating
-  if (!CONTENT_RATINGS.includes(rating)) {
-    return NextResponse.json({ error: 'Invalid rating' }, { status: 400 })
-  }
+  const parsed = await parseJson(req, RatingSchema)
+  if (!parsed.ok) return parsed.response
+  const { rating } = parsed.data
 
   const story = await getStory(id)
   if (!story) return NextResponse.json({ error: 'Story not found' }, { status: 404 })

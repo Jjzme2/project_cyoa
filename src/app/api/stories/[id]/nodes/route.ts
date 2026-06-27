@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { revalidateTag } from 'next/cache'
+import { z } from 'zod'
+import { parseJson } from '@/lib/api-validation'
 import { adminAuth } from '@/lib/firebase-admin'
 import { getAuthContext } from '@/lib/auth'
 import { moderateText, moderationToNodeFields } from '@/lib/moderation'
@@ -7,6 +9,16 @@ import { ratingRank } from '@/lib/ratings'
 import { getStory, getStoryNode, createStoryNode } from '@/lib/firestore-helpers'
 import { adminDb } from '@/lib/firebase-admin'
 import { analytics } from '@/lib/telemetry'
+
+const CreateNodeSchema = z.object({
+  content: z.string().min(1, 'Content required'),
+  depth: z.number().optional(),
+  parentId: z.string().nullish(),
+  choiceText: z.string().nullish(),
+  aiGenerated: z.boolean().optional(),
+  aiModel: z.string().nullish(),
+  choices: z.array(z.string()).optional(),
+})
 
 export async function GET(
   req: NextRequest,
@@ -57,10 +69,9 @@ export async function POST(
   const story = await getStory(storyId)
   if (!story) return NextResponse.json({ error: 'Story not found' }, { status: 404 })
 
-  const body = await req.json()
-  const { content, depth, parentId, choiceText, aiGenerated, aiModel, choices } = body
-
-  if (!content) return NextResponse.json({ error: 'Content required' }, { status: 400 })
+  const parsed = await parseJson(req, CreateNodeSchema)
+  if (!parsed.ok) return parsed.response
+  const { content, depth, parentId, choiceText, aiGenerated, aiModel, choices } = parsed.data
 
   // Guideline check: rating-aware — hard-refuse disallowed content, flag
   // content that exceeds the story's rating, otherwise approve.

@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { parseJson } from '@/lib/api-validation'
 import { getAuthContext } from '@/lib/auth'
 import { resolveRound } from '@/lib/rooms'
+
+const ResolveSchema = z.object({
+  round: z.coerce.number().int({ message: 'round required' }),
+  force: z.boolean().default(false),
+})
 
 /**
  * Resolve the current voting round and advance to the winning path. Idempotent
@@ -15,12 +22,9 @@ export async function POST(
   const auth = await getAuthContext(req)
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await req.json().catch(() => ({}))
-  const round = Number(body.round)
-  if (!Number.isInteger(round)) {
-    return NextResponse.json({ error: 'round required' }, { status: 400 })
-  }
-  const force = body.force === true
+  const parsed = await parseJson(req, ResolveSchema)
+  if (!parsed.ok) return parsed.response
+  const { round, force } = parsed.data
 
   const result = await resolveRound(roomId, round, { force, byUid: auth.uid })
   if (result.error) return NextResponse.json({ error: result.error }, { status: 400 })

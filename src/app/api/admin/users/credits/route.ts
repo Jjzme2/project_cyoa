@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { parseJson } from '@/lib/api-validation'
 import { getAuthContext } from '@/lib/auth'
 import { adminAuth } from '@/lib/firebase-admin'
 import { CreditManager } from '@/lib/credit-manager'
 import { resetDailyUses } from '@/lib/rate-limit'
 import { insights } from '@/lib/telemetry'
 
-type Action = 'grant' | 'set' | 'refreshDaily'
-const ACTIONS: Action[] = ['grant', 'set', 'refreshDaily']
 const MAX_AMOUNT = 100_000
+
+const CreditsSchema = z.object({
+  uid: z.string().trim().min(1, 'Missing uid'),
+  action: z.enum(['grant', 'set', 'refreshDaily'], { message: 'Invalid action' }),
+  // Coerced and clamped below; invalid input falls back to 0 as before.
+  amount: z.coerce.number().catch(0).default(0),
+})
 
 /**
  * Admin-only credit controls for a single user:
@@ -20,17 +27,9 @@ export async function POST(req: NextRequest) {
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!auth.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  let body: { uid?: string; action?: string; amount?: number }
-  try {
-    body = await req.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
-  }
-
-  const uid = typeof body.uid === 'string' ? body.uid.trim() : ''
-  const action = body.action as Action
-  if (!uid) return NextResponse.json({ error: 'Missing uid' }, { status: 400 })
-  if (!ACTIONS.includes(action)) return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+  const parsed = await parseJson(req, CreditsSchema)
+  if (!parsed.ok) return parsed.response
+  const { uid, action, amount: rawAmount } = parsed.data
 
   // Resolve the target's tier (needed for the daily reset) and confirm they exist.
   let tier: 'FREE' | 'PREMIUM' = 'FREE'
@@ -41,7 +40,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 })
   }
 
-  const amount = Math.min(Math.abs(Math.floor(Number(body.amount) || 0)), MAX_AMOUNT)
+  const amount = Math.min(Math.abs(Math.floor(rawAmount)), MAX_AMOUNT)
 
   let result: Record<string, unknown> = {}
   if (action === 'grant') {
