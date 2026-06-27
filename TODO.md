@@ -94,10 +94,16 @@ validation, lint-debt cleanup)._
   reads to lazy init / event handlers; two justified `set-state-in-effect`
   disables for the hydration-safe draft banner). Lint is now a hard CI gate;
   5 unused-var/exhaustive-deps warnings remain (non-blocking)._
-- [ ] **🟢 Generation observability** (review, green) — track AI generation
-  failures, credit cost, and reader drop-off via the telemetry channels so we
-  can answer "how many failed / how much did they cost / where do readers
-  leave" before adding engine depth.
+- [x] **🟢 Generation observability** (review, green) — shared
+  `generation-telemetry.ts` emits uniform `generation.completed` /
+  `generation.failed` analytics events (with `kind`, net `credits`, `source`,
+  and a categorized `reason`) from all four AI paths (assist, cover image,
+  in-story chapter, saga). Failures distinguish model errors, safety refusals,
+  editorial voids, and failed images; the chapter route reports net credits
+  after image refunds. Reader drop-off is captured by a deduped
+  `chapter.reached` event (depth, fired once per new max depth) in `BookViewer`.
+  Daily rollups now answer "how many failed / how much did they cost / where do
+  readers leave". Covered by `generation-telemetry.test.ts` (+4 tests)._
 - [ ] **Reconcile `docs/ROADMAP.md`** once this branch merges (move the
   shipped items into its ✅ section).
 - [ ] **Admin Users search/filter** — by email/uid; the list is currently

@@ -142,6 +142,9 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
   const [pendingChoices, setPendingChoices] = useState<Record<string, string>>({})
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const openedTrackedRef = useRef<string | null>(null)
+  // Tracks the deepest chapter depth we've reported for the current story, so
+  // the drop-off signal fires once per new personal best (not per page turn).
+  const depthTrackedRef = useRef<{ storyId: string; maxDepth: number }>({ storyId: '', maxDepth: -1 })
 
   // Analytics: a reader opened this story. Fire once per story id, once we have
   // an authenticated user (the track endpoint requires auth).
@@ -152,6 +155,23 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
       props: { storyId: story.id, worldId: story.worldId, source: 'solo' },
     })
   }, [user, story.id, story.worldId])
+
+  // Analytics: how deep the reader gets before they leave. Emitting only on a new
+  // maximum depth keeps this to a handful of events per read while still giving a
+  // depth histogram to answer "where do readers drop off".
+  useEffect(() => {
+    if (!user) return
+    const tracked = depthTrackedRef.current
+    if (tracked.storyId !== story.id) {
+      tracked.storyId = story.id
+      tracked.maxDepth = -1
+    }
+    if (node.depth <= tracked.maxDepth) return
+    tracked.maxDepth = node.depth
+    void trackEvent(user, 'chapter.reached', {
+      props: { storyId: story.id, nodeId: node.id, depth: node.depth },
+    })
+  }, [user, node, story.id])
 
   const hasCast = !!story.protagonist?.name || (story.characters?.length ?? 0) > 0
 

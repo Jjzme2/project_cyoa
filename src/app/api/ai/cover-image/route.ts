@@ -5,6 +5,7 @@ import { adminAuth } from '@/lib/firebase-admin'
 import { CreditManager } from '@/lib/credit-manager'
 import { creditFailureResponse } from '@/lib/credit-response'
 import { generateCoverImage } from '@/lib/ai'
+import { trackGenerationCompleted, trackGenerationFailed } from '@/lib/generation-telemetry'
 
 const CoverImageSchema = z.object({
   title: z.string().trim().min(1, 'title required'),
@@ -49,8 +50,10 @@ export async function POST(req: NextRequest) {
 
   if (!result.url) {
     await CreditManager.refund(uid, tier, 3, credit.source)
+    trackGenerationFailed({ kind: 'cover', credits: 3, source: credit.source, uid, reason: 'image_failed' })
     return NextResponse.json({ error: result.error ?? 'Generation failed' }, { status: 503 })
   }
 
+  trackGenerationCompleted({ kind: 'cover', credits: 3, source: credit.source, uid })
   return NextResponse.json({ url: result.url, remaining: credit.remaining })
 }

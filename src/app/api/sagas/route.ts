@@ -13,6 +13,7 @@ import {
 import { CreditManager } from '@/lib/credit-manager'
 import { creditFailureResponse } from '@/lib/credit-response'
 import { generateSagaOpening, PromptRejectedError } from '@/lib/ai'
+import { trackGenerationCompleted, trackGenerationFailed } from '@/lib/generation-telemetry'
 import { clampRating } from '@/lib/ratings'
 import { sanitizeDirector } from '@/lib/director'
 import { analytics } from '@/lib/telemetry'
@@ -198,11 +199,27 @@ export async function POST(req: NextRequest) {
         props: { storyId, worldId, rating: effectiveRating, entryPoints: entries.length },
       }),
     )
+    trackGenerationCompleted({
+      kind: 'saga',
+      credits: cost,
+      source: credit.source,
+      uid,
+      context: { worldId, entryPoints: entries.length },
+    })
 
     return NextResponse.json({ id: storyId }, { status: 201 })
   } catch (error) {
     await CreditManager.refund(uid, tier, cost, credit.source).catch(() => {})
-    if (error instanceof PromptRejectedError) {
+    const rejected = error instanceof PromptRejectedError
+    trackGenerationFailed({
+      kind: 'saga',
+      credits: cost,
+      source: credit.source,
+      uid,
+      reason: rejected ? 'prompt_rejected' : 'model_error',
+      context: { worldId },
+    })
+    if (rejected) {
       return NextResponse.json(
         { error: `An entry point was rejected: ${error.reason}` },
         { status: 422 },

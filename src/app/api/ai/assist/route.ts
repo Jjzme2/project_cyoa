@@ -5,6 +5,7 @@ import { adminAuth } from '@/lib/firebase-admin'
 import { CreditManager } from '@/lib/credit-manager'
 import { creditFailureResponse } from '@/lib/credit-response'
 import { generateWorldFromPrompt, generateStoryFromPrompt } from '@/lib/ai'
+import { trackGenerationCompleted, trackGenerationFailed } from '@/lib/generation-telemetry'
 import type { ContentRating } from '@/types'
 
 const MAX_PROMPT_CHARS = 4000
@@ -77,9 +78,11 @@ export async function POST(req: NextRequest) {
         ? await generateWorldFromPrompt(prompt, uid)
         : await generateStoryFromPrompt(prompt, worldContext, uid)
 
+    trackGenerationCompleted({ kind: 'assist', credits: 1, source: credit.source, uid, context: { type } })
     return NextResponse.json({ ...result, remaining: credit.remaining })
   } catch (error) {
     await CreditManager.refund(uid, tier, 1, credit.source)
+    trackGenerationFailed({ kind: 'assist', credits: 1, source: credit.source, uid, reason: 'model_error', context: { type } })
     const message = error instanceof Error ? error.message : 'Generation failed'
     return NextResponse.json({ error: message }, { status: 503 })
   }

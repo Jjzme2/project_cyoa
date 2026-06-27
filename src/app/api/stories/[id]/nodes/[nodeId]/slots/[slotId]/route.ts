@@ -30,6 +30,7 @@ import {
 import { CreditManager } from '@/lib/credit-manager'
 import { creditFailureResponse } from '@/lib/credit-response'
 import { generateStoryNode, generateStoryImage, reviewContribution, judgeContent, PromptRejectedError } from '@/lib/ai'
+import { trackGenerationCompleted, trackGenerationFailed } from '@/lib/generation-telemetry'
 import type { ModerationResult } from '@/lib/moderation'
 import { validatePromptLocal } from '@/lib/validate'
 import { moderateText, moderationToNodeFields } from '@/lib/moderation'
@@ -181,6 +182,7 @@ export async function POST(
         releaseChoiceSlot(storyId, nodeId, slotId),
         CreditManager.refund(uid, tier, credits, source),
       ])
+      trackGenerationFailed({ kind: 'chapter', credits, source, uid, reason: 'voided', context: { storyId } })
       return NextResponse.json({ error: review.reason, voided: true }, { status: 422 })
     }
     const editedPrompt = review.text
@@ -250,6 +252,7 @@ export async function POST(
         releaseChoiceSlot(storyId, nodeId, slotId),
         CreditManager.refund(uid, tier, credits, source),
       ])
+      trackGenerationFailed({ kind: 'chapter', credits, source, uid, reason: 'refused', context: { storyId } })
       return NextResponse.json(
         { error: verdict.reason ?? 'This content violates the community guidelines.' },
         { status: 422 },
@@ -326,6 +329,9 @@ export async function POST(
       const refundAmount = IMAGE_CREDIT_COST - 1
       patchOps.push(CreditManager.refund(uid, tier, refundAmount, source))
       finalRemaining = remaining + refundAmount
+      // The chapter text still succeeded; only the illustration failed. Record
+      // it as a (refunded) cover failure so image flakiness is measurable.
+      trackGenerationFailed({ kind: 'cover', credits: refundAmount, source, uid, reason: 'image_failed', context: { storyId } })
     }
     await Promise.all(patchOps)
 
@@ -400,6 +406,17 @@ export async function POST(
       await Promise.all(ops).catch(() => {})
     })
 
+    // Net credits actually charged: the image's surcharge is refunded when it
+    // fails, so a text-only-after-image-failure chapter costs just the text.
+    const chargedCredits = includeImage && !imageUrl ? credits - (IMAGE_CREDIT_COST - 1) : credits
+    trackGenerationCompleted({
+      kind: 'chapter',
+      credits: chargedCredits,
+      source,
+      uid,
+      context: { storyId, includeImage, imageGenerated: !!imageUrl, pendingReview },
+    })
+
     return NextResponse.json(
       { nodeId: newNodeId, content, choices, model, imageUrl, remaining: finalRemaining, imageError, pendingReview },
       { status: 201 },
@@ -410,6 +427,19 @@ export async function POST(
       releaseChoiceSlot(storyId, nodeId, slotId),
       consumed ? CreditManager.refund(uid, tier, credits, source) : Promise.resolve(),
     ]).catch(() => {}) // best-effort cleanup; don't mask the original error
+
+    // Only count it as a failed generation if the writer was actually charged
+    // (a pre-credit throw isn't a wasted generation).
+    if (consumed) {
+      trackGenerationFailed({
+        kind: 'chapter',
+        credits,
+        source,
+        uid,
+        reason: error instanceof PromptRejectedError ? 'prompt_rejected' : 'model_error',
+        context: { storyId },
+      })
+    }
 
     if (error instanceof PromptRejectedError) {
       return NextResponse.json({ error: error.reason }, { status: 422 })
