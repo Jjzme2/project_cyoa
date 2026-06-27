@@ -59,6 +59,34 @@ the codebase alone).
 - [ ] Global leaderboards (denormalized aggregate counters).
 - [ ] Global bounty board (collection-group query + index).
 
+## 💡 Ideas & suggestions (surfaced while building)
+
+Candidates that emerged from this session's work — not yet committed, ordered
+roughly by value. (Reader analytics, admin hub live counts, Users search, and
+telemetry retention already graduated into P0/P1 above.)
+
+- [ ] **Author-reusable director presets** — let authors save a tuned director
+  as a named preset and reuse it across stories; optionally share community
+  presets alongside the built-in archetypes.
+- [ ] **"Surprise me" director** — a randomize button that lands on a coherent
+  archetype with slight jitter, for authors who want a starting point.
+- [ ] **Director-aware cover art** — feed the director's vision/axes into the
+  cover-image generation prompt so the art matches the intended tone.
+- [ ] **Funnel & retention in admin analytics** — a conversion view
+  (worlds → stories → reads → purchases) and DAU/retention, beyond raw counts.
+- [ ] **Per-user activity drill-down** — from `/admin/users`, open a user's
+  tracked events, authored stories, and credit history.
+- [ ] **Admin audit trail** — the `insights` channel already logs `admin.*`
+  actions; surface a filtered audit view (who granted credits / changed roles).
+- [ ] **Richer per-page SEO** — `CreativeWork`/`Article` + breadcrumb JSON-LD
+  for story and world pages (the root only has WebSite/Organization today).
+- [ ] **Logo-based brand assets** — once the logo is hosted, generate a proper
+  multi-size favicon/PWA icon set and a logo-bearing OG image.
+- [ ] **Analytics export** — CSV/JSON export of the analytics window for
+  offline analysis.
+- [ ] **Abuse guard on `POST /api/track`** — rate-limit client-emitted events so
+  the telemetry collections can't be spammed.
+
 ## 🔒 Blocked on ops / deploy
 
 - [ ] 🔒 Create + host the brand logo at
