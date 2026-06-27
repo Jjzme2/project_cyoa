@@ -40,7 +40,11 @@ export async function checkRateLimit(
 
     const remaining = Math.max(0, limit - count)
     return { success: count <= limit, remaining, reset: endOfDayUTC() }
-  } catch {
+  } catch (err) {
+    // Redis is unreachable. We FAIL OPEN so a Redis outage doesn't take down all
+    // AI generation — but that means generations are briefly uncredited, so log
+    // loudly for alerting. (TODO: fail closed for the paid-generation path.)
+    console.error('[rate-limit] checkRateLimit failed open (Redis unreachable):', err)
     return { success: true, remaining: FREE_DAILY_LIMIT, reset: endOfDayUTC() }
   }
 }

@@ -33,6 +33,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Webhook Error: ${msg}` }, { status: 400 })
   }
 
+  // Idempotency. Stripe redelivers events (retries, at-least-once delivery);
+  // processing `checkout.session.completed` twice would double-credit the user
+  // because addCredits() increments. Atomically claim the event id before doing
+  // any work, and skip if it's already been claimed.
+  const eventRef = adminDb.collection('stripeEvents').doc(event.id)
+  let claimed = false
+  try {
+    claimed = await adminDb.runTransaction(async (txn) => {
+      const existing = await txn.get(eventRef)
+      if (existing.exists) return false
+      txn.set(eventRef, {
+        type: event.type,
+        status: 'processing',
+        receivedAt: new Date().toISOString(),
+      })
+      return true
+    })
+  } catch (err) {
+    // Fail closed: if we can't establish whether this event was already handled,
+    // ask Stripe to retry rather than risk a double-grant.
+    console.error('[Stripe Webhook] Idempotency claim failed:', err)
+    return NextResponse.json({ error: 'Could not claim event' }, { status: 503 })
+  }
+  if (!claimed) {
+    return NextResponse.json({ received: true, duplicate: true })
+  }
+
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -102,9 +129,14 @@ export async function POST(req: NextRequest) {
         break
     }
 
+    // Mark the event fully processed so future redeliveries are skipped.
+    await eventRef.set({ status: 'done', processedAt: new Date().toISOString() }, { merge: true })
     return NextResponse.json({ received: true })
   } catch (err) {
     console.error('[Stripe Webhook Handler Error]:', err)
+    // Release the claim so Stripe's retry can reprocess this event; otherwise a
+    // transient failure would permanently skip a legitimate grant.
+    await eventRef.delete().catch(() => {})
     return NextResponse.json(
       { error: 'Webhook event processing failed' },
       { status: 500 }
