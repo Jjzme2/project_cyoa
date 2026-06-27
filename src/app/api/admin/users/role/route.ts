@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { parseJson } from '@/lib/api-validation'
 import { getAuthContext } from '@/lib/auth'
 import { adminAuth } from '@/lib/firebase-admin'
 import { insights } from '@/lib/telemetry'
+
+const RoleSchema = z
+  .object({
+    uid: z.string().trim().min(1, 'Missing uid'),
+    role: z.enum(['user', 'admin'], { message: 'Invalid role' }).optional(),
+    tier: z.enum(['FREE', 'PREMIUM'], { message: 'Invalid tier' }).optional(),
+  })
+  .refine((d) => d.role !== undefined || d.tier !== undefined, { message: 'Nothing to update' })
 
 /**
  * Admin-only: set a user's `role` (user/admin) and/or `tier` (FREE/PREMIUM).
@@ -13,27 +23,9 @@ export async function POST(req: NextRequest) {
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!auth.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  let body: { uid?: string; role?: string; tier?: string }
-  try {
-    body = await req.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
-  }
-
-  const uid = typeof body.uid === 'string' ? body.uid.trim() : ''
-  if (!uid) return NextResponse.json({ error: 'Missing uid' }, { status: 400 })
-
-  const role = body.role
-  const tier = body.tier
-  if (role !== undefined && role !== 'user' && role !== 'admin') {
-    return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
-  }
-  if (tier !== undefined && tier !== 'FREE' && tier !== 'PREMIUM') {
-    return NextResponse.json({ error: 'Invalid tier' }, { status: 400 })
-  }
-  if (role === undefined && tier === undefined) {
-    return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
-  }
+  const parsed = await parseJson(req, RoleSchema)
+  if (!parsed.ok) return parsed.response
+  const { uid, role, tier } = parsed.data
 
   // Guard against an admin accidentally stripping their own access.
   if (uid === auth.uid && role === 'user') {

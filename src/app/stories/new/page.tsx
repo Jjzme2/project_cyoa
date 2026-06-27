@@ -123,8 +123,12 @@ export default function NewStoryPage() {
     if (!loading && !user) router.replace('/')
   }, [user, loading, router])
 
+  // Read draft availability once after mount (not during render) so the server
+  // and client agree on first paint; the banner then appears if a draft exists.
+  // The flag stays dismissable via setHasDraft(false) in the handlers below.
   useEffect(() => {
     const saved = draft.load()
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional post-mount external-store read; see note above
     if (saved && (saved.data.title || saved.data.opening)) setHasDraft(true)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -206,7 +210,7 @@ export default function NewStoryPage() {
       const formattedResources = resources
         .filter((r) => r.name.trim() !== '')
         .map((r) => {
-          let defaultValue: any = r.defaultValue
+          let defaultValue: string | number | boolean | string[] = r.defaultValue
           if (r.type === 'array') {
             defaultValue = typeof r.defaultValue === 'string'
               ? r.defaultValue.split(',').map(s => s.trim()).filter(Boolean)

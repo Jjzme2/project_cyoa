@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { BookOpen, Bookmark, Clock, ArrowRight } from 'lucide-react'
+import { Bookmark, Clock } from 'lucide-react'
 import { useAuth } from '@/components/Providers'
 import type { Story } from '@/types'
 import { StoryCard } from '@/components/StoryCard'
@@ -40,10 +40,9 @@ export function ContinueReadingSection() {
   const [fetching, setFetching] = useState(true)
 
   useEffect(() => {
-    if (loading || !user) {
-      setFetching(false)
-      return
-    }
+    // Nothing to fetch until auth resolves; the component renders null in this
+    // state regardless, so there's no flag to flip here.
+    if (loading || !user) return
     async function load() {
       try {
         const token = await user!.getIdToken()

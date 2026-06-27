@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { parseJson } from '@/lib/api-validation'
 import { adminAuth } from '@/lib/firebase-admin'
 import { getReadingProgress, saveReadingProgress, checkAndAwardAchievements } from '@/lib/firestore-helpers'
+
+const ProgressSchema = z.object({
+  currentNodeId: z.string().min(1),
+  nodeHistory: z.array(z.string()),
+})
 
 async function resolveUser(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
@@ -33,10 +40,9 @@ export async function POST(
   if (!uid) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { storyId } = await params
-  const { currentNodeId, nodeHistory } = await req.json()
-  if (!currentNodeId || !Array.isArray(nodeHistory)) {
-    return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
-  }
+  const parsed = await parseJson(req, ProgressSchema)
+  if (!parsed.ok) return parsed.response
+  const { currentNodeId, nodeHistory } = parsed.data
 
   await saveReadingProgress(uid, storyId, currentNodeId, nodeHistory)
   checkAndAwardAchievements(uid, 'story_read').catch(() => {})

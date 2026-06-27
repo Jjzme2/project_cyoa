@@ -58,14 +58,17 @@ function timeAgo(iso: string): string {
 
 export function SaveSlotPicker({ storyId, activeSlotId, onSwitchSlot, onSaveAs }: Props) {
   const [open, setOpen] = useState(false)
-  const [slots, setSlots] = useState<SaveSlot[]>([])
+  const [slots, setSlots] = useState<SaveSlot[]>(() => loadSaveSlots(storyId))
   const [naming, setNaming] = useState(false)
   const [newName, setNewName] = useState('')
   const ref = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    setSlots(loadSaveSlots(storyId))
-  }, [storyId, open])
+  // Re-read localStorage each time the picker opens so same-tab saves (which
+  // don't emit a 'storage' event) show up.
+  function toggleOpen() {
+    if (!open) setSlots(loadSaveSlots(storyId))
+    setOpen((o) => !o)
+  }
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -92,7 +95,7 @@ export function SaveSlotPicker({ storyId, activeSlotId, onSwitchSlot, onSaveAs }
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggleOpen}
         className="flex items-center gap-1.5 text-[10px] font-sans text-muted-foreground/40 hover:text-muted-foreground/70 transition-colors px-2 py-1 rounded border border-white/[0.06] hover:border-white/10 bg-white/[0.02]"
         title="Save slots"
       >

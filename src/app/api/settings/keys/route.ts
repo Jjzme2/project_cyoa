@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { parseJson } from '@/lib/api-validation'
 import { adminAuth } from '@/lib/firebase-admin'
 import { getUserApiKey, saveUserApiKey, deleteUserApiKey } from '@/lib/firestore-helpers'
 import { encrypt } from '@/lib/encrypt'
+
+const KeySchema = z.object({
+  apiKey: z.string().transform((s) => s.trim()).pipe(z.string().min(10, 'Invalid API key')),
+})
 
 async function resolveUser(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
@@ -26,12 +32,10 @@ export async function POST(req: NextRequest) {
   const uid = await resolveUser(req)
   if (!uid) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { apiKey } = await req.json()
-  if (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length < 10) {
-    return NextResponse.json({ error: 'Invalid API key' }, { status: 400 })
-  }
+  const parsed = await parseJson(req, KeySchema)
+  if (!parsed.ok) return parsed.response
 
-  await saveUserApiKey(uid, encrypt(apiKey.trim()))
+  await saveUserApiKey(uid, encrypt(parsed.data.apiKey))
   return NextResponse.json({ ok: true })
 }
 

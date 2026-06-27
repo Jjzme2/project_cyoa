@@ -14,6 +14,7 @@ export const STORY_TAGS = [
 ] as const
 export type StoryTag = typeof STORY_TAGS[number]
 
+import type { DocumentData } from 'firebase-admin/firestore'
 import { GOAPGoal, PersonalityWeights } from './goap'
 import type { EngineState } from './engine'
 
@@ -576,7 +577,7 @@ export class UserProfile {
     this.dateOfBirth = dateOfBirth
   }
 
-  public static fromFirestore(uid: string, data: any): UserProfile {
+  public static fromFirestore(uid: string, data: DocumentData): UserProfile {
     return new UserProfile(
       uid,
       data.email ?? null,
@@ -594,7 +595,7 @@ export class UserProfile {
     )
   }
 
-  public toFirestore(): Record<string, any> {
+  public toFirestore(): Record<string, unknown> {
     return {
       email: this.email,
       displayName: this.displayName,

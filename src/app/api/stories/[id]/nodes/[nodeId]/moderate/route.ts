@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidateTag } from 'next/cache'
+import { z } from 'zod'
+import { parseJson } from '@/lib/api-validation'
 import { getAuthContext } from '@/lib/auth'
 import { getStoryNode, setNodeModeration } from '@/lib/firestore-helpers'
+
+const ModerateSchema = z.object({
+  action: z.enum(['approve', 'reject'], { message: 'action must be "approve" or "reject"' }),
+})
 
 /**
  * Admin-only: approve or reject a flagged/inappropriate route.
@@ -17,11 +23,9 @@ export async function POST(
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!auth.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const body = await req.json().catch(() => ({}))
-  const action = body.action
-  if (action !== 'approve' && action !== 'reject') {
-    return NextResponse.json({ error: 'action must be "approve" or "reject"' }, { status: 400 })
-  }
+  const parsed = await parseJson(req, ModerateSchema)
+  if (!parsed.ok) return parsed.response
+  const { action } = parsed.data
 
   // Include unpublished so an admin can act on a flagged node.
   const node = await getStoryNode(storyId, nodeId, true)

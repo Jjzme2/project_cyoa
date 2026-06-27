@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { parseJson } from '@/lib/api-validation'
 import { adminAuth } from '@/lib/firebase-admin'
 import { StripeService } from '@/lib/stripe'
 import { APP_CONFIG } from '@/lib/config'
+
+const CheckoutSchema = z.object({
+  type: z.enum(['subscription', 'credits'], { message: 'Invalid checkout type' }),
+  packageId: z.string().optional(),
+})
 
 /**
  * Stripe Checkout Session Endpoint
@@ -23,14 +30,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid auth token' }, { status: 401 })
   }
 
+  const parsed = await parseJson(req, CheckoutSchema)
+  if (!parsed.ok) return parsed.response
+  const { type, packageId } = parsed.data
+
   try {
-    const body = await req.json()
-    const { type, packageId } = body
-
-    if (!type || (type !== 'subscription' && type !== 'credits')) {
-      return NextResponse.json({ error: 'Invalid checkout type' }, { status: 400 })
-    }
-
     let priceId = ''
     let creditsAmount = 0
 

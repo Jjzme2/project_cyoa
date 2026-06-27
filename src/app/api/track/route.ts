@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { parseJson } from '@/lib/api-validation'
 import { getAuthContext } from '@/lib/auth'
-import { analytics, insights, type TelemetryChannel } from '@/lib/telemetry'
+import { analytics, insights } from '@/lib/telemetry'
 
-const CHANNELS: TelemetryChannel[] = ['analytics', 'insights']
+// Invalid/missing channels fall back to analytics, matching the prior behavior.
+const TrackSchema = z.object({
+  channel: z.enum(['analytics', 'insights']).catch('analytics').default('analytics'),
+  name: z.string().trim().min(1, 'Missing event name'),
+  props: z.record(z.string(), z.unknown()).optional(),
+})
 
 /**
  * Client → server bridge for tracking. Authenticated callers POST
@@ -14,21 +21,10 @@ export async function POST(req: NextRequest) {
   const auth = await getAuthContext(req)
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let body: { channel?: string; name?: string; props?: Record<string, unknown> }
-  try {
-    body = await req.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
-  }
+  const parsed = await parseJson(req, TrackSchema)
+  if (!parsed.ok) return parsed.response
+  const { channel, name, props } = parsed.data
 
-  const name = typeof body.name === 'string' ? body.name.trim() : ''
-  if (!name) return NextResponse.json({ error: 'Missing event name' }, { status: 400 })
-
-  const channel: TelemetryChannel = CHANNELS.includes(body.channel as TelemetryChannel)
-    ? (body.channel as TelemetryChannel)
-    : 'analytics'
-
-  const props = body.props && typeof body.props === 'object' ? body.props : undefined
   const emitter = channel === 'insights' ? insights : analytics
   await emitter.track(name, { uid: auth.uid, props })
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useId, useEffect } from 'react'
+import { useState, useMemo, useId } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, X, Library, BookOpen, Tag, ChevronDown } from 'lucide-react'
@@ -21,7 +21,9 @@ export function LibraryClient({ stories }: Props) {
 
   const { allowedRank } = useAuth()
   const [search, setSearch] = useState('')
-  const [worldFilter, setWorldFilter] = useState<string | null>(() => searchParams.get('world'))
+  // The URL is the single source of truth for the world filter, so it stays
+  // correct across back/forward navigation without a state mirror to sync.
+  const worldFilter = searchParams.get('world')
   const [tagFilter, setTagFilter] = useState<string | null>(null)
 
   // Age gate: never surface stories rated above what this viewer may see.
@@ -30,14 +32,7 @@ export function LibraryClient({ stories }: Props) {
     [stories, allowedRank],
   )
 
-  // Sync URL param → worldFilter on mount / back-navigation
-  useEffect(() => {
-    const w = searchParams.get('world')
-    setWorldFilter(w)
-  }, [searchParams])
-
   function setWorld(world: string | null) {
-    setWorldFilter(world)
     const params = new URLSearchParams(searchParams.toString())
     if (world) {
       params.set('world', world)

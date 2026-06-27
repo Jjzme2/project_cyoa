@@ -26,8 +26,7 @@ jobs:
       - name: Tests
         run: npm test
 
-      # Informational for now: the repo has pre-existing lint debt (see TODO.md).
-      # Flip continue-on-error off once that's cleared to make lint a hard gate.
+      # Hard gate: lint debt is cleared, so errors now block. Warnings still
+      # surface in the log without failing the build.
       - name: Lint
         run: npm run lint
-        continue-on-error: true

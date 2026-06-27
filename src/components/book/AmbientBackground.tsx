@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef } from 'react'
+import { useState } from 'react'
 import type { AmbientEffect } from '@/types'
 
 interface Particle {
@@ -13,15 +13,15 @@ interface Particle {
 }
 
 function useParticles(count: number): Particle[] {
-  const ref = useRef<Particle[] | null>(null)
-  if (!ref.current) {
-    // Seeded pseudo-random so particles are stable across re-renders
+  // Lazy initial state: computed once and stable across re-renders. The fixed
+  // seed keeps particles deterministic, so server and client render identically.
+  const [particles] = useState<Particle[]>(() => {
     let seed = 42
     const rng = () => {
       seed = (seed * 1664525 + 1013904223) & 0xffffffff
       return Math.abs(seed) / 0x7fffffff
     }
-    ref.current = Array.from({ length: count }, () => ({
+    return Array.from({ length: count }, () => ({
       left:     rng() * 100,
       top:      rng() * 100,
       delay:    rng() * 4,
@@ -29,8 +29,8 @@ function useParticles(count: number): Particle[] {
       size:     0.5 + rng() * 1.5,
       opacity:  0.3 + rng() * 0.7,
     }))
-  }
-  return ref.current
+  })
+  return particles
 }
 
 function RainEffect() {

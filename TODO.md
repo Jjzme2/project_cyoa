@@ -60,6 +60,10 @@ the codebase alone).
 - [x] **Admin hub live counts** — `/admin` overview now shows Events today and
   Insights today (cheap per-day rollup reads), linking to the analytics and
   insights pages.
+- [x] **In-app test runner** — `/admin/tests` runs the Vitest suite via an
+  admin-only API (fixed command, no shell) and **streams logs live** (NDJSON),
+  showing pass/fail per file, failure messages, and a live-tailing output
+  panel. Gated off in production unless `ENABLE_ADMIN_TEST_RUNNER=true`.
 - [x] **Track group reads** — `RoomReader` (co-op) now emits `story.opened`
   tagged `source:'room'`; solo opens are tagged `source:'solo'`, so reads are
   attributable by mode.
@@ -73,23 +77,43 @@ validation, lint-debt cleanup)._
 
 ## P1
 
-- [ ] **🟠 Expand test coverage** (review #4) — `CreditManager`, `rate-limit`,
+- [x] **🟠 Expand test coverage** (review #4) — `CreditManager`, `rate-limit`,
   and the engine's deterministic pieces (seed-rng, goap-planner,
   faction-manager). Firestore/Redis-backed bits need light mocking.
-- [ ] **🟡 Schema validation layer** (review #8) — adopt zod (or extend
-  `lib/validate.ts`) so the ~52 API routes parse request bodies uniformly
-  instead of ad-hoc `req.json()` handling.
-- [ ] **🟠 Clear lint debt → make CI lint blocking** — 12 pre-existing errors
+  _Done: `rate-limit` covered in P0; added `credit-manager`, `seed-rng`,
+  `goap-planner`, and `faction-manager` suites (+58 tests, in-memory
+  Firestore + rate-limit fakes for the I/O-backed paths)._
+- [x] **🟡 Schema validation layer** (review #8) — adopted zod via a shared
+  `parseJson(req, schema)` helper (`src/lib/api-validation.ts`) returning a
+  typed `{ ok, data }` / 400-response union. Migrated every body-parsing API
+  route (~30) off ad-hoc `req.json()` to co-located zod schemas; malformed JSON
+  and validation failures now return uniform 400s. Covered by
+  `api-validation.test.ts` (+9 tests).
+- [x] **🟠 Clear lint debt → make CI lint blocking** — 12 pre-existing errors
   across 8 files (`react-hooks/*`, `no-explicit-any`); fix, then drop
   `continue-on-error` from the CI lint step.
-- [ ] **🟢 Generation observability** (review, green) — track AI generation
-  failures, credit cost, and reader drop-off via the telemetry channels so we
-  can answer "how many failed / how much did they cost / where do readers
-  leave" before adding engine depth.
+  _Done: all 12 errors fixed (typed Stripe/Firestore `any`s — incidentally
+  correcting `current_period_end`, which now reads from the subscription
+  item; derived the library world filter from the URL; moved external-store
+  reads to lazy init / event handlers; two justified `set-state-in-effect`
+  disables for the hydration-safe draft banner). Lint is now a hard CI gate;
+  5 unused-var/exhaustive-deps warnings remain (non-blocking)._
+- [x] **🟢 Generation observability** (review, green) — shared
+  `generation-telemetry.ts` emits uniform `generation.completed` /
+  `generation.failed` analytics events (with `kind`, net `credits`, `source`,
+  and a categorized `reason`) from all four AI paths (assist, cover image,
+  in-story chapter, saga). Failures distinguish model errors, safety refusals,
+  editorial voids, and failed images; the chapter route reports net credits
+  after image refunds. Reader drop-off is captured by a deduped
+  `chapter.reached` event (depth, fired once per new max depth) in `BookViewer`.
+  Daily rollups now answer "how many failed / how much did they cost / where do
+  readers leave". Covered by `generation-telemetry.test.ts` (+4 tests)._
 - [ ] **Reconcile `docs/ROADMAP.md`** once this branch merges (move the
   shipped items into its ✅ section).
-- [ ] **Admin Users search/filter** — by email/uid; the list is currently
-  page-token pagination only.
+- [x] **Admin Users search/filter** — debounced search box on `/admin/users`;
+  the API does exact email/uid lookups plus a bounded substring scan
+  (capped, with a "narrow your search" notice). Pure matcher in
+  `lib/admin-user-search.ts`, unit-tested.
 - [ ] **Telemetry retention** — periodic prune of raw `*Events` docs (keep the
   daily rollups). Needs a scheduled job.
 

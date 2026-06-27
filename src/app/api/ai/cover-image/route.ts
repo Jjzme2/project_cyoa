@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { parseJson } from '@/lib/api-validation'
 import { adminAuth } from '@/lib/firebase-admin'
 import { CreditManager } from '@/lib/credit-manager'
 import { creditFailureResponse } from '@/lib/credit-response'
 import { generateCoverImage } from '@/lib/ai'
+import { trackGenerationCompleted, trackGenerationFailed } from '@/lib/generation-telemetry'
+
+const CoverImageSchema = z.object({
+  title: z.string().trim().min(1, 'title required'),
+  description: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  worldName: z.string().optional(),
+  worldDescription: z.string().optional(),
+})
 
 export async function POST(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
@@ -18,12 +29,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
   }
 
-  const body = await req.json()
-  const { title, description, tags, worldName, worldDescription } = body
-
-  if (!title?.trim()) {
-    return NextResponse.json({ error: 'title required' }, { status: 400 })
-  }
+  const parsed = await parseJson(req, CoverImageSchema)
+  if (!parsed.ok) return parsed.response
+  const { title, description, tags, worldName, worldDescription } = parsed.data
 
   const credit = await CreditManager.consume(uid, tier, 3)
   if (!credit.success) {
@@ -42,8 +50,10 @@ export async function POST(req: NextRequest) {
 
   if (!result.url) {
     await CreditManager.refund(uid, tier, 3, credit.source)
+    trackGenerationFailed({ kind: 'cover', credits: 3, source: credit.source, uid, reason: 'image_failed' })
     return NextResponse.json({ error: result.error ?? 'Generation failed' }, { status: 503 })
   }
 
+  trackGenerationCompleted({ kind: 'cover', credits: 3, source: credit.source, uid })
   return NextResponse.json({ url: result.url, remaining: credit.remaining })
 }
