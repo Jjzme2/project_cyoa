@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Coins, RefreshCw, ShieldCheck, Crown, Plus } from 'lucide-react'
+import { Loader2, Coins, RefreshCw, ShieldCheck, Crown, Plus, Search, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { useAuth } from '@/components/Providers'
 import { useAdminGuard, AdminSpinner, AdminHeading } from '../admin-ui'
 
@@ -27,6 +28,11 @@ export default function AdminUsersPage() {
   const [nextPageToken, setNextPageToken] = useState<string | null>(null)
   const [loadingList, setLoadingList] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
+  const [searchCapped, setSearchCapped] = useState(false)
+
+  const trimmedQuery = query.trim()
+  const isSearching = trimmedQuery.length >= 2
 
   const load = useCallback(
     async (pageToken?: string) => {
@@ -39,6 +45,7 @@ export default function AdminUsersPage() {
         const data = await res.json()
         setUsers((prev) => (pageToken ? [...prev, ...data.users] : data.users))
         setNextPageToken(data.nextPageToken ?? null)
+        setSearchCapped(false)
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to load users')
       } finally {
@@ -48,12 +55,38 @@ export default function AdminUsersPage() {
     [user],
   )
 
+  const runSearch = useCallback(
+    async (q: string) => {
+      if (!user) return
+      try {
+        const token = await user.getIdToken()
+        const res = await fetch(`/api/admin/users?q=${encodeURIComponent(q)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!res.ok) throw new Error((await res.json()).error ?? 'Search failed')
+        const data = await res.json()
+        setUsers(data.users)
+        setNextPageToken(null)
+        setSearchCapped(!!data.capped)
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Search failed')
+      } finally {
+        setLoadingList(false)
+      }
+    },
+    [user],
+  )
+
+  // Debounced: search when the query is meaningful, otherwise browse the list.
   useEffect(() => {
     if (!ready) return
-    ;(async () => {
-      await load()
-    })()
-  }, [ready, load])
+    const handle = setTimeout(() => {
+      setLoadingList(true)
+      if (isSearching) void runSearch(trimmedQuery)
+      else void load()
+    }, 350)
+    return () => clearTimeout(handle)
+  }, [ready, isSearching, trimmedQuery, load, runSearch])
 
   async function postAction(path: string, body: Record<string, unknown>, label: string) {
     if (!user) return
@@ -131,13 +164,41 @@ export default function AdminUsersPage() {
     <main className="max-w-5xl mx-auto px-4 sm:px-6 py-12 space-y-8">
       <AdminHeading eyebrow="Admin" title="Users" subtitle="Manage roles, tiers, and credit balances. Changes apply on the user's next sign-in or token refresh." />
 
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40 pointer-events-none" />
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by email, name, or user ID…"
+          className="pl-9 pr-9"
+          aria-label="Search users"
+        />
+        {query && (
+          <button
+            type="button"
+            onClick={() => setQuery('')}
+            aria-label="Clear search"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-muted-foreground/80"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      {searchCapped && (
+        <p className="-mt-5 text-[11px] text-amber-400/60">
+          Showing the first {users.length} matches — narrow your search to see more.
+        </p>
+      )}
+
       {loadingList ? (
         <div className="flex items-center gap-2 text-muted-foreground/50 text-sm">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading users…
+          <Loader2 className="h-4 w-4 animate-spin" /> {isSearching ? 'Searching…' : 'Loading users…'}
         </div>
       ) : users.length === 0 ? (
         <div className="glass-card rounded-xl p-12 text-center border border-white/[0.07]">
-          <p className="text-muted-foreground/55 text-sm">No users found.</p>
+          <p className="text-muted-foreground/55 text-sm">
+            {isSearching ? `No users match “${trimmedQuery}”.` : 'No users found.'}
+          </p>
         </div>
       ) : (
         <div className="space-y-3">

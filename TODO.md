@@ -106,8 +106,10 @@ validation, lint-debt cleanup)._
   readers leave". Covered by `generation-telemetry.test.ts` (+4 tests)._
 - [ ] **Reconcile `docs/ROADMAP.md`** once this branch merges (move the
   shipped items into its ✅ section).
-- [ ] **Admin Users search/filter** — by email/uid; the list is currently
-  page-token pagination only.
+- [x] **Admin Users search/filter** — debounced search box on `/admin/users`;
+  the API does exact email/uid lookups plus a bounded substring scan
+  (capped, with a "narrow your search" notice). Pure matcher in
+  `lib/admin-user-search.ts`, unit-tested.
 - [ ] **Telemetry retention** — periodic prune of raw `*Events` docs (keep the
   daily rollups). Needs a scheduled job.
 
