@@ -14,3 +14,12 @@ export {
   elaborateWorldBible,
 } from './ai/content'
 export { reviewContribution, judgeContent, type ContributionReview, type ContentJudgment } from './ai/review'
+export {
+  generateAssistQuestions,
+  generateAssistFields,
+  WORLD_ASSIST_FIELDS,
+  STORY_ASSIST_FIELDS,
+  type AssistType,
+  type AssistAnswer,
+  type AssistWorldContext,
+} from './ai/assist'

@@ -219,15 +219,18 @@ export default function NewWorldPage() {
         type="world"
         open={aiModalOpen}
         onOpenChange={setAiModalOpen}
-        onGenerated={(result: WorldAssistResult) => {
-          setName(result.name)
-          setDescription(result.description)
-          setLore(result.lore)
-          setRules(result.rules)
-          setTone(result.tone)
-          setRating(result.rating)
-          // Auto-tune the world's atmosphere to match the AI's chosen tone.
-          setTheme((prev) => themeForTone(result.tone, prev))
+        onGenerated={(result: Partial<WorldAssistResult>) => {
+          // Only fields the author chose to generate come back — merge those.
+          if (result.name !== undefined) setName(result.name)
+          if (result.description !== undefined) setDescription(result.description)
+          if (result.lore !== undefined) setLore(result.lore)
+          if (result.rules !== undefined) setRules(result.rules)
+          if (result.tone !== undefined) {
+            setTone(result.tone)
+            // Auto-tune the world's atmosphere to match the AI's chosen tone.
+            setTheme((prev) => themeForTone(result.tone!, prev))
+          }
+          if (result.rating !== undefined) setRating(result.rating)
         }}
       />
 

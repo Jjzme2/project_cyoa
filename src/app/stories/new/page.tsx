@@ -318,16 +318,17 @@ export default function NewStoryPage() {
         open={aiModalOpen}
         onOpenChange={setAiModalOpen}
         worldContext={worlds.find((w) => w.id === worldId) ?? null}
-        onGenerated={(result: StoryAssistResult) => {
-          setTitle(result.title)
-          setDescription(result.description)
-          setOpening(result.opening)
-          setChoice1(result.choice1)
-          setChoice2(result.choice2)
-          setChoice3(result.choice3)
-          setProtagonistName(result.protagonistName)
-          setProtagonistDesc(result.protagonistDesc)
-          setTags(result.tags)
+        onGenerated={(result: Partial<StoryAssistResult>) => {
+          // Only fields the author chose to generate come back — merge those.
+          if (result.title !== undefined) setTitle(result.title)
+          if (result.description !== undefined) setDescription(result.description)
+          if (result.opening !== undefined) setOpening(result.opening)
+          if (result.choice1 !== undefined) setChoice1(result.choice1)
+          if (result.choice2 !== undefined) setChoice2(result.choice2)
+          if (result.choice3 !== undefined) setChoice3(result.choice3)
+          if (result.protagonistName !== undefined) setProtagonistName(result.protagonistName)
+          if (result.protagonistDesc !== undefined) setProtagonistDesc(result.protagonistDesc)
+          if (result.tags !== undefined) setTags(result.tags)
         }}
       />
 
