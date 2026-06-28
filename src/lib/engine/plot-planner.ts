@@ -13,7 +13,12 @@ export interface PlotState {
   arcId: string;
   beatIndex: number;
   turnsOnBeat: number;
+  /** How many through-lines have already resolved — long stories chain arcs. */
+  arcsCompleted?: number;
 }
+
+/** Narrative phase for a beat, so the prompt conveys where in the arc we are. */
+const PHASES = ['Setup', 'Rising action', 'Turning point', 'Resolution'];
 
 interface PlotArc {
   id: string;
@@ -77,22 +82,35 @@ export const PlotPlanner = {
     if (dark > 0.3) pool = ARCS.filter((a) => a.id !== 'forge_and_test');
     else if (dark < -0.3) pool = ARCS.filter((a) => a.id === 'forge_and_test');
     const arc = pool[SeededRNG.hashString(storyTitle) % pool.length];
-    return { arcId: arc.id, beatIndex: 0, turnsOnBeat: 0 };
+    return { arcId: arc.id, beatIndex: 0, turnsOnBeat: 0, arcsCompleted: 0 };
   },
 
   advance(state: PlotState): PlotState {
     const arc = ARCS.find((a) => a.id === state.arcId) ?? ARCS[0];
+    const arcsCompleted = state.arcsCompleted ?? 0;
     const turnsOnBeat = state.turnsOnBeat + 1;
-    if (turnsOnBeat >= CHAPTERS_PER_BEAT && state.beatIndex < arc.beats.length - 1) {
-      return { ...state, beatIndex: state.beatIndex + 1, turnsOnBeat: 0 };
+
+    if (turnsOnBeat >= CHAPTERS_PER_BEAT) {
+      if (state.beatIndex < arc.beats.length - 1) {
+        return { ...state, beatIndex: state.beatIndex + 1, turnsOnBeat: 0, arcsCompleted };
+      }
+      // The arc has resolved. Rather than plateau on the final beat (which made
+      // long stories stall), chain into a fresh through-line — a new movement —
+      // deterministically chosen so it differs from the one that just ended.
+      const others = ARCS.filter((a) => a.id !== arc.id);
+      const next = others[(arcsCompleted + SeededRNG.hashString(arc.id)) % others.length];
+      return { arcId: next.id, beatIndex: 0, turnsOnBeat: 0, arcsCompleted: arcsCompleted + 1 };
     }
-    return { ...state, turnsOnBeat };
+    return { ...state, turnsOnBeat, arcsCompleted };
   },
 
   directive(state: PlotState): string {
     const arc = ARCS.find((a) => a.id === state.arcId);
     if (!arc) return '';
-    const beat = arc.beats[Math.min(state.beatIndex, arc.beats.length - 1)];
-    return `Advance the story's through-line ("${arc.name}"): ${beat}.`;
+    const i = Math.min(state.beatIndex, arc.beats.length - 1);
+    const beat = arc.beats[i];
+    const phase = PHASES[Math.min(i, PHASES.length - 1)];
+    const movement = (state.arcsCompleted ?? 0) > 0 ? ` (movement ${(state.arcsCompleted ?? 0) + 1})` : '';
+    return `Story through-line${movement} — "${arc.name}", ${phase}: ${beat}.`;
   },
 };
