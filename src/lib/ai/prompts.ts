@@ -1,5 +1,8 @@
-import type { ContentRating, DirectorPersona, Protagonist, StoryCharacter, StoryPathSegment, WorldBible } from '@/types'
+import type { ContentRating, DirectorPersona, Protagonist, StoryCharacter, StoryPathSegment, WorldBible, WorldStorySettings } from '@/types'
 import { describeDirector } from '@/lib/director'
+import { formatCast } from './context-budget'
+import { worldStyleBlock } from './world-style'
+import { formatStoryPath } from './story-memory'
 
 export interface WorldContext {
   name: string
@@ -15,12 +18,16 @@ export interface WorldContext {
   chronicle?: string[]
   /** The world's procedurally generated canon (factions, figures, history). */
   genesis?: WorldBible
+  /** World-level storytelling rules (prose mandate, style pool, motifs). */
+  storySettings?: WorldStorySettings
 }
 
 /** Injects the world's generated canon so stories draw on its powers, figures, and history. */
 function genesisBlock(g?: WorldBible): string {
   if (!g) return ''
   const parts: string[] = []
+  if (g.regions?.length)
+    parts.push('Regions (the world\'s places — use these names for LOCATION): ' + g.regions.slice(0, 12).map((r) => `${r.name} (${r.biome})`).join('; '))
   if (g.factions?.length)
     parts.push('Powers: ' + g.factions.map((f) => `${f.name} (${f.archetype}${f.rivalOf ? `, rivals ${f.rivalOf}` : ''})`).join('; '))
   if (g.characters?.length)
@@ -44,20 +51,9 @@ function directorBlock(d?: DirectorPersona): string {
   return `\nDIRECTOR'S VISION (shape HOW this chapter is directed — its craft and sensibility, always within the CONTENT RATING above):\n${notes.map((n) => `- ${n}`).join('\n')}\n`
 }
 
+/** Dense, budget-aware protagonist + cast block (see context-budget.ts). */
 function castBlock(world: WorldContext): string {
-  const lines: string[] = []
-  if (world.protagonist?.name) {
-    lines.push(
-      `PROTAGONIST (the character the reader plays as — refer to them by name, not "you"): ${world.protagonist.name}${world.protagonist.description ? ` — ${world.protagonist.description}` : ''}`,
-    )
-  }
-  if (world.characters && world.characters.length > 0) {
-    const cast = world.characters
-      .map((c) => `- ${c.name}${c.status ? ` [${c.status}]` : ''}${c.description ? `: ${c.description}` : ''}`)
-      .join('\n')
-    lines.push(`ESTABLISHED CHARACTERS (canon — keep them perfectly consistent):\n${cast}`)
-  }
-  return lines.length > 0 ? `\n${lines.join('\n\n')}\n` : ''
+  return formatCast(world.protagonist, world.characters)
 }
 
 function ratingGuidance(rating: ContentRating | undefined): string {
@@ -78,16 +74,10 @@ export function buildPrompt(
   includeImage: boolean,
   systemNarrativeEvents: string = '',
 ): string {
-  // Format the story path so far
-  const pathContent = storyPath
-    .map((node, index) => {
-      const chapterNum = index + 1
-      const prefix = node.choiceText 
-        ? `The reader chose: "${node.choiceText}"\nChapter ${chapterNum}:` 
-        : `Chapter ${chapterNum} (Beginning):`
-      return `${prefix}\n${node.content}`
-    })
-    .join('\n\n')
+  // Format the story so far — budget-aware: opening + recent chapters verbatim,
+  // the middle condensed (see story-memory.ts) so long stories stay coherent
+  // without unbounded prompt growth.
+  const pathContent = formatStoryPath(storyPath)
 
   // Set strict constraints on length to ensure it fits the book page layout
   // If there's an illustration, the vertical space is significantly reduced.
@@ -107,7 +97,7 @@ WORLD RULES: ${world.rules}
 TONE: ${world.tone}
 
 ${ratingGuidance(world.rating)}
-${castBlock(world)}${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${directorBlock(world.director)}
+${castBlock(world)}${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${directorBlock(world.director)}${worldStyleBlock(world.storySettings, storyPath.length)}
 STORY PATH SO FAR:
 ${pathContent}
 
@@ -139,7 +129,7 @@ STEP 2 — If the choice passes validation, write the next chapter. It MUST foll
 - ${wordLimitInstruction}
 - Do NOT truncate sentences. Every sentence must be complete.
 
-After the chapter, provide exactly 3 brief choice prompts (10 words or less each):
+After the chapter, provide exactly 3 brief choice prompts (10 words or less each). Make them GENUINELY DISTINCT — different approaches with different risks and consequences (e.g. one bold, one cautious, one cunning or unexpected), each leading somewhere meaningfully different. No throwaway or near-duplicate options; every choice should feel like it matters.
 CHOICE_1: [choice text]
 CHOICE_2: [choice text]
 CHOICE_3: [choice text]
@@ -147,7 +137,10 @@ CHOICE_3: [choice text]
 Then, ONLY if this chapter introduces a brand-new named character not already listed above, add one line per new character (omit entirely if none):
 NEW_CHARACTER: [name] — [one-line description]
 
-Write only the chapter, the three choices, and any NEW_CHARACTER lines. No meta-commentary.`
+Finally, name where this chapter takes place on its own line — prefer a Region from WORLD CANON above when the scene is there; otherwise a short place name (4 words max):
+LOCATION: [place]
+
+Write only the chapter, the three choices, any NEW_CHARACTER lines, and the LOCATION line. No meta-commentary.`
 }
 
 export function buildImagePrompt(world: WorldContext, storyContent: string, choiceText: string): string {
@@ -185,7 +178,7 @@ WORLD RULES: ${world.rules}
 TONE: ${world.tone}
 
 ${ratingGuidance(world.rating)}
-${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${directorBlock(world.director)}${sagaPremise.trim() ? `\nSAGA PREMISE (the overall situation this saga drops the reader into — honor it):\n${sagaPremise.trim()}\n` : ''}
+${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${directorBlock(world.director)}${worldStyleBlock(world.storySettings, 0)}${sagaPremise.trim() ? `\nSAGA PREMISE (the overall situation this saga drops the reader into — honor it):\n${sagaPremise.trim()}\n` : ''}
 THIS ENTRY POINT — one of several doorways into the saga the reader could have chosen:
 - How it was offered to the reader: "${entry.label}"
 - What this opening must establish: ${entry.premise}
@@ -199,7 +192,7 @@ Write the opening chapter. It MUST:
 - End at a genuine moment of decision or tension.
 - Be EXACTLY between 130 and 160 words (no more than 1100 characters). Do NOT truncate sentences.
 
-After the chapter, provide exactly 3 brief choice prompts for what the reader does next (10 words or less each):
+After the chapter, provide exactly 3 brief choice prompts for what the reader does next (10 words or less each). Make them GENUINELY DISTINCT — different approaches with different risks (e.g. one bold, one cautious, one cunning), each leading somewhere meaningfully different. No throwaway or near-duplicate options.
 CHOICE_1: [choice text]
 CHOICE_2: [choice text]
 CHOICE_3: [choice text]
@@ -207,7 +200,10 @@ CHOICE_3: [choice text]
 Then, ONLY if this opening introduces a brand-new named character, add one line per new character (omit entirely if none):
 NEW_CHARACTER: [name] — [one-line description]
 
-Write only the chapter, the three choices, and any NEW_CHARACTER lines. No meta-commentary.`
+Finally, name where this opening takes place on its own line — prefer a Region from WORLD CANON above when applicable; otherwise a short place name (4 words max):
+LOCATION: [place]
+
+Write only the chapter, the three choices, any NEW_CHARACTER lines, and the LOCATION line. No meta-commentary.`
 }
 
 /**

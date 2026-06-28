@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
-import { ChevronLeft, Sparkles, Volume2, VolumeX, Waves, Trophy, Users } from 'lucide-react'
+import { ChevronLeft, Sparkles, Volume2, VolumeX, Waves, Trophy, Users, Map as MapIcon } from 'lucide-react'
 import { StoryContent } from './StoryContent'
 import { ChoiceSlots } from './ChoiceSlots'
 import { NodeReactions } from './NodeReactions'
@@ -27,7 +27,7 @@ import {
   isAmbientOn,
   setAmbientOn,
 } from '@/lib/page-sound'
-import type { Story, StoryNode, ChoiceSlot, ChoiceEffect, SaveSlot } from '@/types'
+import type { Story, StoryNode, ChoiceSlot, ChoiceEffect, SaveSlot, WorldBible } from '@/types'
 import {
   type DiscoveredEnding,
   type Direction,
@@ -40,16 +40,18 @@ import {
   loadLocalProgress,
   saveLocalProgress,
 } from './book-viewer-internals'
-import { CastDialog, EndingsDialog } from './ReaderDialogs'
+import { CastDialog, EndingsDialog, MapDialog } from './ReaderDialogs'
 
 interface Props {
   story: Story
   initialNode: StoryNode
   endingCount?: number
+  worldGenesis?: WorldBible
+  worldSeed?: number
 }
 
 
-export function BookViewer({ story, initialNode, endingCount }: Props) {
+export function BookViewer({ story, initialNode, endingCount, worldGenesis, worldSeed }: Props) {
   const { user } = useAuth()
   const [node, setNode] = useState<StoryNode>(initialNode)
   const [history, setHistory] = useState<StoryNode[]>([])
@@ -67,6 +69,12 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
   )
   const [endingsOpen, setEndingsOpen] = useState(false)
   const [castOpen, setCastOpen] = useState(false)
+  const [mapOpen, setMapOpen] = useState(false)
+  const hasMap = !!worldGenesis?.regions && worldGenesis.regions.length > 0
+  // Locations the reader has passed through, plus where they are now.
+  const visitedLocations = [...history, node]
+    .map((n) => n.location)
+    .filter((l): l is string => !!l)
   const [showInitialChoices, setShowInitialChoices] = useState(false)
   const [pendingChoices, setPendingChoices] = useState<Record<string, string>>({})
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -659,6 +667,17 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
         </div>
 
         <div className="flex items-center gap-2">
+          {hasMap && (
+            <button
+              type="button"
+              onClick={() => setMapOpen(true)}
+              title="World map"
+              aria-label="World map"
+              className="flex items-center justify-center h-8 w-8 rounded-full text-amber-400/50 hover:text-amber-300 transition-colors"
+            >
+              <MapIcon className="h-4 w-4" />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setEndingsOpen(true)}
@@ -816,6 +835,15 @@ export function BookViewer({ story, initialNode, endingCount }: Props) {
       </p>
 
       <CastDialog open={castOpen} onOpenChange={setCastOpen} story={story} />
+
+      <MapDialog
+        open={mapOpen}
+        onOpenChange={setMapOpen}
+        genesis={worldGenesis}
+        seed={worldSeed}
+        currentLocation={node.location}
+        visited={visitedLocations}
+      />
 
       <EndingsDialog open={endingsOpen} onOpenChange={setEndingsOpen} discoveredEndings={discoveredEndings} endingCount={endingCount} />
     </div>

@@ -68,6 +68,11 @@ export default function NewWorldPage() {
   const [rating, setRating] = useState<ContentRating>(DEFAULT_CONTENT_RATING)
   const [seed, setSeed] = useState('')
   const [theme, setTheme] = useState<WorldTheme>(() => themeForTone('Epic Fantasy', DEFAULT_WORLD_THEME))
+  // World-level storytelling rules (optional): a per-chapter mandate, a pool of
+  // prose styles the engine rotates through, and recurring motifs.
+  const [mandate, setMandate] = useState('')
+  const [proseStyles, setProseStyles] = useState('') // one per line
+  const [motifs, setMotifs] = useState('') // comma- or newline-separated
 
   const draft = useDraft<WorldDraft>('chronicle:draft:world')
 
@@ -124,6 +129,11 @@ export default function NewWorldPage() {
           rating,
           seed: seed.trim() ? parseInt(seed.trim(), 10) : undefined,
           theme,
+          storySettings: {
+            mandate: mandate.trim() || undefined,
+            proseStyles: proseStyles.split('\n').map((s) => s.trim()).filter(Boolean),
+            motifs: motifs.split(/[,\n]/).map((s) => s.trim()).filter(Boolean),
+          },
         }),
       })
       if (!res.ok) throw new Error((await res.json()).error ?? 'Failed to create world')
@@ -333,6 +343,58 @@ export default function NewWorldPage() {
             required
             className="min-h-[140px] resize-none text-xs leading-relaxed font-mono"
           />
+        </div>
+
+        {/* ── World storytelling (optional) ── */}
+        <div className="glass-card rounded-xl p-6 space-y-4">
+          <div>
+            <Label className="text-sm font-medium text-foreground/65 block">
+              Storytelling style{' '}
+              <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span>
+            </Label>
+            <p className="text-xs text-muted-foreground/45 mt-1">
+              World-level rules that shape how every chapter is written — applied to every story in this world.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="mandate" className="text-xs text-muted-foreground/60">Per-chapter mandate</Label>
+            <Input
+              id="mandate"
+              placeholder="e.g. Every chapter must contain at least one line of poetic prose"
+              value={mandate}
+              onChange={(e) => setMandate(e.target.value)}
+              maxLength={300}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="proseStyles" className="text-xs text-muted-foreground/60">
+              Prose styles{' '}
+              <span className="text-muted-foreground/45">— one per line; the engine rotates through them per chapter</span>
+            </Label>
+            <Textarea
+              id="proseStyles"
+              placeholder={'lyrical and image-rich\nspare and haunting\nornate, formal, almost liturgical'}
+              value={proseStyles}
+              onChange={(e) => setProseStyles(e.target.value)}
+              rows={3}
+              className="resize-none text-xs leading-relaxed"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="motifs" className="text-xs text-muted-foreground/60">
+              Recurring motifs{' '}
+              <span className="text-muted-foreground/45">— comma-separated; woven in where they fit</span>
+            </Label>
+            <Input
+              id="motifs"
+              placeholder="e.g. water, mirrors, the turning of seasons"
+              value={motifs}
+              onChange={(e) => setMotifs(e.target.value)}
+            />
+          </div>
         </div>
 
         <Button
