@@ -53,6 +53,19 @@ interface WorldDraft {
   theme: WorldTheme
 }
 
+/** Quick-add templates for common per-story style options (authors can edit after adding). */
+const PRESET_STYLE_OPTIONS: { label: string; choices: string }[] = [
+  { label: 'Narration', choices: 'First person, Second person, Third limited, Third omniscient' },
+  { label: 'Tense', choices: 'Past tense, Present tense' },
+  { label: 'Tone register', choices: 'Formal, Conversational, Archaic, Terse' },
+  { label: 'Pacing', choices: 'Slow-burn, Brisk, Breakneck' },
+  { label: 'Sentence rhythm', choices: 'Long and flowing, Short and punchy, Varied' },
+  { label: 'Dialogue density', choices: 'Dialogue-heavy, Balanced, Sparse' },
+  { label: 'Humor', choices: 'None, Dry wit, Broad comedy' },
+  { label: 'Chapter endings', choices: 'Cliffhanger, Soft beat, Reflective' },
+  { label: 'Rhyme scheme', choices: 'ABAB, ABBA, AABB, Free verse' },
+]
+
 export default function NewWorldPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
@@ -418,6 +431,29 @@ export default function NewWorldPage() {
                 <Plus className="h-3 w-3" /> Add option
               </Button>
             </div>
+
+            {/* Quick-add presets — common configurations that apply across worlds. */}
+            <div className="flex flex-wrap gap-1.5">
+              {PRESET_STYLE_OPTIONS.map((p) => {
+                const added = styleOptions.some((o) => o.label.trim().toLowerCase() === p.label.toLowerCase())
+                return (
+                  <button
+                    key={p.label}
+                    type="button"
+                    disabled={added}
+                    onClick={() => setStyleOptions((prev) => [...prev, { label: p.label, choices: p.choices }])}
+                    className={`px-2 py-1 rounded-md text-[11px] font-sans border transition-all ${
+                      added
+                        ? 'border-white/5 text-muted-foreground/30 cursor-default'
+                        : 'border-white/10 text-muted-foreground/60 hover:border-amber-500/25 hover:text-amber-200/80'
+                    }`}
+                  >
+                    + {p.label}
+                  </button>
+                )
+              })}
+            </div>
+
             {styleOptions.map((opt, i) => (
               <div key={i} className="flex gap-2 items-start">
                 <Input

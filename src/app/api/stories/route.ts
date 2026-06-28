@@ -7,6 +7,7 @@ import { adminAuth } from '@/lib/firebase-admin'
 import { getStories, createStory, getWorld, checkAndAwardAchievements } from '@/lib/firestore-helpers'
 import { clampRating } from '@/lib/ratings'
 import { sanitizeDirector } from '@/lib/director'
+import { sanitizeStyleChoices } from '@/lib/story-style'
 import { analytics } from '@/lib/telemetry'
 import { CONTENT_RATINGS, DEFAULT_CONTENT_RATING } from '@/types'
 import type { CoverTheme, ReadingTheme, ResourceDefinition } from '@/types'
@@ -37,20 +38,6 @@ const CreateStorySchema = z.object({
   goapEnabled: z.boolean().optional(),
   implementQuests: z.boolean().optional(),
 })
-
-/** Keep only choices that match one of the world's offered style options. */
-function sanitizeStyleChoices(
-  choices: Record<string, string> | undefined,
-  options: { label: string; choices: string[] }[] | undefined,
-): Record<string, string> | null {
-  if (!choices || !options?.length) return null
-  const out: Record<string, string> = {}
-  for (const opt of options) {
-    const picked = choices[opt.label]
-    if (picked && opt.choices.includes(picked)) out[opt.label] = picked
-  }
-  return Object.keys(out).length > 0 ? out : null
-}
 
 export async function GET(req: NextRequest) {
   const limit = Number(req.nextUrl.searchParams.get('limit') ?? 20)

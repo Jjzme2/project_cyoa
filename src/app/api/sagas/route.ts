@@ -16,6 +16,7 @@ import { generateSagaOpening, PromptRejectedError } from '@/lib/ai'
 import { trackGenerationCompleted, trackGenerationFailed } from '@/lib/generation-telemetry'
 import { clampRating } from '@/lib/ratings'
 import { sanitizeDirector } from '@/lib/director'
+import { sanitizeStyleChoices } from '@/lib/story-style'
 import { analytics } from '@/lib/telemetry'
 import { CONTENT_RATINGS, DEFAULT_CONTENT_RATING } from '@/types'
 import type { CoverTheme, ReadingTheme } from '@/types'
@@ -35,6 +36,7 @@ const SagaSchema = z.object({
   coverTheme: z.custom<CoverTheme>().optional(),
   readingTheme: z.custom<ReadingTheme>().optional(),
   director: z.unknown().optional(),
+  styleChoices: z.record(z.string(), z.string()).optional(),
   shared: z.boolean().optional(),
   premise: z.string().optional(),
   entryPoints: z
@@ -70,6 +72,7 @@ export async function POST(req: NextRequest) {
     coverTheme,
     readingTheme,
     director,
+    styleChoices,
     shared,
     premise,
     entryPoints,
@@ -102,6 +105,8 @@ export async function POST(req: NextRequest) {
   const world = await getWorld(worldId).catch(() => null)
   if (!world) return NextResponse.json({ error: 'World not found' }, { status: 404 })
   const effectiveRating = world.rating ? clampRating(rating, world.rating) : rating
+  // The saga's picks for the world's configurable style options.
+  const safeStyleChoices = sanitizeStyleChoices(styleChoices, world.storySettings?.styleOptions)
 
   // One credit per opening we render. Reserve up front; refund on any failure.
   const cost = entries.length
@@ -124,6 +129,7 @@ export async function POST(req: NextRequest) {
       director: safeDirector ?? undefined,
       genesis: world.genesis,
       storySettings: world.storySettings,
+      styleChoices: safeStyleChoices ?? undefined,
     }
 
     // Render every entry point's opening. If any single one is rejected by the
@@ -176,6 +182,7 @@ export async function POST(req: NextRequest) {
       implementQuests: false,
       ...(shared === false ? { unlisted: true } : {}),
       ...(safeDirector ? { director: safeDirector } : {}),
+      ...(safeStyleChoices ? { styleChoices: safeStyleChoices } : {}),
       tags: Array.isArray(tags) ? tags.slice(0, 5) : [],
       ...(coverTheme ? { coverTheme } : {}),
       ...(readingTheme ? { readingTheme } : {}),
