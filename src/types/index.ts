@@ -6,6 +6,7 @@
 export * from './content'
 export * from './user'
 export * from './characters'
+export * from './character-registry'
 export * from './rooms'
 export * from './social'
 export * from './story'

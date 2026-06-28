@@ -6,7 +6,7 @@ Living strategy doc. The companion to `ROADMAP.md` (what we're building) and
 go viral, sustain a community for years, and eventually carry IP beyond the app
 itself (characters, merch, an entertainment brand).
 
-Status legend: 🎯 thesis · 🟢 in motion · 🔭 sequenced next · 🧊 deliberately not now.
+Status legend: 🎯 thesis · ✅ shipped · 🟢 in motion · 🔭 sequenced next · 🧊 deliberately not now.
 
 ---
 
@@ -66,7 +66,7 @@ these are promotions of latent value, not green-field bets.
 ### 1. Growth-strategy doc 🟢
 This document. Captures the thesis so the threads below share a why.
 
-### 2. Share Card 🔭 — *the screenshot-able artifact*
+### 2. Share Card ✅ — *the screenshot-able artifact*
 **Highest ROI, lowest effort.** We already render branded 1200×630 OG cards via
 `src/lib/og.tsx` (`renderOgImage`). The Share Card is the deliberate, *portrait*
 -orientation, social-native (story/feed) version for three units:
@@ -79,7 +79,7 @@ This is the TikTok / Instagram / Discord unit. *Nothing spreads until it exists.
 It's also the surface every later thread shares — characters, endings, and
 events all become cards.
 
-### 3. Seasons / Events (admin-defined) 🔭 — *the live-ops heartbeat*
+### 3. Seasons / Events (admin-defined) ✅ — *the live-ops heartbeat*
 A live-ops layer built on the economy + telemetry we already have. Admins define
 time-boxed, multiverse-wide themed events ("The Sundering — a crisis everyone
 writes into") from an admin screen. Gives players a *reason to return* and a
@@ -87,11 +87,10 @@ writes into") from an admin screen. Gives players a *reason to return* and a
 admin definition tool; surfaces to players as a banner + themed prompts + an
 event-scoped leaderboard.
 
-### 4. First-class Characters 🔭 — *the IP bet*
-The big one. Promote the emergent canon cast from a story sub-object into a
-**Character** entity: name, generated portrait (we already do cover-image
-generation), one-line identity, and the worlds/stories they've appeared in.
-Then:
+### 4. First-class Characters 🟢 — *the IP bet*
+The big one. Promote the canon cast from a story sub-object into a **Character**
+entity that aggregates appearances across stories and worlds — the seed of
+Chronicle's character IP.
 
 - **Collect** characters across stories — an infinite, emergent "catch 'em all."
 - **Travel the multiverse** — let a beloved character *cameo* in another world
@@ -104,6 +103,20 @@ You don't need a toy factory to start an IP enterprise. You need **one
 recognizable character people feel ownership of.** A platform that generates
 thousands and lets the community vote the best to the top is a character-IP
 source no studio can match.
+
+**Fold 1 (shipped):** the `Character` registry — identity keyed by (scope,
+owner, name) so an author's hero is one collectible identity across their
+stories and a world's canon figure is one across its stories. Appearances
+aggregate (idempotent per story); `worldIds` tracks cross-world travel. A
+collectible directory (`/characters`), profile pages (`/characters/[id]`), a
+per-world Cast section, a Characters nav link, and the character Share Card are
+live. Heroes (author-defined protagonists) and world genesis figures register on
+story creation. Portraits fall back to a name-derived monogram.
+
+**Fold 2+ (next):** generated portraits (reuse the cover-image pipeline);
+surfacing a character's *cameo* into another world's prompt assembly (the
+multiverse crossover); author-claimed/curated characters and community voting;
+richer `CreativeWork`/`Person` JSON-LD + a landscape OG image per character.
 
 ---
 
