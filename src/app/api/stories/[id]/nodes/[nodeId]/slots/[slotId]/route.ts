@@ -163,7 +163,7 @@ export async function POST(
     // few legends from its sibling worlds — surfaced as clearly-foreign echoes.
     // An unconnected world is never queried, so nothing crosses in.
     const echoes = world.multiverse?.id
-      ? await getMultiverseEchoes(world.multiverse.id, story.worldId).catch(() => [])
+      ? await getMultiverseEchoes(world.multiverse.id, story.worldId, { maxRating: effectiveRating }).catch(() => [])
       : []
     // Assembled through the single audited seam (buildWorldContext): the chronicle
     // is read with story.worldId and passed in here, so only THIS world's legends
