@@ -5,6 +5,7 @@
  * preserves the original `@/lib/ai` public surface.
  */
 export { PromptRejectedError } from './ai/shared'
+export { buildWorldContext, type WorldContextOptions } from './ai/world-context'
 export { generateStoryImage, generateCoverImage } from './ai/images'
 export {
   generateWorldFromPrompt,

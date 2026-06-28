@@ -12,7 +12,7 @@ import {
 } from '@/lib/firestore-helpers'
 import { CreditManager } from '@/lib/credit-manager'
 import { creditFailureResponse } from '@/lib/credit-response'
-import { generateSagaOpening, PromptRejectedError } from '@/lib/ai'
+import { generateSagaOpening, buildWorldContext, PromptRejectedError } from '@/lib/ai'
 import { trackGenerationCompleted, trackGenerationFailed } from '@/lib/generation-telemetry'
 import { clampRating } from '@/lib/ratings'
 import { sanitizeDirector } from '@/lib/director'
@@ -28,7 +28,9 @@ type EntryInput = { label: string; premise: string }
 const SagaSchema = z.object({
   title: z.string().trim().min(1, 'Missing required fields'),
   worldId: z.string().min(1, 'Missing required fields'),
-  worldName: z.string().min(1, 'Missing required fields'),
+  // Accepted for back-compat but ignored — the saga is labeled from the world we
+  // load by worldId (see below), so a stale/mismatched client name can't stick.
+  worldName: z.string().optional(),
   description: z.string().optional(),
   // Invalid/absent ratings fall back to the default, as before.
   rating: z.enum(CONTENT_RATINGS).catch(DEFAULT_CONTENT_RATING),
@@ -66,7 +68,6 @@ export async function POST(req: NextRequest) {
     title,
     description,
     worldId,
-    worldName,
     rating,
     tags,
     coverTheme,
@@ -119,18 +120,14 @@ export async function POST(req: NextRequest) {
 
   let storyId: string | null = null
   try {
-    const worldCtx = {
-      name: world.name,
-      description: world.description,
-      lore: world.lore,
-      rules: world.rules,
-      tone: world.tone,
+    // Assembled through the single audited seam: this context can only ever carry
+    // THIS world's data. A fresh saga opening deliberately carries no chronicle —
+    // the reader arrives as an outsider with no legends yet attached to them.
+    const worldCtx = buildWorldContext(world, {
       rating: effectiveRating,
       director: safeDirector ?? undefined,
-      genesis: world.genesis,
-      storySettings: world.storySettings,
       styleChoices: safeStyleChoices ?? undefined,
-    }
+    })
 
     // Render every entry point's opening. If any single one is rejected by the
     // model's safety pass, surface it rather than shipping a half-built saga.
@@ -166,7 +163,9 @@ export async function POST(req: NextRequest) {
       title: title.trim().slice(0, 120),
       description: typeof description === 'string' ? description.trim().slice(0, 200) : '',
       worldId,
-      worldName,
+      // Label the saga with the world we actually loaded by worldId, never the
+      // client-supplied name — a saga can't be mislabeled with a different world.
+      worldName: world.name,
       authorId: uid,
       authorName: displayName ?? 'Anonymous',
       rootNodeId: null,
