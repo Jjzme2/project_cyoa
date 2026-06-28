@@ -22,6 +22,16 @@ export async function getWorld(id: string): Promise<World | null> {
   return { id: doc.id, ...doc.data() } as World
 }
 
+/** Every world tagged into a given multiverse pool (members share legends). */
+export async function getWorldsByMultiverse(multiverseId: string, limit = 12): Promise<World[]> {
+  const snap = await adminDb
+    .collection('worlds')
+    .where('multiverse.id', '==', multiverseId)
+    .limit(limit)
+    .get()
+  return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as World))
+}
+
 export async function getWorldsByAuthor(authorId: string): Promise<World[]> {
   const snap = await adminDb
     .collection('worlds')

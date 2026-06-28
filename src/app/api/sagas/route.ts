@@ -8,6 +8,7 @@ import {
   createStory,
   createSagaTree,
   getWorld,
+  getMultiverseEchoes,
   checkAndAwardAchievements,
 } from '@/lib/firestore-helpers'
 import { CreditManager } from '@/lib/credit-manager'
@@ -120,13 +121,19 @@ export async function POST(req: NextRequest) {
 
   let storyId: string | null = null
   try {
+    // Multiverse pool: a fresh saga carries no chronicle of its own (the reader
+    // just arrived), but the WORLD's declared multiverse is canon — so its
+    // sibling worlds' legends may drift in as clearly-foreign echoes.
+    const echoes = world.multiverse?.id
+      ? await getMultiverseEchoes(world.multiverse.id, worldId).catch(() => [])
+      : []
     // Assembled through the single audited seam: this context can only ever carry
-    // THIS world's data. A fresh saga opening deliberately carries no chronicle —
-    // the reader arrives as an outsider with no legends yet attached to them.
+    // THIS world's data plus the echoes its own multiverse membership opted into.
     const worldCtx = buildWorldContext(world, {
       rating: effectiveRating,
       director: safeDirector ?? undefined,
       styleChoices: safeStyleChoices ?? undefined,
+      echoes,
     })
 
     // Render every entry point's opening. If any single one is rejected by the

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildWorldContext } from '@/lib/ai/world-context'
 import { buildPrompt, buildSagaOpeningPrompt } from '@/lib/ai/prompts'
+import { toMultiverseId } from '@/lib/multiverse'
 import type { World } from '@/types'
 
 /**
@@ -85,5 +86,55 @@ describe('prompt builders never invent foreign-world content', () => {
     // does cross-world text appear — proving there is no implicit path.
     const injected = buildPrompt(buildWorldContext(makeWorld(), { chronicle: [FOREIGN] }), [], 'Look around', false)
     expect(injected).toContain(FOREIGN)
+  })
+})
+
+describe('multiverse echoes (the only sanctioned cross-world path)', () => {
+  it('an unconnected world renders no MULTIVERSE ECHOES block', () => {
+    const prompt = buildPrompt(buildWorldContext(makeWorld()), [], 'Walk on', false)
+    expect(prompt).not.toContain('MULTIVERSE ECHOES')
+  })
+
+  it('echoes appear only when the world opted into a multiverse and legends are pooled', () => {
+    const ctx = buildWorldContext(makeWorld(), {
+      echoes: [{ worldName: 'Tartwater Reach', nexus: 'a shimmering rift', legends: ['The river ran sour for a year.'] }],
+    })
+    const prompt = buildPrompt(ctx, [], 'Walk on', false)
+    expect(prompt).toContain('MULTIVERSE ECHOES')
+    expect(prompt).toContain('Tartwater Reach')
+    expect(prompt).toContain('a shimmering rift')
+    expect(prompt).toContain('The river ran sour for a year.')
+    // Foreign legends are explicitly framed as from ELSEWHERE, not native canon.
+    expect(prompt).toContain('ELSEWHERE')
+  })
+
+  it('an echo bundle with no usable legends renders nothing', () => {
+    const ctx = buildWorldContext(makeWorld(), { echoes: [{ worldName: 'Empty', legends: ['   '] }] })
+    expect(ctx.echoes).toBeDefined()
+    expect(buildPrompt(ctx, [], 'Walk on', false)).not.toContain('MULTIVERSE ECHOES')
+  })
+
+  it('a saga opening surfaces multiverse echoes too when the world declares them', () => {
+    const ctx = buildWorldContext(makeWorld(), {
+      echoes: [{ worldName: 'Tartwater Reach', legends: ['A baker crossed the rift.'] }],
+    })
+    const prompt = buildSagaOpeningPrompt(ctx, '', { label: 'Arrive', premise: 'You step in.' })
+    expect(prompt).toContain('MULTIVERSE ECHOES')
+    expect(prompt).toContain('A baker crossed the rift.')
+  })
+})
+
+describe('toMultiverseId (author-scoped pool key)', () => {
+  it('is stable and author-scoped, so identical names from different authors never pool', () => {
+    expect(toMultiverseId('alice', 'The Sugar Multiverse')).toBe('alice:the-sugar-multiverse')
+    expect(toMultiverseId('alice', '  the   sugar   multiverse  ')).toBe('alice:the-sugar-multiverse')
+    expect(toMultiverseId('bob', 'The Sugar Multiverse')).toBe('bob:the-sugar-multiverse')
+    expect(toMultiverseId('alice', 'The Sugar Multiverse')).not.toBe(toMultiverseId('bob', 'The Sugar Multiverse'))
+  })
+
+  it('returns null for an empty / symbol-only name', () => {
+    expect(toMultiverseId('alice', '   ')).toBeNull()
+    expect(toMultiverseId('alice', '✨✨')).toBeNull()
+    expect(toMultiverseId('', 'Sugarverse')).toBeNull()
   })
 })

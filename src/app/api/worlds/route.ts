@@ -8,6 +8,7 @@ import { createWorld, getWorldsByAuthor, checkAndAwardAchievements, setWorldGene
 import { analytics } from '@/lib/telemetry'
 import { buildGenesisSkeleton } from '@/lib/engine/world-genesis'
 import { SeededRNG } from '@/lib/engine/seed-rng'
+import { toMultiverseId } from '@/lib/multiverse'
 import { elaborateWorldBible } from '@/lib/ai'
 import { CONTENT_RATINGS, DEFAULT_CONTENT_RATING } from '@/types'
 import type { WorldTheme } from '@/types'
@@ -23,6 +24,8 @@ const CreateWorldSchema = z.object({
   rating: z.enum(CONTENT_RATINGS).catch(DEFAULT_CONTENT_RATING),
   seed: z.union([z.number(), z.string()]).nullish(),
   theme: z.custom<WorldTheme>().optional(),
+  // Optional multiverse this world joins; the pool key is derived server-side.
+  multiverseName: z.string().optional(),
   storySettings: z
     .object({
       mandate: z.string().optional(),
@@ -99,6 +102,13 @@ export async function POST(req: NextRequest) {
   const { name, description, lore, rules, tone, tags, rating: safeRating, seed, theme } = parsed.data
   const storySettings = sanitizeStorySettings(parsed.data.storySettings)
 
+  // Resolve an opt-in multiverse: the display name is trimmed and the pool key is
+  // derived server-side, author-scoped, so two of this author's worlds with the
+  // same multiverse name pool together — and no one else's can join by name.
+  const multiverseName = parsed.data.multiverseName?.trim().slice(0, 60) || ''
+  const multiverseId = multiverseName ? toMultiverseId(uid, multiverseName) : null
+  const multiverse = multiverseId ? { id: multiverseId, name: multiverseName } : null
+
   const effectiveTone = tone ?? 'Epic Fantasy'
   // Every world gets a stable seed, so its genesis + simulation are reproducible.
   const effectiveSeed = seed !== undefined && seed !== null ? Number(seed) : SeededRNG.hashString(name)
@@ -117,6 +127,7 @@ export async function POST(req: NextRequest) {
     seed: effectiveSeed,
     ...(theme ? { theme } : {}),
     ...(storySettings ? { storySettings } : {}),
+    ...(multiverse ? { multiverse } : {}),
   })
 
   revalidateTag('worlds', 'max')

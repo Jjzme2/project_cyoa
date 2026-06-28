@@ -14,6 +14,21 @@ export interface WorldStyleOption {
 }
 
 /**
+ * A "multiverse" is an opt-in shared pool that worlds can belong to. Every world
+ * tagged into the same multiverse contributes its legends to one common pool, and
+ * each member may draw faint echoes of the others — clearly framed as foreign
+ * (see WorldEcho / the MULTIVERSE ECHOES prompt block). A world with no multiverse
+ * stays fully isolated: nothing crosses in. Membership is the explicit, drawn
+ * connection the author opts into; content never bleeds across worlds without it.
+ */
+export interface WorldMultiverse {
+  /** Stable pool key (author-scoped slug); worlds sharing it pool together. */
+  id: string
+  /** Display name of the multiverse, e.g. "The Sugar Multiverse". */
+  name: string
+}
+
+/**
  * Authored, world-level storytelling rules that shape HOW every chapter in the
  * world is written (distinct from the per-story Director). Optional throughout.
  */
@@ -52,6 +67,8 @@ export interface World {
   genesis?: WorldBible
   /** World-level storytelling rules (prose mandate, style pool, motifs). */
   storySettings?: WorldStorySettings
+  /** Opt-in shared pool this world belongs to; its legends echo only among members. */
+  multiverse?: WorldMultiverse
   createdAt: string
 }
 
