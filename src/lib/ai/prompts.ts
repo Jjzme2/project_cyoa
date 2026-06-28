@@ -20,6 +20,8 @@ export interface WorldContext {
   genesis?: WorldBible
   /** World-level storytelling rules (prose mandate, style pool, motifs). */
   storySettings?: WorldStorySettings
+  /** This story's pick for each of the world's configurable style options. */
+  styleChoices?: Record<string, string>
 }
 
 /** Injects the world's generated canon so stories draw on its powers, figures, and history. */
@@ -97,7 +99,7 @@ WORLD RULES: ${world.rules}
 TONE: ${world.tone}
 
 ${ratingGuidance(world.rating)}
-${castBlock(world)}${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${directorBlock(world.director)}${worldStyleBlock(world.storySettings, storyPath.length)}
+${castBlock(world)}${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${directorBlock(world.director)}${worldStyleBlock(world.storySettings, storyPath.length, world.styleChoices)}
 STORY PATH SO FAR:
 ${pathContent}
 
@@ -178,7 +180,7 @@ WORLD RULES: ${world.rules}
 TONE: ${world.tone}
 
 ${ratingGuidance(world.rating)}
-${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${directorBlock(world.director)}${worldStyleBlock(world.storySettings, 0)}${sagaPremise.trim() ? `\nSAGA PREMISE (the overall situation this saga drops the reader into — honor it):\n${sagaPremise.trim()}\n` : ''}
+${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${directorBlock(world.director)}${worldStyleBlock(world.storySettings, 0, world.styleChoices)}${sagaPremise.trim() ? `\nSAGA PREMISE (the overall situation this saga drops the reader into — honor it):\n${sagaPremise.trim()}\n` : ''}
 THIS ENTRY POINT — one of several doorways into the saga the reader could have chosen:
 - How it was offered to the reader: "${entry.label}"
 - What this opening must establish: ${entry.premise}

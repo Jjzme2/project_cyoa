@@ -97,6 +97,8 @@ export interface Story {
   unlisted?: boolean
   /** Authored directorial sensibility that shapes how chapters are directed. */
   director?: DirectorPersona
+  /** This story's pick for each of its world's configurable style options (label → choice). */
+  styleChoices?: Record<string, string>
   /** Canon cast — author-seeded and grown emergently as the AI introduces characters. */
   characters?: StoryCharacter[]
   coverTheme?: CoverTheme
