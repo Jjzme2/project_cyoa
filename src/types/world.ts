@@ -14,6 +14,22 @@ export interface WorldStyleOption {
 }
 
 /**
+ * An explicit, directed link from one world to specific other worlds — the
+ * second multiverse mode. Independent of the shared pool: a world can link to
+ * hand-picked worlds whether or not they share a multiverse. The link is
+ * one-directional (it pulls echoes IN from the named world, never pushes this
+ * world's content out), and the target name is resolved server-side at save.
+ */
+export interface WorldLink {
+  /** The id of the linked world. */
+  worldId: string
+  /** The linked world's name (resolved server-side, for display + prompt). */
+  worldName: string
+  /** How the two are linked, in-world (e.g. "a shimmering rift"). */
+  nexus?: string
+}
+
+/**
  * A "multiverse" is an opt-in shared pool that worlds can belong to. Every world
  * tagged into the same multiverse contributes its legends to one common pool, and
  * each member may draw faint echoes of the others — clearly framed as foreign
@@ -69,6 +85,8 @@ export interface World {
   storySettings?: WorldStorySettings
   /** Opt-in shared pool this world belongs to; its legends echo only among members. */
   multiverse?: WorldMultiverse
+  /** Explicit, hand-picked worlds whose legends also echo into this one. */
+  links?: WorldLink[]
   createdAt: string
 }
 

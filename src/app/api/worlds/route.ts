@@ -4,7 +4,7 @@ import { revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import { parseJson } from '@/lib/api-validation'
 import { adminAuth } from '@/lib/firebase-admin'
-import { createWorld, getWorldsByAuthor, checkAndAwardAchievements, setWorldGenesis } from '@/lib/firestore-helpers'
+import { createWorld, getWorld, getWorldsByAuthor, checkAndAwardAchievements, setWorldGenesis } from '@/lib/firestore-helpers'
 import { analytics } from '@/lib/telemetry'
 import { buildGenesisSkeleton } from '@/lib/engine/world-genesis'
 import { SeededRNG } from '@/lib/engine/seed-rng'
@@ -26,6 +26,10 @@ const CreateWorldSchema = z.object({
   theme: z.custom<WorldTheme>().optional(),
   // Optional multiverse this world joins; the pool key is derived server-side.
   multiverseName: z.string().optional(),
+  // Optional explicit links to specific worlds; names are resolved server-side.
+  links: z
+    .array(z.object({ worldId: z.string().min(1), nexus: z.string().optional() }))
+    .optional(),
   storySettings: z
     .object({
       mandate: z.string().optional(),
@@ -110,6 +114,22 @@ export async function POST(req: NextRequest) {
   const multiverseId = multiverseName ? toMultiverseId(multiverseName) : null
   const multiverse = multiverseId ? { id: multiverseId, name: multiverseName } : null
 
+  // Resolve explicit links: validate each target exists and take its REAL name
+  // server-side (never a client-supplied label), deduped, capped.
+  const linkInputs = (parsed.data.links ?? []).slice(0, 8)
+  const seenLinks = new Set<string>()
+  const resolvedLinks: { worldId: string; worldName: string; nexus?: string }[] = []
+  for (const l of linkInputs) {
+    if (seenLinks.has(l.worldId)) continue
+    seenLinks.add(l.worldId)
+    const target = await getWorld(l.worldId).catch(() => null)
+    if (!target) continue
+    const nexus = l.nexus?.trim().slice(0, 120)
+    resolvedLinks.push({ worldId: l.worldId, worldName: target.name, ...(nexus ? { nexus } : {}) })
+    if (resolvedLinks.length >= 5) break
+  }
+  const links = resolvedLinks.length ? resolvedLinks : null
+
   const effectiveTone = tone ?? 'Epic Fantasy'
   // Every world gets a stable seed, so its genesis + simulation are reproducible.
   const effectiveSeed = seed !== undefined && seed !== null ? Number(seed) : SeededRNG.hashString(name)
@@ -129,6 +149,7 @@ export async function POST(req: NextRequest) {
     ...(theme ? { theme } : {}),
     ...(storySettings ? { storySettings } : {}),
     ...(multiverse ? { multiverse } : {}),
+    ...(links ? { links } : {}),
   })
 
   revalidateTag('worlds', 'max')

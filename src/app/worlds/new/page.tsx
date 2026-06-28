@@ -86,6 +86,9 @@ export default function NewWorldPage() {
   // Existing public multiverse names, offered as suggestions so a collective is
   // joined by its exact, matching name.
   const [knownMultiverses, setKnownMultiverses] = useState<string[]>([])
+  // Explicit links (fold 2): hand-picked worlds whose legends echo into this one.
+  const [worldChoices, setWorldChoices] = useState<{ id: string; name: string }[]>([])
+  const [links, setLinks] = useState<{ worldId: string; worldName: string; nexus: string }[]>([])
 
   const draft = useDraft<WorldDraft>('chronicle:draft:world')
 
@@ -116,6 +119,23 @@ export default function NewWorldPage() {
         setKnownMultiverses(Array.from(new Set(names)))
       } catch {
         /* suggestions are optional */
+      }
+    })()
+  }, [])
+
+  // Candidate worlds to link to explicitly (fold 2). Best-effort.
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const res = await fetch('/api/worlds/public')
+        if (!res.ok) return
+        const data = await res.json()
+        const choices = ((data.worlds ?? []) as { id: string; name: string }[])
+          .map((w) => ({ id: w.id, name: w.name }))
+          .filter((w) => w.id && w.name)
+        setWorldChoices(choices)
+      } catch {
+        /* link picker is optional */
       }
     })()
   }, [])
@@ -161,6 +181,9 @@ export default function NewWorldPage() {
           seed: seed.trim() ? parseInt(seed.trim(), 10) : undefined,
           theme,
           multiverseName: multiverseName.trim() || undefined,
+          links: links.length
+            ? links.map((l) => ({ worldId: l.worldId, nexus: l.nexus.trim() || undefined }))
+            : undefined,
           storySettings: {
             mandate: mandate.trim() || undefined,
             proseStyles: proseStyles.split('\n').map((s) => s.trim()).filter(Boolean),
@@ -510,6 +533,65 @@ export default function NewWorldPage() {
           into a lower-rated world.
         </p>
       </div>
+
+      <div className="space-y-2 border-t border-white/[0.06] pt-4">
+        <Label htmlFor="link-add">
+          Linked worlds <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span>
+        </Label>
+        <p className="text-[11px] text-muted-foreground/45 leading-relaxed">
+          Or hand-pick specific worlds whose legends echo into this one — whether or not they share a
+          multiverse. Same rating safety applies.
+        </p>
+        <select
+          id="link-add"
+          value=""
+          onChange={(e) => {
+            const id = e.target.value
+            if (!id) return
+            const w = worldChoices.find((c) => c.id === id)
+            if (w && !links.some((l) => l.worldId === id)) {
+              setLinks((prev) => [...prev, { worldId: w.id, worldName: w.name, nexus: '' }])
+            }
+          }}
+          className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          <option value="">{worldChoices.length ? 'Add a world to link…' : 'No other worlds to link yet'}</option>
+          {worldChoices
+            .filter((c) => !links.some((l) => l.worldId === c.id))
+            .map((c) => (
+              <option key={c.id} value={c.id} className="bg-background">{c.name}</option>
+            ))}
+        </select>
+
+        {links.length > 0 && (
+          <div className="space-y-2 pt-1">
+            {links.map((l, i) => (
+              <div key={l.worldId} className="flex items-center gap-2 bg-white/[0.02] border border-white/[0.04] p-2.5 rounded-lg">
+                <Link2 className="h-3.5 w-3.5 text-amber-400/45 shrink-0" />
+                <span className="text-[12px] text-foreground/75 shrink-0 max-w-[30%] truncate">{l.worldName}</span>
+                <Input
+                  placeholder="how they're linked (optional) — e.g. a shimmering rift"
+                  value={l.nexus}
+                  onChange={(e) =>
+                    setLinks((prev) => prev.map((x, j) => (j === i ? { ...x, nexus: e.target.value } : x)))
+                  }
+                  maxLength={120}
+                  className="h-8 text-[12px]"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setLinks((prev) => prev.filter((_, j) => j !== i))}
+                  className="h-7 px-2 text-red-400/80 hover:text-red-300 hover:bg-red-500/10 shrink-0"
+                >
+                  ×
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 
@@ -523,7 +605,17 @@ export default function NewWorldPage() {
         <ReviewRow label="Name" value={name || <Missing>Unnamed</Missing>} />
         <ReviewRow label="Tone" value={tone} />
         <ReviewRow label="Rating" value={rating} />
-        <ReviewRow label="Multiverse" value={multiverseName.trim() || 'Self-contained'} />
+        <ReviewRow
+          label="Multiverse"
+          value={
+            [
+              multiverseName.trim() ? `Pool: ${multiverseName.trim()}` : null,
+              links.length ? `${links.length} linked world${links.length === 1 ? '' : 's'}` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ') || 'Self-contained'
+          }
+        />
         <ReviewRow label="Description" value={description.trim() || <Missing>Required</Missing>} />
       </dl>
       <div className="grid sm:grid-cols-2 gap-3">
@@ -598,7 +690,7 @@ export default function NewWorldPage() {
     {
       id: 'multiverse',
       title: 'Multiverse',
-      hint: 'Optionally link this world into a shared pool with your others.',
+      hint: 'Optionally join a shared pool or hand-pick worlds to link.',
       content: multiverseCard,
     },
     {

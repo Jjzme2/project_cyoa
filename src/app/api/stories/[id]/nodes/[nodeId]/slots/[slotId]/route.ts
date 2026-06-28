@@ -27,7 +27,9 @@ import {
   getWorldChronicle,
   appendWorldChronicle,
   getMultiverseEchoes,
+  getLinkedEchoes,
 } from '@/lib/firestore-helpers'
+import { mergeEchoes } from '@/lib/multiverse'
 import { CreditManager } from '@/lib/credit-manager'
 import { creditFailureResponse } from '@/lib/credit-response'
 import { generateStoryNode, generateStoryImage, reviewContribution, judgeContent, buildWorldContext, PromptRejectedError } from '@/lib/ai'
@@ -162,9 +164,15 @@ export async function POST(
     // Multiverse pool: only if THIS world opted into a multiverse do we draw a
     // few legends from its sibling worlds — surfaced as clearly-foreign echoes.
     // An unconnected world is never queried, so nothing crosses in.
-    const echoes = world.multiverse?.id
-      ? await getMultiverseEchoes(world.multiverse.id, story.worldId, { maxRating: effectiveRating }).catch(() => [])
-      : []
+    const [poolEchoes, linkEchoes] = await Promise.all([
+      world.multiverse?.id
+        ? getMultiverseEchoes(world.multiverse.id, story.worldId, { maxRating: effectiveRating }).catch(() => [])
+        : Promise.resolve([]),
+      world.links?.length
+        ? getLinkedEchoes(world.links, { maxRating: effectiveRating }).catch(() => [])
+        : Promise.resolve([]),
+    ])
+    const echoes = mergeEchoes(poolEchoes, linkEchoes)
     // Assembled through the single audited seam (buildWorldContext): the chronicle
     // is read with story.worldId and passed in here, so only THIS world's legends
     // can reach the prompt — never another world's (save for declared echoes above).
