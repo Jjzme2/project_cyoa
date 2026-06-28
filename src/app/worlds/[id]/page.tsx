@@ -2,7 +2,8 @@ import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { Feather, BookOpen, Plus, ArrowLeft, ScrollText } from 'lucide-react'
+import { Feather, BookOpen, Plus, ArrowLeft, ScrollText, Map } from 'lucide-react'
+import { WorldMap } from '@/components/world/WorldMap'
 import { Button } from '@/components/ui/button'
 import { AgeFilteredStoryGrid } from '@/components/library/AgeFilteredStoryGrid'
 import { SeededBadge } from '@/components/ContentBadges'
@@ -149,6 +150,20 @@ async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
           </h2>
           <div className="flex-1 h-px bg-white/5" />
         </div>
+
+        {world.genesis?.regions && world.genesis.regions.length > 0 && (
+          <div className="glass-card rounded-xl p-6 space-y-3 border border-white/[0.07]">
+            <h2 className="text-sm font-medium text-foreground/65 flex items-center gap-2">
+              <Map className="h-4 w-4 text-amber-400/55" /> World Map
+            </h2>
+            <div className="rounded-lg bg-black/20 border border-white/[0.05] overflow-hidden">
+              <WorldMap bible={world.genesis} seed={world.seed ?? 0} className="w-full aspect-[4/3]" />
+            </div>
+            <p className="text-[11px] text-muted-foreground/45">
+              The realm&apos;s regions, with bonds (gold) and rivalries (red) between the powers that hold them.
+            </p>
+          </div>
+        )}
 
         {world.genesis ? (
           <WorldGenesis genesis={world.genesis} />
