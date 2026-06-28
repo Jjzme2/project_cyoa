@@ -4,14 +4,15 @@ import { Plus, Sparkles, Library, BookOpen, MousePointerClick, PenLine } from 'l
 import { cacheLife, cacheTag } from 'next/cache'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { LibraryClient } from '@/components/library/LibraryClient'
+import { LibraryClient, type WorldChrome } from '@/components/library/LibraryClient'
 import { ContinueReadingSection } from '@/components/library/ContinueReadingSection'
-import { getStories } from '@/lib/firestore-helpers'
+import { getStories, getPublicWorlds } from '@/lib/firestore-helpers'
 
 async function LibraryContent() {
   'use cache'
   cacheLife('minutes')
   cacheTag('stories')
+  cacheTag('worlds')
 
   let stories
   try {
@@ -23,7 +24,21 @@ async function LibraryContent() {
       </div>
     )
   }
-  return <LibraryClient stories={stories} />
+
+  // The visual identity for each world, keyed by name so shelves (grouped by
+  // world name) can show the world's banner. Worlds load best-effort: a failure
+  // here just falls back to the plain text shelf headers.
+  let worldChrome: Record<string, WorldChrome> = {}
+  try {
+    const worlds = await getPublicWorlds(200)
+    worldChrome = Object.fromEntries(
+      worlds.map((w) => [w.name, { theme: w.theme, tone: w.tone }]),
+    )
+  } catch {
+    worldChrome = {}
+  }
+
+  return <LibraryClient stories={stories} worldChrome={worldChrome} />
 }
 
 function LibrarySkeleton() {

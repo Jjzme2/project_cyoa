@@ -137,8 +137,11 @@ export default function NewStoryPage() {
       .finally(() => setLoadingWorlds(false))
   }, [user])
 
+  // The currently-selected world (drives the description preview, style options,
+  // and rating ceiling below).
+  const selectedWorld = worlds.find((w) => w.id === worldId)
   // The selected world's configurable style options (empty for most worlds).
-  const styleOptions = worlds.find((w) => w.id === worldId)?.storySettings?.styleOptions ?? []
+  const styleOptions = selectedWorld?.storySettings?.styleOptions ?? []
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -379,11 +382,12 @@ export default function NewStoryPage() {
               Description{' '}
               <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span>
             </Label>
-            <Input
+            <Textarea
               id="desc"
-              placeholder="A brief tagline for your story…"
+              placeholder="A short blurb that sets the hook for your story…"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              className="min-h-[80px] resize-y text-sm leading-relaxed"
             />
           </div>
 
@@ -439,6 +443,14 @@ export default function NewStoryPage() {
                   </option>
                 ))}
               </select>
+            )}
+            {selectedWorld?.description && (
+              <div className="mt-1 flex items-start gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+                <Globe className="h-3.5 w-3.5 text-amber-400/55 mt-0.5 shrink-0" />
+                <p className="text-[11px] text-muted-foreground/60 leading-relaxed">
+                  {selectedWorld.description}
+                </p>
+              </div>
             )}
           </div>
 
@@ -555,6 +567,10 @@ export default function NewStoryPage() {
             <Palette className="h-4 w-4 text-amber-400/55" />
             Book Cover Design
           </h2>
+          <p className="text-[11px] text-muted-foreground/45 -mt-2">
+            The cover for <em>this story</em> — its spine on the shelf. The world&apos;s own banner is set once,
+            when the world is created.
+          </p>
           <CoverDesigner
             value={coverTheme}
             onChange={setCoverTheme}

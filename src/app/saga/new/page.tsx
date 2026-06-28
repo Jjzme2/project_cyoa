@@ -207,9 +207,10 @@ export default function NewSagaPage() {
     )
   }
 
-  const styleOptions = worlds.find((w) => w.id === worldId)?.storySettings?.styleOptions ?? []
+  const selectedWorld = worlds.find((w) => w.id === worldId)
+  const styleOptions = selectedWorld?.storySettings?.styleOptions ?? []
 
-  const worldRating = worlds.find((w) => w.id === worldId)?.rating
+  const worldRating = selectedWorld?.rating
   const allowedRatings = worldRating
     ? CONTENT_RATINGS.filter((r) => ratingRank(r) <= ratingRank(worldRating))
     : CONTENT_RATINGS
@@ -272,7 +273,13 @@ export default function NewSagaPage() {
             <Label htmlFor="desc">
               Description <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span>
             </Label>
-            <Input id="desc" placeholder="A brief tagline for your saga…" value={description} onChange={(e) => setDescription(e.target.value)} />
+            <Textarea
+              id="desc"
+              placeholder="A short blurb that sets the hook for your saga…"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="min-h-[80px] resize-y text-sm leading-relaxed"
+            />
           </div>
 
           <div className="space-y-2">
@@ -320,6 +327,14 @@ export default function NewSagaPage() {
                   <option key={w.id} value={w.id} className="bg-background">{w.name}</option>
                 ))}
               </select>
+            )}
+            {selectedWorld?.description && (
+              <div className="mt-1 flex items-start gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+                <Globe className="h-3.5 w-3.5 text-amber-400/55 mt-0.5 shrink-0" />
+                <p className="text-[11px] text-muted-foreground/60 leading-relaxed">
+                  {selectedWorld.description}
+                </p>
+              </div>
             )}
             <p className="text-[11px] text-muted-foreground/45">
               Your standing carries across every saga in this world — its people remember how you&apos;ve treated them.

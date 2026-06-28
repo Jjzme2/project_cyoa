@@ -250,14 +250,18 @@ export default function NewWorldPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="desc">Brief description</Label>
-            <Input
+            <Label htmlFor="desc">Description</Label>
+            <Textarea
               id="desc"
-              placeholder="A realm of fractured magic and ancient prophecy…"
+              placeholder="A realm of fractured magic and ancient prophecy, where the sky itself was shattered into drifting shards of raw power…"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               required
+              className="min-h-[90px] resize-y text-sm leading-relaxed"
             />
+            <p className="text-[11px] text-muted-foreground/45">
+              The elevator pitch shown to authors choosing a world and to readers browsing it.
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -314,8 +318,13 @@ export default function NewWorldPage() {
           <h2 className="text-sm font-medium text-foreground/65 flex items-center gap-2">
             <Palette className="h-4 w-4 text-amber-400/55" />
             World Portal
-            <span className="text-muted-foreground/55 font-normal text-xs">(its face across the Chronicle)</span>
+            <span className="text-muted-foreground/55 font-normal text-xs">(the world&apos;s banner)</span>
           </h2>
+          <p className="text-[11px] text-muted-foreground/45 -mt-2">
+            This is the wide <strong>banner</strong> for the whole world — it heads the world&apos;s page and its
+            shelf in the library. It&apos;s different from a <strong>book cover</strong>, which you design later for
+            each individual story inside this world.
+          </p>
           <WorldThemeDesigner value={theme} onChange={setTheme} name={name} tone={tone} />
         </div>
 

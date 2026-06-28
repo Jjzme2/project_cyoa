@@ -5,15 +5,23 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, X, Library, BookOpen, Tag, ChevronDown } from 'lucide-react'
 import { StoryCard } from '@/components/StoryCard'
+import { WorldPortal } from '@/components/world/WorldPortal'
 import { useAuth } from '@/components/Providers'
 import { ratingRank } from '@/lib/ratings'
-import type { Story } from '@/types'
+import type { Story, WorldTheme } from '@/types'
+
+/** A world's display identity, keyed by world name, used to head its shelf. */
+export interface WorldChrome {
+  theme?: WorldTheme
+  tone?: string
+}
 
 interface Props {
   stories: Story[]
+  worldChrome?: Record<string, WorldChrome>
 }
 
-export function LibraryClient({ stories }: Props) {
+export function LibraryClient({ stories, worldChrome = {} }: Props) {
   const searchId = useId()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -188,7 +196,7 @@ export function LibraryClient({ stories }: Props) {
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.3, ease: 'easeOut' }}
               >
-                <WorldShelf worldName={worldName} books={books} />
+                <WorldShelf worldName={worldName} books={books} chrome={worldChrome[worldName]} />
               </motion.div>
             ))}
           </AnimatePresence>
@@ -235,27 +243,59 @@ function FilterPill({
   )
 }
 
-function WorldShelf({ worldName, books }: { worldName: string; books: Story[] }) {
+function WorldShelf({
+  worldName,
+  books,
+  chrome,
+}: {
+  worldName: string
+  books: Story[]
+  chrome?: WorldChrome
+}) {
+  const storyCount = `${books.length} ${books.length === 1 ? 'story' : 'stories'}`
   return (
-    <section aria-label={`${worldName} — ${books.length} ${books.length === 1 ? 'story' : 'stories'}`}>
-      <div className="flex items-baseline gap-4 mb-7">
-        <div className="flex items-center gap-2.5">
-          <span className="text-amber-500/25 text-xs">§</span>
-          <h2
-            className="text-[17px] font-semibold text-foreground/65 tracking-tight"
-            style={{ fontFamily: 'Georgia, serif' }}
-          >
-            {worldName}
-          </h2>
+    <section aria-label={`${worldName} — ${storyCount}`}>
+      {chrome?.theme ? (
+        // Worlds with a designed identity head their shelf with their banner.
+        <div className="mb-7 space-y-2">
+          <WorldPortal
+            theme={chrome.theme}
+            name={worldName}
+            tagline={chrome.tone}
+            variant="card"
+            animate={false}
+          />
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] font-sans text-muted-foreground/45 uppercase tracking-widest shrink-0">
+              {storyCount}
+            </span>
+            <div
+              className="flex-1 h-px"
+              style={{ background: 'linear-gradient(to right, oklch(1 0 0 / 7%), transparent)' }}
+            />
+          </div>
         </div>
-        <span className="text-[10px] font-sans text-muted-foreground/45 uppercase tracking-widest shrink-0">
-          {books.length} {books.length === 1 ? 'story' : 'stories'}
-        </span>
-        <div
-          className="flex-1 h-px"
-          style={{ background: 'linear-gradient(to right, oklch(1 0 0 / 7%), transparent)' }}
-        />
-      </div>
+      ) : (
+        // Fallback: a plain text header for worlds without a theme.
+        <div className="flex items-baseline gap-4 mb-7">
+          <div className="flex items-center gap-2.5">
+            <span className="text-amber-500/25 text-xs">§</span>
+            <h2
+              className="text-[17px] font-semibold text-foreground/65 tracking-tight"
+              style={{ fontFamily: 'Georgia, serif' }}
+            >
+              {worldName}
+            </h2>
+          </div>
+          <span className="text-[10px] font-sans text-muted-foreground/45 uppercase tracking-widest shrink-0">
+            {storyCount}
+          </span>
+          <div
+            className="flex-1 h-px"
+            style={{ background: 'linear-gradient(to right, oklch(1 0 0 / 7%), transparent)' }}
+          />
+        </div>
+      )}
 
       <div className="relative">
         <div className="flex flex-wrap gap-2.5 pb-6">

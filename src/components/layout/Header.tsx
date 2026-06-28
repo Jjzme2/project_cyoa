@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { signOut } from 'firebase/auth'
 import { toast } from 'sonner'
-import { BookOpen, Plus, LogOut, Sparkles, Menu, Wand2, KeyRound, Globe, LayoutDashboard, ShieldAlert } from 'lucide-react'
+import { BookOpen, Plus, LogOut, Sparkles, Menu, Wand2, KeyRound, Globe, LayoutDashboard, ShieldAlert, Library, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -37,7 +37,8 @@ export function Header() {
 
   const navLinks = (
     <>
-      <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+      <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+        <Library className="h-3.5 w-3.5 opacity-60" />
         Library
       </Link>
       <Link href="/worlds" className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
@@ -54,7 +55,8 @@ export function Header() {
             <LayoutDashboard className="h-3.5 w-3.5 opacity-60" />
             Dashboard
           </Link>
-          <Link href="/profile" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <Link href="/profile" className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+            <User className="h-3.5 w-3.5 opacity-60" />
             Profile
           </Link>
         </>
