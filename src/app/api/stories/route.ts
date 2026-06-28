@@ -31,11 +31,26 @@ const CreateStorySchema = z.object({
     .loose()
     .optional(),
   director: z.unknown().optional(),
+  styleChoices: z.record(z.string(), z.string()).optional(),
   youMode: z.boolean().optional(),
   shared: z.boolean().optional(),
   goapEnabled: z.boolean().optional(),
   implementQuests: z.boolean().optional(),
 })
+
+/** Keep only choices that match one of the world's offered style options. */
+function sanitizeStyleChoices(
+  choices: Record<string, string> | undefined,
+  options: { label: string; choices: string[] }[] | undefined,
+): Record<string, string> | null {
+  if (!choices || !options?.length) return null
+  const out: Record<string, string> = {}
+  for (const opt of options) {
+    const picked = choices[opt.label]
+    if (picked && opt.choices.includes(picked)) out[opt.label] = picked
+  }
+  return Object.keys(out).length > 0 ? out : null
+}
 
 export async function GET(req: NextRequest) {
   const limit = Number(req.nextUrl.searchParams.get('limit') ?? 20)
@@ -59,7 +74,7 @@ export async function POST(req: NextRequest) {
 
   const parsed = await parseJson(req, CreateStorySchema)
   if (!parsed.ok) return parsed.response
-  const { title, description, worldId, worldName, coverGradient, resources, tags, coverTheme, readingTheme, rating, protagonist, director, youMode, shared, goapEnabled, implementQuests } = parsed.data
+  const { title, description, worldId, worldName, coverGradient, resources, tags, coverTheme, readingTheme, rating, protagonist, director, styleChoices, youMode, shared, goapEnabled, implementQuests } = parsed.data
 
   // Authored director persona (optional). Axes are clamped to [-1, 1]; only kept
   // if the author actually set something.
@@ -78,6 +93,9 @@ export async function POST(req: NextRequest) {
   // A story can never be rated more mature than the world that contains it.
   const world = await getWorld(worldId).catch(() => null)
   const safeRating = world?.rating ? clampRating(rating, world.rating) : rating
+  // The story's picks for the world's configurable style options — kept only
+  // when they match an offered choice.
+  const safeStyleChoices = sanitizeStyleChoices(styleChoices, world?.storySettings?.styleOptions)
 
   // Seed the opening cast from the world's genesis canon, so stories begin
   // grounded in the world's real figures (emergent characters still grow on top).
@@ -107,6 +125,7 @@ export async function POST(req: NextRequest) {
     // In "You" mode there's no authored protagonist — the reader is the hero.
     ...(safeProtagonist && !youMode ? { protagonist: safeProtagonist } : {}),
     ...(safeDirector ? { director: safeDirector } : {}),
+    ...(safeStyleChoices ? { styleChoices: safeStyleChoices } : {}),
     tags: Array.isArray(tags) ? tags.slice(0, 5) : [],
     ...(coverTheme   ? { coverTheme }   : {}),
     ...(readingTheme ? { readingTheme } : {}),

@@ -41,6 +41,8 @@ export default function NewStoryPage() {
   const [protagonistDesc, setProtagonistDesc] = useState('')
   const [shared, setShared] = useState(true)
   const [director, setDirector] = useState<DirectorPersona>(emptyDirector)
+  // This story's pick for each of the selected world's configurable style options.
+  const [styleChoices, setStyleChoices] = useState<Record<string, string>>({})
   const [opening, setOpening] = useState('')
   const [choice1, setChoice1] = useState('')
   const [choice2, setChoice2] = useState('')
@@ -135,6 +137,9 @@ export default function NewStoryPage() {
       .finally(() => setLoadingWorlds(false))
   }, [user])
 
+  // The selected world's configurable style options (empty for most worlds).
+  const styleOptions = worlds.find((w) => w.id === worldId)?.storySettings?.styleOptions ?? []
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!user || !title.trim() || !worldId || !opening.trim()) return
@@ -191,6 +196,10 @@ export default function NewStoryPage() {
             : undefined,
           director: isDirectorMeaningful(director)
             ? { ...director, vision: (director.vision ?? '').trim() }
+            : undefined,
+          // Default any untouched option to its first choice.
+          styleChoices: styleOptions.length > 0
+            ? Object.fromEntries(styleOptions.map((o) => [o.label, styleChoices[o.label] ?? o.choices[0]]))
             : undefined,
           published: true,
           coverGradient: null,
@@ -508,6 +517,34 @@ export default function NewStoryPage() {
           </div>
 
           <DirectorControls value={director} onChange={setDirector} />
+
+          {styleOptions.length > 0 && (
+            <div className="space-y-3 border-t border-white/[0.06] pt-5">
+              <div>
+                <Label className="text-sm font-medium text-foreground/65 block">This world&apos;s style choices</Label>
+                <p className="text-[11px] text-muted-foreground/45 mt-1">
+                  {worlds.find((w) => w.id === worldId)?.name} lets each story pick how these are handled.
+                </p>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                {styleOptions.map((opt) => (
+                  <div key={opt.label} className="space-y-1.5">
+                    <Label htmlFor={`style-${opt.label}`} className="text-xs text-muted-foreground/60">{opt.label}</Label>
+                    <select
+                      id={`style-${opt.label}`}
+                      value={styleChoices[opt.label] ?? opt.choices[0]}
+                      onChange={(e) => setStyleChoices((prev) => ({ ...prev, [opt.label]: e.target.value }))}
+                      className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      {opt.choices.map((c) => (
+                        <option key={c} value={c} className="bg-background">{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <StoryResourcesEditor resources={resources} setResources={setResources} />
         </div>
