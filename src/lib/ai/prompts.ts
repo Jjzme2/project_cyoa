@@ -127,7 +127,7 @@ STEP 2 — If the choice passes validation, write the next chapter. It MUST foll
 - ${wordLimitInstruction}
 - Do NOT truncate sentences. Every sentence must be complete.
 
-After the chapter, provide exactly 3 brief choice prompts (10 words or less each):
+After the chapter, provide exactly 3 brief choice prompts (10 words or less each). Make them GENUINELY DISTINCT — different approaches with different risks and consequences (e.g. one bold, one cautious, one cunning or unexpected), each leading somewhere meaningfully different. No throwaway or near-duplicate options; every choice should feel like it matters.
 CHOICE_1: [choice text]
 CHOICE_2: [choice text]
 CHOICE_3: [choice text]
@@ -187,7 +187,7 @@ Write the opening chapter. It MUST:
 - End at a genuine moment of decision or tension.
 - Be EXACTLY between 130 and 160 words (no more than 1100 characters). Do NOT truncate sentences.
 
-After the chapter, provide exactly 3 brief choice prompts for what the reader does next (10 words or less each):
+After the chapter, provide exactly 3 brief choice prompts for what the reader does next (10 words or less each). Make them GENUINELY DISTINCT — different approaches with different risks (e.g. one bold, one cautious, one cunning), each leading somewhere meaningfully different. No throwaway or near-duplicate options.
 CHOICE_1: [choice text]
 CHOICE_2: [choice text]
 CHOICE_3: [choice text]
