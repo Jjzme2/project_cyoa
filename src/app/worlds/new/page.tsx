@@ -16,6 +16,7 @@ import type { WorldAssistResult } from '@/components/ai/AIAssistModal'
 import { WorldThemeDesigner } from '@/components/world/WorldThemeDesigner'
 import { DEFAULT_WORLD_THEME, themeForTone } from '@/components/world/world-theme'
 import { useDraft } from '@/hooks/useDraft'
+import { STYLE_OPTION_PRESETS, CURATED_STYLE_BUNDLES, applyBundle } from '@/lib/world-style-presets'
 
 const TONE_OPTIONS = [
   'Epic Fantasy',
@@ -53,18 +54,6 @@ interface WorldDraft {
   theme: WorldTheme
 }
 
-/** Quick-add templates for common per-story style options (authors can edit after adding). */
-const PRESET_STYLE_OPTIONS: { label: string; choices: string }[] = [
-  { label: 'Narration', choices: 'First person, Second person, Third limited, Third omniscient' },
-  { label: 'Tense', choices: 'Past tense, Present tense' },
-  { label: 'Tone register', choices: 'Formal, Conversational, Archaic, Terse' },
-  { label: 'Pacing', choices: 'Slow-burn, Brisk, Breakneck' },
-  { label: 'Sentence rhythm', choices: 'Long and flowing, Short and punchy, Varied' },
-  { label: 'Dialogue density', choices: 'Dialogue-heavy, Balanced, Sparse' },
-  { label: 'Humor', choices: 'None, Dry wit, Broad comedy' },
-  { label: 'Chapter endings', choices: 'Cliffhanger, Soft beat, Reflective' },
-  { label: 'Rhyme scheme', choices: 'ABAB, ABBA, AABB, Free verse' },
-]
 
 export default function NewWorldPage() {
   const { user, loading } = useAuth()
@@ -432,9 +421,27 @@ export default function NewWorldPage() {
               </Button>
             </div>
 
-            {/* Quick-add presets — common configurations that apply across worlds. */}
+            {/* Curated profiles — one click configures several coherent options. */}
+            <div className="space-y-1.5">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground/40 font-sans">Curated profiles</p>
+              <div className="flex flex-wrap gap-1.5">
+                {CURATED_STYLE_BUNDLES.map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    title={b.description}
+                    onClick={() => setStyleOptions((prev) => applyBundle(prev, b))}
+                    className="px-2.5 py-1 rounded-md text-[11px] font-sans border border-white/10 text-muted-foreground/65 hover:border-violet-500/30 hover:text-violet-200/85 transition-all"
+                  >
+                    {b.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Single quick-add options. */}
             <div className="flex flex-wrap gap-1.5">
-              {PRESET_STYLE_OPTIONS.map((p) => {
+              {STYLE_OPTION_PRESETS.map((p) => {
                 const added = styleOptions.some((o) => o.label.trim().toLowerCase() === p.label.toLowerCase())
                 return (
                   <button
