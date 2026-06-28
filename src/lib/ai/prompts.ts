@@ -26,6 +26,8 @@ export interface WorldContext {
 function genesisBlock(g?: WorldBible): string {
   if (!g) return ''
   const parts: string[] = []
+  if (g.regions?.length)
+    parts.push('Regions (the world\'s places — use these names for LOCATION): ' + g.regions.slice(0, 12).map((r) => `${r.name} (${r.biome})`).join('; '))
   if (g.factions?.length)
     parts.push('Powers: ' + g.factions.map((f) => `${f.name} (${f.archetype}${f.rivalOf ? `, rivals ${f.rivalOf}` : ''})`).join('; '))
   if (g.characters?.length)
@@ -135,7 +137,10 @@ CHOICE_3: [choice text]
 Then, ONLY if this chapter introduces a brand-new named character not already listed above, add one line per new character (omit entirely if none):
 NEW_CHARACTER: [name] — [one-line description]
 
-Write only the chapter, the three choices, and any NEW_CHARACTER lines. No meta-commentary.`
+Finally, name where this chapter takes place on its own line — prefer a Region from WORLD CANON above when the scene is there; otherwise a short place name (4 words max):
+LOCATION: [place]
+
+Write only the chapter, the three choices, any NEW_CHARACTER lines, and the LOCATION line. No meta-commentary.`
 }
 
 export function buildImagePrompt(world: WorldContext, storyContent: string, choiceText: string): string {
@@ -195,7 +200,10 @@ CHOICE_3: [choice text]
 Then, ONLY if this opening introduces a brand-new named character, add one line per new character (omit entirely if none):
 NEW_CHARACTER: [name] — [one-line description]
 
-Write only the chapter, the three choices, and any NEW_CHARACTER lines. No meta-commentary.`
+Finally, name where this opening takes place on its own line — prefer a Region from WORLD CANON above when applicable; otherwise a short place name (4 words max):
+LOCATION: [place]
+
+Write only the chapter, the three choices, any NEW_CHARACTER lines, and the LOCATION line. No meta-commentary.`
 }
 
 /**

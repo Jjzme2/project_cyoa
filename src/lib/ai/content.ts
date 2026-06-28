@@ -123,7 +123,7 @@ export async function generateSagaOpening(
   sagaPremise: string,
   entry: { label: string; premise: string },
   userId: string,
-): Promise<{ content: string; choices: string[]; model: string; newCharacters: StoryCharacter[] }> {
+): Promise<{ content: string; choices: string[]; model: string; newCharacters: StoryCharacter[]; location?: string }> {
   const prompt = buildSagaOpeningPrompt(world, sagaPremise, entry)
 
   try {
@@ -155,7 +155,7 @@ export async function generateStoryNode(
   userId: string,
   includeImage: boolean,
   systemNarrativeEvents: string = '',
-): Promise<{ content: string; choices: string[]; model: string; newCharacters: StoryCharacter[] }> {
+): Promise<{ content: string; choices: string[]; model: string; newCharacters: StoryCharacter[]; location?: string }> {
   const prompt = buildPrompt(world, storyPath, choiceText, includeImage, systemNarrativeEvents)
 
   try {

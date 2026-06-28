@@ -228,7 +228,7 @@ export async function POST(
       updatedEngineState = nextState
     }
 
-    const { content, choices, model, newCharacters } = await generateStoryNode(
+    const { content, choices, model, newCharacters, location } = await generateStoryNode(
       worldCtx,
       storyPath,
       editedPrompt,
@@ -306,6 +306,7 @@ export async function POST(
           aiModel: model,
           imageUrl: null,
           ...(qualityScore !== undefined ? { qualityScore } : {}),
+          ...(location ? { location } : {}),
           ...(updatedEngineState ? { engineState: updatedEngineState } : {}),
         },
         choices,

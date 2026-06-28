@@ -135,6 +135,8 @@ export interface StoryNode {
   engineState?: EngineState
   /** Content Judge craft score (0-100); informational, for future ranking. */
   qualityScore?: number
+  /** Where this chapter takes place (a world region or place name) — for the map. */
+  location?: string
   createdAt: string
 }
 

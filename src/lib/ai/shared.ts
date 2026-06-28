@@ -15,11 +15,16 @@ export function parseAIResponse(text: string): {
   content: string
   choices: string[]
   newCharacters: StoryCharacter[]
+  location?: string
 } {
   const rejectionMatch = text.match(/^REJECTED:\s*(.+)/im)
   if (rejectionMatch) {
     throw new PromptRejectedError(rejectionMatch[1].trim())
   }
+
+  // Where this chapter takes place — used for the world map / location tracking.
+  const locMatch = text.match(/^LOCATION:\s*(.+)/im)
+  const location = locMatch ? locMatch[1].trim().slice(0, 80) || undefined : undefined
 
   const choicePattern = /CHOICE_(\d):\s*(.+)/g
   const choices: string[] = []
@@ -48,10 +53,11 @@ export function parseAIResponse(text: string): {
   const content = text
     .replace(/CHOICE_\d:.+/g, '')
     .replace(/NEW_CHARACTER:.+/gi, '')
+    .replace(/^LOCATION:.+/gim, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 
-  return { content, choices: choices.slice(0, 3), newCharacters }
+  return { content, choices: choices.slice(0, 3), newCharacters, location }
 }
 
 export const VALID_TONES = [

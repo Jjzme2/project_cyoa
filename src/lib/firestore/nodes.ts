@@ -260,7 +260,7 @@ export async function createSagaTree(
   storyId: string,
   thresholdContent: string,
   authorId: string,
-  openings: { label: string; content: string; choices: string[]; aiModel: string }[],
+  openings: { label: string; content: string; choices: string[]; aiModel: string; location?: string }[],
 ): Promise<{ rootNodeId: string; nodeCount: number }> {
   const rootRef = nodesRef(storyId).doc()
   const rootId = rootRef.id
@@ -280,6 +280,7 @@ export async function createSagaTree(
           aiGenerated: true,
           aiModel: o.aiModel,
           imageUrl: null,
+          ...(o.location ? { location: o.location } : {}),
         },
         o.choices,
       ),
