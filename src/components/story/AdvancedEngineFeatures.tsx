@@ -46,7 +46,13 @@ export function AdvancedEngineFeatures({
           <h2 className="text-sm font-medium text-foreground/65 flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-amber-400/55" />
             Advanced Engine Features
+            <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span>
           </h2>
+          <p className="text-[11px] text-muted-foreground/50 leading-relaxed -mt-1">
+            Power-user simulation layers that run a living world behind the prose. Everything here is off by default —
+            leave it untouched for a classic write-and-choose story, or switch pieces on to add autonomous characters,
+            procedural side-quests, and a reactive economy.
+          </p>
 
           <div className="space-y-4">
             <div className="flex items-start gap-3">
@@ -92,8 +98,13 @@ export function AdvancedEngineFeatures({
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-emerald-500/80 font-sans">
                       Market Effects
                     </h3>
-                    <p className="text-[11px] text-muted-foreground/45 mt-0.5">
-                      When a commodity becomes scarce or cheap, modify reader resources automatically.
+                    <p className="text-[11px] text-muted-foreground/45 mt-0.5 leading-relaxed">
+                      The living world trades commodities, so their prices rise and fall. These rules let those swings
+                      touch the reader: when a commodity gets <em>scarce</em> (price &gt; 1.5× normal) or{' '}
+                      <em>cheap</em> (&lt; 0.5×), automatically adjust one of your story&apos;s resources.
+                    </p>
+                    <p className="text-[11px] text-muted-foreground/35 mt-1 italic">
+                      e.g. When <span className="not-italic">Food</span> is scarce → <span className="not-italic">Gold −= 5</span>.
                     </p>
                   </div>
                   <Button

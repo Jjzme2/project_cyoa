@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Globe, Loader2, ChevronRight, Plus, Palette, Feather, Sparkles, DoorOpen, Trash2, RotateCcw } from 'lucide-react'
+import { Globe, Loader2, ChevronRight, ChevronLeft, Check, Plus, Palette, Feather, Sparkles, DoorOpen, Trash2, RotateCcw } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,6 +29,16 @@ const ENTRY_PLACEHOLDERS: EntryPoint[] = [
   { label: 'Marched in among the prisoners', premise: 'You are brought into the world in chains, mistaken for someone — or something — you are not.' },
 ]
 
+// The wizard groups the saga form into ordered, validated steps. Step copy lives
+// here so the progress header and panel headings stay in sync.
+const STEPS = [
+  { id: 'foundation', label: 'Foundation', blurb: 'World, title, and rating' },
+  { id: 'situation', label: 'The saga', blurb: 'The situation and ways in' },
+  { id: 'voice', label: 'Voice', blurb: 'Direction and style' },
+  { id: 'look', label: 'Look & share', blurb: 'Cover, reading, visibility' },
+  { id: 'review', label: 'Review', blurb: 'Confirm and open the saga' },
+] as const
+
 export default function NewSagaPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
@@ -36,6 +46,7 @@ export default function NewSagaPage() {
   const [worlds, setWorlds] = useState<World[]>([])
   const [loadingWorlds, setLoadingWorlds] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [step, setStep] = useState(0)
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -89,6 +100,7 @@ export default function NewSagaPage() {
     setCoverTheme(d.coverTheme)
     setReadingTheme(d.readingTheme)
     setHasDraft(false)
+    setStep(0)
     toast.success('Draft restored')
   }
 
@@ -129,6 +141,9 @@ export default function NewSagaPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    // The form only submits for real on the final step; on earlier steps a stray
+    // Enter keypress is a no-op (the Next button drives navigation).
+    if (step < STEPS.length - 1) return
     if (!user || !canSubmit) return
 
     setSubmitting(true)
@@ -207,12 +222,31 @@ export default function NewSagaPage() {
     )
   }
 
-  const styleOptions = worlds.find((w) => w.id === worldId)?.storySettings?.styleOptions ?? []
+  const selectedWorld = worlds.find((w) => w.id === worldId)
+  const styleOptions = selectedWorld?.storySettings?.styleOptions ?? []
 
-  const worldRating = worlds.find((w) => w.id === worldId)?.rating
+  const worldRating = selectedWorld?.rating
   const allowedRatings = worldRating
     ? CONTENT_RATINGS.filter((r) => ratingRank(r) <= ratingRank(worldRating))
     : CONTENT_RATINGS
+
+  // Per-step gating: a step must be valid before the wizard lets you advance.
+  const stepValidity = [
+    !!title.trim() && !!worldId,
+    readyEntries.length >= 1,
+    true,
+    true,
+    canSubmit,
+  ]
+  const currentValid = stepValidity[step]
+  const isLast = step === STEPS.length - 1
+
+  function goNext() {
+    if (currentValid && step < STEPS.length - 1) setStep((s) => s + 1)
+  }
+  function goBack() {
+    setStep((s) => Math.max(0, s - 1))
+  }
 
   return (
     <main className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
@@ -256,8 +290,41 @@ export default function NewSagaPage() {
         </div>
       )}
 
+      {/* ── Progress header ── */}
+      <div className="mb-7">
+        <div className="flex items-end gap-1.5">
+          {STEPS.map((s, i) => {
+            const reached = i <= step
+            const done = i < step
+            return (
+              <button
+                key={s.id}
+                type="button"
+                // Let travellers jump back to a completed step, but not skip ahead
+                // past unvalidated ones.
+                onClick={() => { if (i < step) setStep(i) }}
+                disabled={i > step}
+                className={`group flex-1 text-left ${i <= step ? 'cursor-pointer' : 'cursor-default'}`}
+              >
+                <div className={`h-1 rounded-full transition-colors ${reached ? 'bg-amber-400/70' : 'bg-white/10'}`} />
+                <span className={`mt-1.5 hidden sm:flex items-center gap-1 text-[10px] uppercase tracking-wider font-sans transition-colors ${
+                  i === step ? 'text-amber-300/85' : done ? 'text-amber-400/45' : 'text-muted-foreground/35'
+                }`}>
+                  {done && <Check className="h-2.5 w-2.5" />}
+                  {s.label}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        <p className="mt-2 text-[11px] text-muted-foreground/45 font-sans">
+          Step {step + 1} of {STEPS.length} — {STEPS[step].blurb}
+        </p>
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* ── Saga details ── */}
+        {/* ── Step 1: Foundation ── */}
+        {step === 0 && (
         <div className="glass-card rounded-xl p-6 space-y-5">
           <h2 className="text-sm font-medium text-foreground/65 flex items-center gap-2">
             <Feather className="h-4 w-4 text-amber-400/55" /> Saga details
@@ -272,7 +339,13 @@ export default function NewSagaPage() {
             <Label htmlFor="desc">
               Description <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span>
             </Label>
-            <Input id="desc" placeholder="A brief tagline for your saga…" value={description} onChange={(e) => setDescription(e.target.value)} />
+            <Textarea
+              id="desc"
+              placeholder="A short blurb that sets the hook for your saga…"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="min-h-[80px] resize-y text-sm leading-relaxed"
+            />
           </div>
 
           <div className="space-y-2">
@@ -321,6 +394,14 @@ export default function NewSagaPage() {
                 ))}
               </select>
             )}
+            {selectedWorld?.description && (
+              <div className="mt-1 flex items-start gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+                <Globe className="h-3.5 w-3.5 text-amber-400/55 mt-0.5 shrink-0" />
+                <p className="text-[11px] text-muted-foreground/60 leading-relaxed">
+                  {selectedWorld.description}
+                </p>
+              </div>
+            )}
             <p className="text-[11px] text-muted-foreground/45">
               Your standing carries across every saga in this world — its people remember how you&apos;ve treated them.
             </p>
@@ -344,8 +425,11 @@ export default function NewSagaPage() {
             </p>
           </div>
         </div>
+        )}
 
-        {/* ── The situation ── */}
+        {/* ── Step 2: The saga (situation + ways in) ── */}
+        {step === 1 && (
+        <>
         <div className="glass-card rounded-xl p-6 space-y-3">
           <div>
             <h2 className="text-sm font-medium text-foreground/65 flex items-center gap-2">
@@ -365,7 +449,6 @@ export default function NewSagaPage() {
           />
         </div>
 
-        {/* ── Entry points ── */}
         <div className="glass-card rounded-xl p-6 space-y-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -435,8 +518,12 @@ export default function NewSagaPage() {
             Rendering costs <strong>1 credit per doorway</strong> — each opening is written when you create the saga.
           </p>
         </div>
+        </>
+        )}
 
-        {/* ── Director ── */}
+        {/* ── Step 3: Voice (director + style) ── */}
+        {step === 2 && (
+        <>
         <div className="glass-card rounded-xl p-6 space-y-4">
           <DirectorControls value={director} onChange={setDirector} />
         </div>
@@ -446,7 +533,7 @@ export default function NewSagaPage() {
             <div>
               <Label className="text-sm font-medium text-foreground/65 block">This world&apos;s style choices</Label>
               <p className="text-[11px] text-muted-foreground/45 mt-1">
-                {worlds.find((w) => w.id === worldId)?.name} lets each saga pick how these are handled.
+                {selectedWorld?.name} lets each saga pick how these are handled.
               </p>
             </div>
             <div className="grid sm:grid-cols-2 gap-3">
@@ -468,21 +555,17 @@ export default function NewSagaPage() {
             </div>
           </div>
         )}
-
-        {/* ── Share ── */}
-        <div className="glass-card rounded-xl p-6 space-y-2">
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input type="checkbox" checked={shared} onChange={(e) => setShared(e.target.checked)} className="accent-amber-500" />
-            <span className="text-sm">Share with the community</span>
-          </label>
-          <p className="text-[11px] text-muted-foreground/45">
-            {shared
-              ? 'Listed in the Personal Saga browse, for anyone to play as themselves.'
-              : 'Kept personal — hidden from public listings (still reachable by direct link and from your dashboard).'}
+        {styleOptions.length === 0 && (
+          <p className="text-[11px] text-muted-foreground/40 px-1">
+            This world doesn&apos;t expose any per-saga style choices. Direction above is all you need.
           </p>
-        </div>
+        )}
+        </>
+        )}
 
-        {/* ── Cover ── */}
+        {/* ── Step 4: Look & share ── */}
+        {step === 3 && (
+        <>
         <div className="glass-card rounded-xl p-6 space-y-5">
           <h2 className="text-sm font-medium text-foreground/65 flex items-center gap-2">
             <Palette className="h-4 w-4 text-amber-400/55" /> Book Cover Design
@@ -515,23 +598,126 @@ export default function NewSagaPage() {
 
         <ReadingThemePicker value={readingTheme} onChange={setReadingTheme} />
 
-        <Button
-          type="submit"
-          disabled={!canSubmit}
-          className="w-full gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300"
-        >
-          {submitting ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Rendering {readyEntries.length} opening{readyEntries.length === 1 ? '' : 's'}…
-            </>
-          ) : (
-            <>
-              <ChevronRight className="h-4 w-4" />
-              Open this saga ({readyEntries.length} {readyEntries.length === 1 ? 'doorway' : 'doorways'})
-            </>
+        <div className="glass-card rounded-xl p-6 space-y-2">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" checked={shared} onChange={(e) => setShared(e.target.checked)} className="accent-amber-500" />
+            <span className="text-sm">Share with the community</span>
+          </label>
+          <p className="text-[11px] text-muted-foreground/45">
+            {shared
+              ? 'Listed in the Personal Saga browse, for anyone to play as themselves.'
+              : 'Kept personal — hidden from public listings (still reachable by direct link and from your dashboard).'}
+          </p>
+        </div>
+        </>
+        )}
+
+        {/* ── Step 5: Review ── */}
+        {step === 4 && (
+        <div className="glass-card rounded-xl p-6 space-y-5">
+          <h2 className="text-sm font-medium text-foreground/65 flex items-center gap-2">
+            <Check className="h-4 w-4 text-amber-400/55" /> Review &amp; open
+          </h2>
+
+          <dl className="space-y-3 text-sm">
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted-foreground/45">World</dt>
+              <dd className="text-foreground/80 text-right">{selectedWorld?.name ?? '—'}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted-foreground/45">Title</dt>
+              <dd className="text-foreground/80 text-right">{title.trim() || <span className="text-red-400/70">Missing</span>}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted-foreground/45">Rating</dt>
+              <dd className="text-foreground/80 text-right">{rating}</dd>
+            </div>
+            {tags.length > 0 && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground/45">Tags</dt>
+                <dd className="text-foreground/80 text-right">{tags.join(', ')}</dd>
+              </div>
+            )}
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted-foreground/45">Direction</dt>
+              <dd className="text-foreground/80 text-right">{isDirectorMeaningful(director) ? 'Custom' : 'Storyteller’s choice'}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted-foreground/45">Visibility</dt>
+              <dd className="text-foreground/80 text-right">{shared ? 'Shared with community' : 'Personal'}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted-foreground/45">Doorways</dt>
+              <dd className="text-foreground/80 text-right">
+                {readyEntries.length > 0
+                  ? `${readyEntries.length} ready`
+                  : <span className="text-red-400/70">None yet — add at least one</span>}
+              </dd>
+            </div>
+          </dl>
+
+          {readyEntries.length > 0 && (
+            <ul className="space-y-1.5 border-t border-white/[0.06] pt-4">
+              {readyEntries.map((ep, i) => (
+                <li key={i} className="flex items-start gap-2 text-[12px] text-muted-foreground/65">
+                  <DoorOpen className="h-3.5 w-3.5 text-amber-400/45 mt-0.5 shrink-0" />
+                  <span>{ep.label}</span>
+                </li>
+              ))}
+            </ul>
           )}
-        </Button>
+
+          <p className="text-[11px] text-muted-foreground/45 border-t border-white/[0.06] pt-4">
+            Rendering costs <strong>1 credit per doorway</strong> — {readyEntries.length} opening{readyEntries.length === 1 ? '' : 's'} will be written now.
+          </p>
+        </div>
+        )}
+
+        {/* ── Wizard navigation ── */}
+        <div className="flex items-center justify-between gap-3 pt-1">
+          {step > 0 ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={goBack}
+              disabled={submitting}
+              className="gap-1.5 text-muted-foreground/60 hover:text-foreground"
+            >
+              <ChevronLeft className="h-4 w-4" /> Back
+            </Button>
+          ) : (
+            <span />
+          )}
+
+          {!isLast ? (
+            <Button
+              type="button"
+              onClick={goNext}
+              disabled={!currentValid}
+              className="gap-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300"
+            >
+              Next <ChevronRight className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button
+              type="submit"
+              disabled={!canSubmit}
+              className="gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Rendering {readyEntries.length} opening{readyEntries.length === 1 ? '' : 's'}…
+                </>
+              ) : (
+                <>
+                  <ChevronRight className="h-4 w-4" />
+                  Open this saga ({readyEntries.length} {readyEntries.length === 1 ? 'doorway' : 'doorways'})
+                </>
+              )}
+            </Button>
+          )}
+        </div>
       </form>
     </main>
   )
