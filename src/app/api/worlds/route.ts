@@ -28,24 +28,38 @@ const CreateWorldSchema = z.object({
       mandate: z.string().optional(),
       proseStyles: z.array(z.string()).optional(),
       motifs: z.array(z.string()).optional(),
+      styleOptions: z
+        .array(z.object({ label: z.string(), choices: z.array(z.string()) }))
+        .optional(),
     })
     .optional(),
 })
 
+type StyleOptionInput = { label: string; choices: string[] }
+type StorySettingsInput = {
+  mandate?: string
+  proseStyles?: string[]
+  motifs?: string[]
+  styleOptions?: StyleOptionInput[]
+}
+
 /** Trim + bound the world story settings; drop it entirely if nothing is set. */
-function sanitizeStorySettings(
-  s: { mandate?: string; proseStyles?: string[]; motifs?: string[] } | undefined,
-): { mandate?: string; proseStyles?: string[]; motifs?: string[] } | null {
+function sanitizeStorySettings(s: StorySettingsInput | undefined): StorySettingsInput | null {
   if (!s) return null
   const mandate = s.mandate?.trim().slice(0, 300) || undefined
   const clean = (arr?: string[]) =>
     (arr ?? []).map((x) => x.trim().slice(0, 120)).filter(Boolean).slice(0, 8)
   const proseStyles = clean(s.proseStyles)
   const motifs = clean(s.motifs)
-  const out = {
+  const styleOptions = (s.styleOptions ?? [])
+    .map((o) => ({ label: (o.label ?? '').trim().slice(0, 60), choices: clean(o.choices) }))
+    .filter((o) => o.label && o.choices.length > 0)
+    .slice(0, 8)
+  const out: StorySettingsInput = {
     ...(mandate ? { mandate } : {}),
     ...(proseStyles.length ? { proseStyles } : {}),
     ...(motifs.length ? { motifs } : {}),
+    ...(styleOptions.length ? { styleOptions } : {}),
   }
   return Object.keys(out).length > 0 ? out : null
 }
