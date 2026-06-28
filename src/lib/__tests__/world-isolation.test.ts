@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { buildWorldContext } from '@/lib/ai/world-context'
 import { buildPrompt, buildSagaOpeningPrompt } from '@/lib/ai/prompts'
 import { toMultiverseId, mergeEchoes } from '@/lib/multiverse'
-import type { World } from '@/types'
+import type { World, StoryPathSegment } from '@/types'
 
 /**
  * Cross-world isolation guarantee.
@@ -15,6 +15,11 @@ import type { World } from '@/types'
  */
 
 const FOREIGN = 'tartness lemon-zest forbidden-tang' // a phrase from a different world
+
+// A story path of a given length, to drive chapter-index-based behavior.
+function path(len: number): StoryPathSegment[] {
+  return Array.from({ length: len }, (_, i) => ({ id: `n${i}`, content: 'x', choiceText: null, depth: i }))
+}
 
 function makeWorld(over: Partial<World> = {}): World {
   return {
@@ -121,6 +126,28 @@ describe('multiverse echoes (the only sanctioned cross-world path)', () => {
     const prompt = buildSagaOpeningPrompt(ctx, '', { label: 'Arrive', premise: 'You step in.' })
     expect(prompt).toContain('MULTIVERSE ECHOES')
     expect(prompt).toContain('A baker crossed the rift.')
+  })
+
+  it('surfaces at most two rumours per chapter (a faint drift, not a digest)', () => {
+    const ctx = buildWorldContext(makeWorld(), {
+      echoes: [{ worldName: 'Reach', legends: ['L0', 'L1', 'L2', 'L3', 'L4'] }],
+    })
+    const prompt = buildPrompt(ctx, path(0), 'go', false)
+    const shown = (prompt.match(/- From /g) ?? []).length
+    expect(shown).toBe(2)
+  })
+
+  it('rotates which rumours surface as the story goes on', () => {
+    const ctx = buildWorldContext(makeWorld(), {
+      echoes: [{ worldName: 'Reach', legends: ['L0', 'L1', 'L2', 'L3', 'L4'] }],
+    })
+    const early = buildPrompt(ctx, path(0), 'go', false)
+    const later = buildPrompt(ctx, path(2), 'go', false)
+    // Chapter 0 hears L0/L1; two chapters later the window has moved to L2/L3.
+    expect(early).toContain('L0')
+    expect(early).not.toContain('L2')
+    expect(later).toContain('L2')
+    expect(later).not.toContain('L0')
   })
 })
 
