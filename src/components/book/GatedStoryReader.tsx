@@ -6,14 +6,24 @@ import { Button } from '@/components/ui/button'
 import { BookViewerClient } from '@/components/book/BookViewerClient'
 import { useAuth } from '@/components/Providers'
 import { ratingRank, MATURE_MIN_AGE, MIN_SITE_AGE } from '@/lib/ratings'
-import type { Story, StoryNode } from '@/types'
+import type { Story, StoryNode, WorldBible } from '@/types'
 
 /**
  * Client gate for Teen/Mature stories. The opening chapter is never rendered on
  * the server for gated stories; instead we resolve the viewer's allowance and
  * fetch the root node through the authed (age-enforcing) endpoint.
  */
-export function GatedStoryReader({ story, endingCount }: { story: Story; endingCount?: number }) {
+export function GatedStoryReader({
+  story,
+  endingCount,
+  worldGenesis,
+  worldSeed,
+}: {
+  story: Story
+  endingCount?: number
+  worldGenesis?: WorldBible
+  worldSeed?: number
+}) {
   const { user, loading, allowedRank, openAuthModal } = useAuth()
   const [node, setNode] = useState<StoryNode | null>(null)
   const [denied, setDenied] = useState(false)
@@ -54,7 +64,7 @@ export function GatedStoryReader({ story, endingCount }: { story: Story; endingC
   }, [loading, blockedByAge, empty, user, story.id, story.rootNodeId])
 
   if (!loading && node && !blockedByAge && !denied) {
-    return <BookViewerClient story={story} initialNode={node} endingCount={endingCount} />
+    return <BookViewerClient story={story} initialNode={node} endingCount={endingCount} worldGenesis={worldGenesis} worldSeed={worldSeed} />
   }
 
   if (blockedByAge || denied) {

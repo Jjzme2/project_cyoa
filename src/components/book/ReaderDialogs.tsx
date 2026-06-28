@@ -1,9 +1,48 @@
 'use client'
 
-import { Users, Trophy } from 'lucide-react'
+import { Users, Trophy, Map as MapIcon } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import type { Story } from '@/types'
+import type { Story, WorldBible } from '@/types'
+import { WorldMap } from '@/components/world/WorldMap'
 import type { DiscoveredEnding } from './book-viewer-internals'
+
+/** The world map, with the reader's current location highlighted + path so far. */
+export function MapDialog({
+  open,
+  onOpenChange,
+  genesis,
+  seed,
+  currentLocation,
+  visited,
+}: {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  genesis?: WorldBible
+  seed?: number
+  currentLocation?: string | null
+  visited?: string[]
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="glass-strong border-white/15 sm:max-w-[560px]">
+        <DialogHeader>
+          <DialogTitle className="gold-text text-lg flex items-center gap-2">
+            <MapIcon className="h-4 w-4 text-amber-400" />
+            World map
+          </DialogTitle>
+        </DialogHeader>
+        <div className="rounded-lg bg-black/30 border border-white/[0.06] overflow-hidden">
+          <WorldMap bible={genesis} seed={seed} currentLocation={currentLocation} visited={visited} className="w-full aspect-square" />
+        </div>
+        {currentLocation && (
+          <p className="text-xs text-muted-foreground/55 text-center">
+            You are in <span className="text-amber-300/85 font-medium">{currentLocation}</span>.
+          </p>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 /** The story's protagonist + emergent canon cast. */
 export function CastDialog({ open, onOpenChange, story }: { open: boolean; onOpenChange: (o: boolean) => void; story: Story }) {

@@ -9,7 +9,7 @@ import { ReadTogetherButton } from '@/components/story/ReadTogetherButton'
 import { WorldStandingBadge } from '@/components/story/WorldStandingBadge'
 import { SeededBadge } from '@/components/ContentBadges'
 import { Skeleton } from '@/components/ui/skeleton'
-import { getStory, getStoryNode, getStoryTree, incrementStoryViews } from '@/lib/firestore-helpers'
+import { getStory, getStoryNode, getStoryTree, incrementStoryViews, getWorld } from '@/lib/firestore-helpers'
 import { ratingRank } from '@/lib/ratings'
 import { APP_CONFIG } from '@/lib/config'
 import type { StoryTreeNode } from '@/types'
@@ -52,13 +52,16 @@ async function StoryContent({ params }: { params: Promise<{ id: string }> }) {
   // Teen/Mature stories are never rendered on the server; the client gate
   // resolves the viewer's age first (see GatedStoryReader).
   const gated = ratingRank(story.rating) > 0
-  const [rootNode, tree] = await Promise.all([
+  const [rootNode, tree, world] = await Promise.all([
     !gated && story.rootNodeId
       ? getStoryNode(id, story.rootNodeId).catch(() => null)
       : Promise.resolve(null),
     getStoryTree(id).catch(() => []),
+    story.worldId ? getWorld(story.worldId).catch(() => null) : Promise.resolve(null),
   ])
   const endingCount = countEndings(tree)
+  const worldGenesis = world?.genesis
+  const worldSeed = world?.seed ?? 0
 
   after(() => incrementStoryViews(id).catch(() => {}))
 
@@ -82,9 +85,9 @@ async function StoryContent({ params }: { params: Promise<{ id: string }> }) {
       </div>
 
       {gated ? (
-        <GatedStoryReader story={story} endingCount={endingCount} />
+        <GatedStoryReader story={story} endingCount={endingCount} worldGenesis={worldGenesis} worldSeed={worldSeed} />
       ) : rootNode ? (
-        <BookViewerClient story={story} initialNode={rootNode} endingCount={endingCount} />
+        <BookViewerClient story={story} initialNode={rootNode} endingCount={endingCount} worldGenesis={worldGenesis} worldSeed={worldSeed} />
       ) : (
         <div className="glass-card rounded-2xl p-14 text-center">
           <p className="text-muted-foreground/45 text-sm">
