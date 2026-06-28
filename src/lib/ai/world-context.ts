@@ -1,5 +1,5 @@
 import type { ContentRating, DirectorPersona, Protagonist, StoryCharacter, World } from '@/types'
-import type { WorldContext } from './prompts'
+import type { WorldContext, WorldEcho } from './prompts'
 
 export interface WorldContextOptions {
   /** Effective content rating (e.g. a story's clamped rating); defaults to the world's own. */
@@ -15,6 +15,12 @@ export interface WorldContextOptions {
   chronicle?: string[]
   /** This story/saga's picks for the world's configurable style options. */
   styleChoices?: Record<string, string>
+  /**
+   * Legends pooled from OTHER worlds in this world's multiverse, ALREADY READ by
+   * the caller for this exact world's membership. Omitted for an unconnected
+   * world — there is no implicit cross-world read here.
+   */
+  echoes?: WorldEcho[]
 }
 
 /**
@@ -44,5 +50,6 @@ export function buildWorldContext(world: World, opts: WorldContextOptions = {}):
     ...(opts.director ? { director: opts.director } : {}),
     ...(opts.chronicle ? { chronicle: opts.chronicle } : {}),
     ...(opts.styleChoices ? { styleChoices: opts.styleChoices } : {}),
+    ...(opts.echoes && opts.echoes.length ? { echoes: opts.echoes } : {}),
   }
 }

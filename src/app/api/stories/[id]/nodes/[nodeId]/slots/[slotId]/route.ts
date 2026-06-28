@@ -26,6 +26,7 @@ import {
   updateWorldOutsiderRegard,
   getWorldChronicle,
   appendWorldChronicle,
+  getMultiverseEchoes,
 } from '@/lib/firestore-helpers'
 import { CreditManager } from '@/lib/credit-manager'
 import { creditFailureResponse } from '@/lib/credit-response'
@@ -158,9 +159,15 @@ export async function POST(
     // The world's chronicle is shared lore — injected for every story so
     // characters are aware of the legends that prior personal sagas wrote.
     const chronicle = await getWorldChronicle(story.worldId).catch(() => [])
+    // Multiverse pool: only if THIS world opted into a multiverse do we draw a
+    // few legends from its sibling worlds — surfaced as clearly-foreign echoes.
+    // An unconnected world is never queried, so nothing crosses in.
+    const echoes = world.multiverse?.id
+      ? await getMultiverseEchoes(world.multiverse.id, story.worldId).catch(() => [])
+      : []
     // Assembled through the single audited seam (buildWorldContext): the chronicle
     // is read with story.worldId and passed in here, so only THIS world's legends
-    // can reach the prompt — never another world's.
+    // can reach the prompt — never another world's (save for declared echoes above).
     const worldCtx = buildWorldContext(world, {
       rating: effectiveRating,
       protagonist,
@@ -168,6 +175,7 @@ export async function POST(
       director: story.director,
       chronicle: chronicle.map((e) => e.text),
       styleChoices: story.styleChoices,
+      echoes,
     })
 
     // Autonomous Editor: void genuinely illegitimate / world-breaking entries

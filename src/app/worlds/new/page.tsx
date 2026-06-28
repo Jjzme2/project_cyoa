@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Globe, Loader2, ChevronRight, Sparkles, RotateCcw, Palette, Plus } from 'lucide-react'
+import { Globe, Loader2, ChevronRight, Sparkles, RotateCcw, Palette, Plus, Link2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -80,6 +80,11 @@ export default function NewWorldPage() {
   // Configurable style parameters each story in this world will choose from
   // (e.g. label "Rhyme scheme", choices "ABAB, ABBA, AABB, Free verse").
   const [styleOptions, setStyleOptions] = useState<{ label: string; choices: string }[]>([])
+  // Opt-in multiverse: name a shared pool to link this world with your others.
+  const [multiverseName, setMultiverseName] = useState('')
+  // The author's existing multiverse names, offered as reuse suggestions so the
+  // same pool is joined by an exact, matching name.
+  const [myMultiverses, setMyMultiverses] = useState<string[]>([])
 
   const draft = useDraft<WorldDraft>('chronicle:draft:world')
 
@@ -95,6 +100,30 @@ export default function NewWorldPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional post-mount external-store read; see note above
     if (saved && (saved.data.name || saved.data.lore)) setHasDraft(true)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Offer the author's existing multiverse names so worlds pool together by an
+  // exact, matching name. Best-effort; failure just means no suggestions.
+  useEffect(() => {
+    if (!user) return
+    ;(async () => {
+      try {
+        const token = await user.getIdToken()
+        const res = await fetch('/api/worlds', { headers: { Authorization: `Bearer ${token}` } })
+        if (!res.ok) return
+        const data = await res.json()
+        const names = Array.from(
+          new Set(
+            ((data.worlds ?? []) as { multiverse?: { name?: string } }[])
+              .map((w) => w.multiverse?.name?.trim())
+              .filter((n): n is string => !!n),
+          ),
+        )
+        setMyMultiverses(names)
+      } catch {
+        /* suggestions are optional */
+      }
+    })()
+  }, [user])
 
   function restoreDraft() {
     const saved = draft.load()
@@ -136,6 +165,7 @@ export default function NewWorldPage() {
           rating,
           seed: seed.trim() ? parseInt(seed.trim(), 10) : undefined,
           theme,
+          multiverseName: multiverseName.trim() || undefined,
           storySettings: {
             mandate: mandate.trim() || undefined,
             proseStyles: proseStyles.split('\n').map((s) => s.trim()).filter(Boolean),
@@ -448,6 +478,45 @@ export default function NewWorldPage() {
     </div>
   )
 
+  const multiverseCard = (
+    <div className="glass-card rounded-xl p-6 space-y-4">
+      <div>
+        <h2 className="text-sm font-medium text-foreground/65 flex items-center gap-2">
+          <Link2 className="h-4 w-4 text-amber-400/55" />
+          Multiverse
+          <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span>
+        </h2>
+        <p className="text-[11px] text-muted-foreground/45 mt-1 leading-relaxed">
+          By default a world is sealed — its legends never reach another world. Name a multiverse to
+          pool this world with your others that share the name: their legends drift between them as
+          faint, clearly-foreign echoes, never overriding each world&apos;s own canon. Leave blank to keep
+          this world fully self-contained.
+        </p>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="multiverse">Multiverse name</Label>
+        <Input
+          id="multiverse"
+          list="my-multiverses"
+          placeholder="e.g. The Sugar Multiverse"
+          value={multiverseName}
+          onChange={(e) => setMultiverseName(e.target.value)}
+          maxLength={60}
+        />
+        {myMultiverses.length > 0 && (
+          <datalist id="my-multiverses">
+            {myMultiverses.map((m) => (
+              <option key={m} value={m} />
+            ))}
+          </datalist>
+        )}
+        <p className="text-[11px] text-muted-foreground/45">
+          Worlds you create with the exact same name share one pool — only your own worlds can join.
+        </p>
+      </div>
+    </div>
+  )
+
   const reviewCard = (
     <div className="glass-card rounded-xl p-6 space-y-4">
       <h2 className="text-sm font-medium text-foreground/65 flex items-center gap-2">
@@ -458,6 +527,7 @@ export default function NewWorldPage() {
         <ReviewRow label="Name" value={name || <Missing>Unnamed</Missing>} />
         <ReviewRow label="Tone" value={tone} />
         <ReviewRow label="Rating" value={rating} />
+        <ReviewRow label="Multiverse" value={multiverseName.trim() || 'Self-contained'} />
         <ReviewRow label="Description" value={description.trim() || <Missing>Required</Missing>} />
       </dl>
       <div className="grid sm:grid-cols-2 gap-3">
@@ -530,6 +600,12 @@ export default function NewWorldPage() {
       canProceed: !!rules.trim(),
     },
     {
+      id: 'multiverse',
+      title: 'Multiverse',
+      hint: 'Optionally link this world into a shared pool with your others.',
+      content: multiverseCard,
+    },
+    {
       id: 'review',
       title: 'Review & forge',
       hint: 'A last look before your world comes into being.',
@@ -544,6 +620,7 @@ export default function NewWorldPage() {
       {loreCard}
       {rulesCard}
       {storytellingCard}
+      {multiverseCard}
       {renderSubmit('w-full gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300')}
     </div>
   )

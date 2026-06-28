@@ -22,6 +22,22 @@ export interface WorldContext {
   storySettings?: WorldStorySettings
   /** This story's pick for each of the world's configurable style options. */
   styleChoices?: Record<string, string>
+  /**
+   * Faint legends drifting in from OTHER worlds this world is explicitly
+   * connected to (the multiverse layer). Present only when the world declared a
+   * connection; otherwise the world is fully isolated.
+   */
+  echoes?: WorldEcho[]
+}
+
+/** A bundle of legends echoing in from one connected world. */
+export interface WorldEcho {
+  /** The connected world's name. */
+  worldName: string
+  /** How it is linked to this world, in-world (e.g. "a shimmering rift"). */
+  nexus?: string
+  /** A few of that world's legends, to surface only as distant rumor. */
+  legends: string[]
 }
 
 /** Injects the world's generated canon so stories draw on its powers, figures, and history. */
@@ -44,6 +60,27 @@ function chronicleBlock(chronicle?: string[]): string {
   if (!chronicle || chronicle.length === 0) return ''
   const lines = chronicle.slice(0, 5).map((c) => `- ${c}`).join('\n')
   return `\nWORLD CHRONICLE (legends the people of this world remember and may speak of — honor them as established history; do not contradict them):\n${lines}\n`
+}
+
+/**
+ * Injects legends from explicitly-connected worlds — the multiverse layer. These
+ * are clearly framed as foreign: they may surface only as distant rumour or myth,
+ * never as this world's own history, and never override its canon. Renders
+ * nothing unless the world declared a connection AND that world has legends, so
+ * an unconnected world stays fully isolated.
+ */
+function multiverseBlock(echoes?: WorldEcho[]): string {
+  if (!echoes || echoes.length === 0) return ''
+  const lines = echoes
+    .slice(0, 3)
+    .flatMap((e) => {
+      const legends = (e.legends ?? []).filter((l) => l.trim()).slice(0, 2)
+      if (legends.length === 0) return []
+      const via = e.nexus?.trim() ? ` (linked by ${e.nexus.trim()})` : ''
+      return legends.map((l) => `- From ${e.worldName}${via}: ${l}`)
+    })
+  if (lines.length === 0) return ''
+  return `\nMULTIVERSE ECHOES (faint legends drifting in from OTHER worlds connected to this one — they are from ELSEWHERE: reference them only as distant rumour, myth, or a traveller's tale, NEVER as this world's own history, and never let them contradict or override the canon above):\n${lines.join('\n')}\n`
 }
 
 /** Translate the authored director persona into directorial guidance for the prompt. */
@@ -99,7 +136,7 @@ WORLD RULES: ${world.rules}
 TONE: ${world.tone}
 
 ${ratingGuidance(world.rating)}
-${castBlock(world)}${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${directorBlock(world.director)}${worldStyleBlock(world.storySettings, storyPath.length, world.styleChoices)}
+${castBlock(world)}${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${multiverseBlock(world.echoes)}${directorBlock(world.director)}${worldStyleBlock(world.storySettings, storyPath.length, world.styleChoices)}
 STORY PATH SO FAR:
 ${pathContent}
 
@@ -180,7 +217,7 @@ WORLD RULES: ${world.rules}
 TONE: ${world.tone}
 
 ${ratingGuidance(world.rating)}
-${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${directorBlock(world.director)}${worldStyleBlock(world.storySettings, 0, world.styleChoices)}${sagaPremise.trim() ? `\nSAGA PREMISE (the overall situation this saga drops the reader into — honor it):\n${sagaPremise.trim()}\n` : ''}
+${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${multiverseBlock(world.echoes)}${directorBlock(world.director)}${worldStyleBlock(world.storySettings, 0, world.styleChoices)}${sagaPremise.trim() ? `\nSAGA PREMISE (the overall situation this saga drops the reader into — honor it):\n${sagaPremise.trim()}\n` : ''}
 THIS ENTRY POINT — one of several doorways into the saga the reader could have chosen:
 - How it was offered to the reader: "${entry.label}"
 - What this opening must establish: ${entry.premise}
