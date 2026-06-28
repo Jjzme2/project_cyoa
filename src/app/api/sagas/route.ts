@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
     // just arrived), but the WORLD's declared multiverse is canon — so its
     // sibling worlds' legends may drift in as clearly-foreign echoes.
     const echoes = world.multiverse?.id
-      ? await getMultiverseEchoes(world.multiverse.id, worldId).catch(() => [])
+      ? await getMultiverseEchoes(world.multiverse.id, worldId, { maxRating: effectiveRating }).catch(() => [])
       : []
     // Assembled through the single audited seam: this context can only ever carry
     // THIS world's data plus the echoes its own multiverse membership opted into.

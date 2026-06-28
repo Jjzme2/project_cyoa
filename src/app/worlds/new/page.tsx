@@ -80,11 +80,12 @@ export default function NewWorldPage() {
   // Configurable style parameters each story in this world will choose from
   // (e.g. label "Rhyme scheme", choices "ABAB, ABBA, AABB, Free verse").
   const [styleOptions, setStyleOptions] = useState<{ label: string; choices: string }[]>([])
-  // Opt-in multiverse: name a shared pool to link this world with your others.
+  // Opt-in multiverse: name a shared collective to pool this world's legends with
+  // any other worlds in it.
   const [multiverseName, setMultiverseName] = useState('')
-  // The author's existing multiverse names, offered as reuse suggestions so the
-  // same pool is joined by an exact, matching name.
-  const [myMultiverses, setMyMultiverses] = useState<string[]>([])
+  // Existing public multiverse names, offered as suggestions so a collective is
+  // joined by its exact, matching name.
+  const [knownMultiverses, setKnownMultiverses] = useState<string[]>([])
 
   const draft = useDraft<WorldDraft>('chronicle:draft:world')
 
@@ -101,29 +102,23 @@ export default function NewWorldPage() {
     if (saved && (saved.data.name || saved.data.lore)) setHasDraft(true)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Offer the author's existing multiverse names so worlds pool together by an
+  // Offer existing public multiverse names so worlds join a collective by an
   // exact, matching name. Best-effort; failure just means no suggestions.
   useEffect(() => {
-    if (!user) return
     ;(async () => {
       try {
-        const token = await user.getIdToken()
-        const res = await fetch('/api/worlds', { headers: { Authorization: `Bearer ${token}` } })
+        const res = await fetch('/api/multiverses')
         if (!res.ok) return
         const data = await res.json()
-        const names = Array.from(
-          new Set(
-            ((data.worlds ?? []) as { multiverse?: { name?: string } }[])
-              .map((w) => w.multiverse?.name?.trim())
-              .filter((n): n is string => !!n),
-          ),
-        )
-        setMyMultiverses(names)
+        const names = ((data.multiverses ?? []) as { name?: string }[])
+          .map((m) => m.name?.trim())
+          .filter((n): n is string => !!n)
+        setKnownMultiverses(Array.from(new Set(names)))
       } catch {
         /* suggestions are optional */
       }
     })()
-  }, [user])
+  }, [])
 
   function restoreDraft() {
     const saved = draft.load()
@@ -487,10 +482,10 @@ export default function NewWorldPage() {
           <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span>
         </h2>
         <p className="text-[11px] text-muted-foreground/45 mt-1 leading-relaxed">
-          By default a world is sealed — its legends never reach another world. Name a multiverse to
-          pool this world with your others that share the name: their legends drift between them as
-          faint, clearly-foreign echoes, never overriding each world&apos;s own canon. Leave blank to keep
-          this world fully self-contained.
+          By default a world is sealed — its legends never reach another world. A multiverse is a
+          shared collective <em>anyone</em> can join: name yours into one and its legends pool with
+          every other world in it, drifting between them as faint, clearly-foreign echoes that never
+          override a world&apos;s own canon. Leave blank to keep this world fully self-contained.
         </p>
       </div>
       <div className="space-y-2">
@@ -503,15 +498,16 @@ export default function NewWorldPage() {
           onChange={(e) => setMultiverseName(e.target.value)}
           maxLength={60}
         />
-        {myMultiverses.length > 0 && (
+        {knownMultiverses.length > 0 && (
           <datalist id="my-multiverses">
-            {myMultiverses.map((m) => (
+            {knownMultiverses.map((m) => (
               <option key={m} value={m} />
             ))}
           </datalist>
         )}
         <p className="text-[11px] text-muted-foreground/45">
-          Worlds you create with the exact same name share one pool — only your own worlds can join.
+          Any world named into the exact same multiverse shares one pool. Mature legends never echo
+          into a lower-rated world.
         </p>
       </div>
     </div>

@@ -102,11 +102,12 @@ export async function POST(req: NextRequest) {
   const { name, description, lore, rules, tone, tags, rating: safeRating, seed, theme } = parsed.data
   const storySettings = sanitizeStorySettings(parsed.data.storySettings)
 
-  // Resolve an opt-in multiverse: the display name is trimmed and the pool key is
-  // derived server-side, author-scoped, so two of this author's worlds with the
-  // same multiverse name pool together — and no one else's can join by name.
+  // Resolve an opt-in multiverse: a GLOBAL collective keyed by the normalized
+  // name, so any creator who names their world into the same multiverse joins the
+  // same shared pool. Opting in is the explicit, drawn connection; echoes are
+  // rating-gated when they're read.
   const multiverseName = parsed.data.multiverseName?.trim().slice(0, 60) || ''
-  const multiverseId = multiverseName ? toMultiverseId(uid, multiverseName) : null
+  const multiverseId = multiverseName ? toMultiverseId(multiverseName) : null
   const multiverse = multiverseId ? { id: multiverseId, name: multiverseName } : null
 
   const effectiveTone = tone ?? 'Epic Fantasy'

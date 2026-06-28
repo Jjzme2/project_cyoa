@@ -124,17 +124,17 @@ describe('multiverse echoes (the only sanctioned cross-world path)', () => {
   })
 })
 
-describe('toMultiverseId (author-scoped pool key)', () => {
-  it('is stable and author-scoped, so identical names from different authors never pool', () => {
-    expect(toMultiverseId('alice', 'The Sugar Multiverse')).toBe('alice:the-sugar-multiverse')
-    expect(toMultiverseId('alice', '  the   sugar   multiverse  ')).toBe('alice:the-sugar-multiverse')
-    expect(toMultiverseId('bob', 'The Sugar Multiverse')).toBe('bob:the-sugar-multiverse')
-    expect(toMultiverseId('alice', 'The Sugar Multiverse')).not.toBe(toMultiverseId('bob', 'The Sugar Multiverse'))
+describe('toMultiverseId (global collective key)', () => {
+  it('is a stable, normalized, author-independent key so anyone naming the same multiverse pools together', () => {
+    expect(toMultiverseId('The Sugar Multiverse')).toBe('the-sugar-multiverse')
+    expect(toMultiverseId('  the   sugar   multiverse  ')).toBe('the-sugar-multiverse')
+    expect(toMultiverseId('The-Sugar-Multiverse!')).toBe('the-sugar-multiverse')
+    // Same name from any creator → same pool (a public collective).
+    expect(toMultiverseId('The Sugar Multiverse')).toBe(toMultiverseId('the sugar multiverse'))
   })
 
   it('returns null for an empty / symbol-only name', () => {
-    expect(toMultiverseId('alice', '   ')).toBeNull()
-    expect(toMultiverseId('alice', '✨✨')).toBeNull()
-    expect(toMultiverseId('', 'Sugarverse')).toBeNull()
+    expect(toMultiverseId('   ')).toBeNull()
+    expect(toMultiverseId('✨✨')).toBeNull()
   })
 })
