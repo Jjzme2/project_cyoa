@@ -15,6 +15,7 @@ import { AIAssistModal } from '@/components/ai/AIAssistModal'
 import type { WorldAssistResult } from '@/components/ai/AIAssistModal'
 import { WorldThemeDesigner } from '@/components/world/WorldThemeDesigner'
 import { DEFAULT_WORLD_THEME, themeForTone } from '@/components/world/world-theme'
+import { CreationWizard, type CreationMode, type WizardStep } from '@/components/creation/CreationWizard'
 import { useDraft } from '@/hooks/useDraft'
 import { STYLE_OPTION_PRESETS, CURATED_STYLE_BUNDLES, applyBundle } from '@/lib/world-style-presets'
 
@@ -61,6 +62,7 @@ export default function NewWorldPage() {
   const [submitting, setSubmitting] = useState(false)
   const [aiModalOpen, setAiModalOpen] = useState(false)
   const [hasDraft, setHasDraft] = useState(false)
+  const [mode, setMode] = useState<CreationMode>('simple')
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -165,6 +167,387 @@ export default function NewWorldPage() {
     )
   }
 
+  // ── Section building blocks (shared by the guided steps and the advanced form) ──
+
+  const identityCard = (
+    <div className="glass-card rounded-xl p-6 space-y-5">
+      <h2 className="text-sm font-medium text-foreground/65 flex items-center gap-2">
+        <Globe className="h-4 w-4 text-amber-400/55" />
+        World identity
+      </h2>
+
+      <div className="space-y-2">
+        <Label htmlFor="name">World name</Label>
+        <Input
+          id="name"
+          placeholder="The Shattered Realm"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="desc">Description</Label>
+        <Textarea
+          id="desc"
+          placeholder="A realm of fractured magic and ancient prophecy, where the sky itself was shattered into drifting shards of raw power…"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          required
+          className="min-h-[90px] resize-y text-sm leading-relaxed"
+        />
+        <p className="text-[11px] text-muted-foreground/45">
+          The elevator pitch shown to authors choosing a world and to readers browsing it.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="tone">Tone</Label>
+        <select
+          id="tone"
+          value={tone}
+          onChange={(e) => setTone(e.target.value)}
+          className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          {TONE_OPTIONS.map((t) => (
+            <option key={t} value={t} className="bg-background">
+              {t}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="rating">Content rating</Label>
+        <select
+          id="rating"
+          value={rating}
+          onChange={(e) => setRating(e.target.value as ContentRating)}
+          className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          {CONTENT_RATINGS.map((r) => (
+            <option key={r} value={r} className="bg-background">
+              {r} ({CONTENT_RATING_META[r].abbr})
+            </option>
+          ))}
+        </select>
+        <p className="text-[11px] text-muted-foreground/45">
+          {CONTENT_RATING_META[rating].description} A moderator may adjust this if needed.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="seed">World Seed (Optional)</Label>
+        <Input
+          id="seed"
+          type="number"
+          placeholder="e.g. 12345"
+          value={seed}
+          onChange={(e) => setSeed(e.target.value)}
+        />
+        <p className="text-[11px] text-muted-foreground/45">
+          Used for deterministic procedural generation. Leave blank to let the system generate one.
+        </p>
+      </div>
+    </div>
+  )
+
+  const portalCard = (
+    <div className="glass-card rounded-xl p-6 space-y-5">
+      <h2 className="text-sm font-medium text-foreground/65 flex items-center gap-2">
+        <Palette className="h-4 w-4 text-amber-400/55" />
+        World Portal
+        <span className="text-muted-foreground/55 font-normal text-xs">(the world&apos;s banner)</span>
+      </h2>
+      <p className="text-[11px] text-muted-foreground/45 -mt-2">
+        This is the wide <strong>banner</strong> for the whole world — it heads the world&apos;s page and its
+        shelf in the library. It&apos;s different from a <strong>book cover</strong>, which you design later for
+        each individual story inside this world.
+      </p>
+      <WorldThemeDesigner value={theme} onChange={setTheme} name={name} tone={tone} />
+    </div>
+  )
+
+  const loreCard = (
+    <div className="glass-card rounded-xl p-6 space-y-3">
+      <div>
+        <Label htmlFor="lore" className="text-sm font-medium text-foreground/65 block">World lore</Label>
+        <p className="text-xs text-muted-foreground/45 mt-1">
+          History, geography, factions, and the major events that shaped your world.
+        </p>
+      </div>
+      <Textarea
+        id="lore"
+        placeholder="Once, the five kingdoms were united under a crystalline sky. When the Sundering occurred three centuries ago, the sky itself fractured into shards of pure magic that drifted like frozen lightning across the land…"
+        value={lore}
+        onChange={(e) => setLore(e.target.value)}
+        required
+        className="min-h-[160px] resize-none text-sm leading-relaxed"
+      />
+    </div>
+  )
+
+  const rulesCard = (
+    <div className="glass-card rounded-xl p-6 space-y-3">
+      <div>
+        <Label htmlFor="rules" className="text-sm font-medium text-foreground/65 block">Rules &amp; constraints</Label>
+        <p className="text-xs text-muted-foreground/45 mt-1">
+          What the AI must always follow — magic systems, forbidden topics, narrative tone.
+        </p>
+      </div>
+      <Textarea
+        id="rules"
+        placeholder={`• Magic requires a physical cost — the caster ages with each spell\n• Technology is medieval — no firearms, no electricity\n• The protagonist must always have agency\n• Keep violence tasteful, not gratuitous`}
+        value={rules}
+        onChange={(e) => setRules(e.target.value)}
+        required
+        className="min-h-[140px] resize-none text-xs leading-relaxed font-mono"
+      />
+    </div>
+  )
+
+  const storytellingCard = (
+    <div className="glass-card rounded-xl p-6 space-y-4">
+      <div>
+        <Label className="text-sm font-medium text-foreground/65 block">
+          Storytelling style{' '}
+          <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span>
+        </Label>
+        <p className="text-xs text-muted-foreground/45 mt-1">
+          World-level rules that shape how every chapter is written — applied to every story in this world.
+        </p>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="mandate" className="text-xs text-muted-foreground/60">Per-chapter mandate</Label>
+        <Input
+          id="mandate"
+          placeholder="e.g. Every chapter must contain at least one line of poetic prose"
+          value={mandate}
+          onChange={(e) => setMandate(e.target.value)}
+          maxLength={300}
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="proseStyles" className="text-xs text-muted-foreground/60">
+          Prose styles{' '}
+          <span className="text-muted-foreground/45">— one per line; the engine rotates through them per chapter</span>
+        </Label>
+        <Textarea
+          id="proseStyles"
+          placeholder={'lyrical and image-rich\nspare and haunting\nornate, formal, almost liturgical'}
+          value={proseStyles}
+          onChange={(e) => setProseStyles(e.target.value)}
+          rows={3}
+          className="resize-none text-xs leading-relaxed"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="motifs" className="text-xs text-muted-foreground/60">
+          Recurring motifs{' '}
+          <span className="text-muted-foreground/45">— comma-separated; woven in where they fit</span>
+        </Label>
+        <Input
+          id="motifs"
+          placeholder="e.g. water, mirrors, the turning of seasons"
+          value={motifs}
+          onChange={(e) => setMotifs(e.target.value)}
+        />
+      </div>
+
+      <div className="space-y-2 pt-1">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs text-muted-foreground/60">
+            Style options{' '}
+            <span className="text-muted-foreground/45">— each story picks one choice per option at creation</span>
+          </Label>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setStyleOptions((prev) => [...prev, { label: '', choices: '' }])}
+            className="text-xs gap-1 border-white/10 hover:bg-white/5 h-7"
+          >
+            <Plus className="h-3 w-3" /> Add option
+          </Button>
+        </div>
+
+        {/* Curated profiles — one click configures several coherent options. */}
+        <div className="space-y-1.5">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground/40 font-sans">Curated profiles</p>
+          <div className="flex flex-wrap gap-1.5">
+            {CURATED_STYLE_BUNDLES.map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                title={b.description}
+                onClick={() => setStyleOptions((prev) => applyBundle(prev, b))}
+                className="px-2.5 py-1 rounded-md text-[11px] font-sans border border-white/10 text-muted-foreground/65 hover:border-violet-500/30 hover:text-violet-200/85 transition-all"
+              >
+                {b.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Single quick-add options. */}
+        <div className="flex flex-wrap gap-1.5">
+          {STYLE_OPTION_PRESETS.map((p) => {
+            const added = styleOptions.some((o) => o.label.trim().toLowerCase() === p.label.toLowerCase())
+            return (
+              <button
+                key={p.label}
+                type="button"
+                disabled={added}
+                onClick={() => setStyleOptions((prev) => [...prev, { label: p.label, choices: p.choices }])}
+                className={`px-2 py-1 rounded-md text-[11px] font-sans border transition-all ${
+                  added
+                    ? 'border-white/5 text-muted-foreground/30 cursor-default'
+                    : 'border-white/10 text-muted-foreground/60 hover:border-amber-500/25 hover:text-amber-200/80'
+                }`}
+              >
+                + {p.label}
+              </button>
+            )
+          })}
+        </div>
+
+        {styleOptions.map((opt, i) => (
+          <div key={i} className="flex gap-2 items-start">
+            <Input
+              placeholder="Label — e.g. Rhyme scheme"
+              value={opt.label}
+              onChange={(e) =>
+                setStyleOptions((prev) => prev.map((o, j) => (j === i ? { ...o, label: e.target.value } : o)))
+              }
+              className="w-44 h-9 text-xs"
+            />
+            <Input
+              placeholder="Choices, comma-separated — e.g. ABAB, ABBA, AABB, Free verse"
+              value={opt.choices}
+              onChange={(e) =>
+                setStyleOptions((prev) => prev.map((o, j) => (j === i ? { ...o, choices: e.target.value } : o)))
+              }
+              className="flex-1 h-9 text-xs"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setStyleOptions((prev) => prev.filter((_, j) => j !== i))}
+              className="h-9 px-2 text-red-400/70 hover:text-red-300 hover:bg-red-500/10"
+            >
+              ×
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+
+  const reviewCard = (
+    <div className="glass-card rounded-xl p-6 space-y-4">
+      <h2 className="text-sm font-medium text-foreground/65 flex items-center gap-2">
+        <Globe className="h-4 w-4 text-amber-400/55" />
+        Ready to forge
+      </h2>
+      <dl className="space-y-2 text-sm">
+        <ReviewRow label="Name" value={name || <Missing>Unnamed</Missing>} />
+        <ReviewRow label="Tone" value={tone} />
+        <ReviewRow label="Rating" value={rating} />
+        <ReviewRow label="Description" value={description.trim() || <Missing>Required</Missing>} />
+      </dl>
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground/45 font-sans mb-1">Lore</p>
+          <p className="text-[12px] text-foreground/70 leading-relaxed line-clamp-5">
+            {lore.trim() || 'No lore yet — go back to the Lore step.'}
+          </p>
+        </div>
+        <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground/45 font-sans mb-1">Rules</p>
+          <p className="text-[12px] text-foreground/70 leading-relaxed line-clamp-5 whitespace-pre-wrap font-mono">
+            {rules.trim() || 'No rules yet — go back to the Rules step.'}
+          </p>
+        </div>
+      </div>
+      <p className="text-[11px] text-muted-foreground/45">
+        Want a per-chapter mandate, prose-style pool, motifs, or per-story style options? Switch to{' '}
+        <strong>Advanced</strong> above — your work carries over.
+      </p>
+    </div>
+  )
+
+  const renderSubmit = (className: string) => (
+    <Button
+      type="submit"
+      disabled={submitting || !name.trim() || !description.trim() || !lore.trim() || !rules.trim()}
+      className={className}
+    >
+      {submitting ? (
+        <>
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Creating world…
+        </>
+      ) : (
+        <>
+          <ChevronRight className="h-4 w-4" />
+          Forge this world
+        </>
+      )}
+    </Button>
+  )
+
+  const steps: WizardStep[] = [
+    {
+      id: 'identity',
+      title: 'World identity',
+      hint: 'Name your world, pitch it in a sentence, and set its tone and rating.',
+      content: identityCard,
+      canProceed: !!name.trim() && !!description.trim(),
+    },
+    {
+      id: 'portal',
+      title: 'World Portal',
+      hint: 'Design the banner that represents the whole world.',
+      content: portalCard,
+    },
+    {
+      id: 'lore',
+      title: 'World lore',
+      hint: 'The history and geography the AI draws on for every story.',
+      content: loreCard,
+      canProceed: !!lore.trim(),
+    },
+    {
+      id: 'rules',
+      title: 'Rules & constraints',
+      hint: 'The guardrails every chapter must respect.',
+      content: rulesCard,
+      canProceed: !!rules.trim(),
+    },
+    {
+      id: 'review',
+      title: 'Review & forge',
+      hint: 'A last look before your world comes into being.',
+      content: reviewCard,
+    },
+  ]
+
+  const advanced = (
+    <div className="space-y-5">
+      {identityCard}
+      {portalCard}
+      {loreCard}
+      {rulesCard}
+      {storytellingCard}
+      {renderSubmit('w-full gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300')}
+    </div>
+  )
+
   return (
     <main className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
       <div className="mb-8 space-y-1">
@@ -235,300 +618,29 @@ export default function NewWorldPage() {
       />
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="glass-card rounded-xl p-6 space-y-5">
-          <h2 className="text-sm font-medium text-foreground/65 flex items-center gap-2">
-            <Globe className="h-4 w-4 text-amber-400/55" />
-            World identity
-          </h2>
-
-          <div className="space-y-2">
-            <Label htmlFor="name">World name</Label>
-            <Input
-              id="name"
-              placeholder="The Shattered Realm"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="desc">Description</Label>
-            <Textarea
-              id="desc"
-              placeholder="A realm of fractured magic and ancient prophecy, where the sky itself was shattered into drifting shards of raw power…"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              required
-              className="min-h-[90px] resize-y text-sm leading-relaxed"
-            />
-            <p className="text-[11px] text-muted-foreground/45">
-              The elevator pitch shown to authors choosing a world and to readers browsing it.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="tone">Tone</Label>
-            <select
-              id="tone"
-              value={tone}
-              onChange={(e) => setTone(e.target.value)}
-              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              {TONE_OPTIONS.map((t) => (
-                <option key={t} value={t} className="bg-background">
-                  {t}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="rating">Content rating</Label>
-            <select
-              id="rating"
-              value={rating}
-              onChange={(e) => setRating(e.target.value as ContentRating)}
-              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              {CONTENT_RATINGS.map((r) => (
-                <option key={r} value={r} className="bg-background">
-                  {r} ({CONTENT_RATING_META[r].abbr})
-                </option>
-              ))}
-            </select>
-            <p className="text-[11px] text-muted-foreground/45">
-              {CONTENT_RATING_META[rating].description} A moderator may adjust this if needed.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="seed">World Seed (Optional)</Label>
-            <Input
-              id="seed"
-              type="number"
-              placeholder="e.g. 12345"
-              value={seed}
-              onChange={(e) => setSeed(e.target.value)}
-            />
-            <p className="text-[11px] text-muted-foreground/45">
-              Used for deterministic procedural generation. Leave blank to let the system generate one.
-            </p>
-          </div>
-        </div>
-
-        <div className="glass-card rounded-xl p-6 space-y-5">
-          <h2 className="text-sm font-medium text-foreground/65 flex items-center gap-2">
-            <Palette className="h-4 w-4 text-amber-400/55" />
-            World Portal
-            <span className="text-muted-foreground/55 font-normal text-xs">(the world&apos;s banner)</span>
-          </h2>
-          <p className="text-[11px] text-muted-foreground/45 -mt-2">
-            This is the wide <strong>banner</strong> for the whole world — it heads the world&apos;s page and its
-            shelf in the library. It&apos;s different from a <strong>book cover</strong>, which you design later for
-            each individual story inside this world.
-          </p>
-          <WorldThemeDesigner value={theme} onChange={setTheme} name={name} tone={tone} />
-        </div>
-
-        <div className="glass-card rounded-xl p-6 space-y-3">
-          <div>
-            <Label htmlFor="lore" className="text-sm font-medium text-foreground/65 block">World lore</Label>
-            <p className="text-xs text-muted-foreground/45 mt-1">
-              History, geography, factions, and the major events that shaped your world.
-            </p>
-          </div>
-          <Textarea
-            id="lore"
-            placeholder="Once, the five kingdoms were united under a crystalline sky. When the Sundering occurred three centuries ago, the sky itself fractured into shards of pure magic that drifted like frozen lightning across the land…"
-            value={lore}
-            onChange={(e) => setLore(e.target.value)}
-            required
-            className="min-h-[160px] resize-none text-sm leading-relaxed"
-          />
-        </div>
-
-        <div className="glass-card rounded-xl p-6 space-y-3">
-          <div>
-            <Label htmlFor="rules" className="text-sm font-medium text-foreground/65 block">Rules &amp; constraints</Label>
-            <p className="text-xs text-muted-foreground/45 mt-1">
-              What the AI must always follow — magic systems, forbidden topics, narrative tone.
-            </p>
-          </div>
-          <Textarea
-            id="rules"
-            placeholder={`• Magic requires a physical cost — the caster ages with each spell\n• Technology is medieval — no firearms, no electricity\n• The protagonist must always have agency\n• Keep violence tasteful, not gratuitous`}
-            value={rules}
-            onChange={(e) => setRules(e.target.value)}
-            required
-            className="min-h-[140px] resize-none text-xs leading-relaxed font-mono"
-          />
-        </div>
-
-        {/* ── World storytelling (optional) ── */}
-        <div className="glass-card rounded-xl p-6 space-y-4">
-          <div>
-            <Label className="text-sm font-medium text-foreground/65 block">
-              Storytelling style{' '}
-              <span className="text-muted-foreground/55 font-normal text-xs">(optional)</span>
-            </Label>
-            <p className="text-xs text-muted-foreground/45 mt-1">
-              World-level rules that shape how every chapter is written — applied to every story in this world.
-            </p>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="mandate" className="text-xs text-muted-foreground/60">Per-chapter mandate</Label>
-            <Input
-              id="mandate"
-              placeholder="e.g. Every chapter must contain at least one line of poetic prose"
-              value={mandate}
-              onChange={(e) => setMandate(e.target.value)}
-              maxLength={300}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="proseStyles" className="text-xs text-muted-foreground/60">
-              Prose styles{' '}
-              <span className="text-muted-foreground/45">— one per line; the engine rotates through them per chapter</span>
-            </Label>
-            <Textarea
-              id="proseStyles"
-              placeholder={'lyrical and image-rich\nspare and haunting\nornate, formal, almost liturgical'}
-              value={proseStyles}
-              onChange={(e) => setProseStyles(e.target.value)}
-              rows={3}
-              className="resize-none text-xs leading-relaxed"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="motifs" className="text-xs text-muted-foreground/60">
-              Recurring motifs{' '}
-              <span className="text-muted-foreground/45">— comma-separated; woven in where they fit</span>
-            </Label>
-            <Input
-              id="motifs"
-              placeholder="e.g. water, mirrors, the turning of seasons"
-              value={motifs}
-              onChange={(e) => setMotifs(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2 pt-1">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs text-muted-foreground/60">
-                Style options{' '}
-                <span className="text-muted-foreground/45">— each story picks one choice per option at creation</span>
-              </Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setStyleOptions((prev) => [...prev, { label: '', choices: '' }])}
-                className="text-xs gap-1 border-white/10 hover:bg-white/5 h-7"
-              >
-                <Plus className="h-3 w-3" /> Add option
-              </Button>
-            </div>
-
-            {/* Curated profiles — one click configures several coherent options. */}
-            <div className="space-y-1.5">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground/40 font-sans">Curated profiles</p>
-              <div className="flex flex-wrap gap-1.5">
-                {CURATED_STYLE_BUNDLES.map((b) => (
-                  <button
-                    key={b.id}
-                    type="button"
-                    title={b.description}
-                    onClick={() => setStyleOptions((prev) => applyBundle(prev, b))}
-                    className="px-2.5 py-1 rounded-md text-[11px] font-sans border border-white/10 text-muted-foreground/65 hover:border-violet-500/30 hover:text-violet-200/85 transition-all"
-                  >
-                    {b.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Single quick-add options. */}
-            <div className="flex flex-wrap gap-1.5">
-              {STYLE_OPTION_PRESETS.map((p) => {
-                const added = styleOptions.some((o) => o.label.trim().toLowerCase() === p.label.toLowerCase())
-                return (
-                  <button
-                    key={p.label}
-                    type="button"
-                    disabled={added}
-                    onClick={() => setStyleOptions((prev) => [...prev, { label: p.label, choices: p.choices }])}
-                    className={`px-2 py-1 rounded-md text-[11px] font-sans border transition-all ${
-                      added
-                        ? 'border-white/5 text-muted-foreground/30 cursor-default'
-                        : 'border-white/10 text-muted-foreground/60 hover:border-amber-500/25 hover:text-amber-200/80'
-                    }`}
-                  >
-                    + {p.label}
-                  </button>
-                )
-              })}
-            </div>
-
-            {styleOptions.map((opt, i) => (
-              <div key={i} className="flex gap-2 items-start">
-                <Input
-                  placeholder="Label — e.g. Rhyme scheme"
-                  value={opt.label}
-                  onChange={(e) =>
-                    setStyleOptions((prev) => prev.map((o, j) => (j === i ? { ...o, label: e.target.value } : o)))
-                  }
-                  className="w-44 h-9 text-xs"
-                />
-                <Input
-                  placeholder="Choices, comma-separated — e.g. ABAB, ABBA, AABB, Free verse"
-                  value={opt.choices}
-                  onChange={(e) =>
-                    setStyleOptions((prev) => prev.map((o, j) => (j === i ? { ...o, choices: e.target.value } : o)))
-                  }
-                  className="flex-1 h-9 text-xs"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setStyleOptions((prev) => prev.filter((_, j) => j !== i))}
-                  className="h-9 px-2 text-red-400/70 hover:text-red-300 hover:bg-red-500/10"
-                >
-                  ×
-                </Button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <Button
-          type="submit"
-          disabled={
-            submitting ||
-            !name.trim() ||
-            !description.trim() ||
-            !lore.trim() ||
-            !rules.trim()
-          }
-          className="w-full gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300"
-        >
-          {submitting ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Creating world…
-            </>
-          ) : (
-            <>
-              <ChevronRight className="h-4 w-4" />
-              Forge this world
-            </>
-          )}
-        </Button>
+        <CreationWizard
+          mode={mode}
+          onModeChange={setMode}
+          steps={steps}
+          advanced={advanced}
+          submitButton={renderSubmit('gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300')}
+        />
       </form>
     </main>
   )
+}
+
+// ── Review-step helpers ───────────────────────────────────────────────────────
+
+function ReviewRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline gap-3">
+      <dt className="text-[11px] uppercase tracking-wider text-muted-foreground/45 font-sans w-24 shrink-0">{label}</dt>
+      <dd className="text-foreground/80 text-[13px]">{value}</dd>
+    </div>
+  )
+}
+
+function Missing({ children }: { children: React.ReactNode }) {
+  return <span className="text-amber-400/70">{children}</span>
 }
