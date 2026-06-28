@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildWorldContext } from '@/lib/ai/world-context'
 import { buildPrompt, buildSagaOpeningPrompt } from '@/lib/ai/prompts'
-import { toMultiverseId } from '@/lib/multiverse'
+import { toMultiverseId, mergeEchoes } from '@/lib/multiverse'
 import type { World } from '@/types'
 
 /**
@@ -136,5 +136,26 @@ describe('toMultiverseId (global collective key)', () => {
   it('returns null for an empty / symbol-only name', () => {
     expect(toMultiverseId('   ')).toBeNull()
     expect(toMultiverseId('✨✨')).toBeNull()
+  })
+})
+
+describe('mergeEchoes (pool + explicit links)', () => {
+  it('combines both sources', () => {
+    const pool = [{ worldName: 'A', legends: ['la'] }]
+    const links = [{ worldName: 'B', legends: ['lb'] }]
+    expect(mergeEchoes(pool, links)).toHaveLength(2)
+  })
+
+  it('dedupes by source world name (a linked world that is also a pool sibling appears once)', () => {
+    const pool = [{ worldName: 'Tartwater', legends: ['from pool'] }]
+    const links = [{ worldName: 'tartwater', nexus: 'a rift', legends: ['from link'] }]
+    const merged = mergeEchoes(pool, links)
+    expect(merged).toHaveLength(1)
+    // First occurrence wins (pool listed first here).
+    expect(merged[0].legends).toEqual(['from pool'])
+  })
+
+  it('is empty when neither source has echoes', () => {
+    expect(mergeEchoes([], [])).toEqual([])
   })
 })

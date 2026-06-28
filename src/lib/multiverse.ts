@@ -8,6 +8,21 @@
  * still strictly opt-in (a world only pools if its creator named it in) and
  * rating-gated downstream. Returns null when the name has no usable characters.
  */
+import type { WorldEcho } from '@/lib/ai/prompts'
+
+/**
+ * Merge pool echoes and explicit-link echoes into one list, deduped by source
+ * world name (a linked world that's also a pool sibling appears once). Pure.
+ */
+export function mergeEchoes(...groups: WorldEcho[][]): WorldEcho[] {
+  const byName = new Map<string, WorldEcho>()
+  for (const echo of groups.flat()) {
+    const key = echo.worldName.trim().toLowerCase()
+    if (key && !byName.has(key)) byName.set(key, echo)
+  }
+  return Array.from(byName.values())
+}
+
 export function toMultiverseId(name: string): string | null {
   const slug = name
     .trim()

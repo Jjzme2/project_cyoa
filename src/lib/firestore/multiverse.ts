@@ -1,8 +1,8 @@
-import { getWorldsByMultiverse, getPublicWorlds } from './worlds'
+import { getWorldsByMultiverse, getPublicWorlds, getWorld } from './worlds'
 import { getWorldChronicle } from './chronicle'
 import { ratingRank } from '@/lib/ratings'
 import type { WorldEcho } from '@/lib/ai/prompts'
-import type { ContentRating } from '@/types'
+import type { ContentRating, WorldLink } from '@/types'
 
 /**
  * Gather the multiverse pool's echoes for ONE world: the legends of the OTHER
@@ -37,6 +37,35 @@ export async function getMultiverseEchoes(
       const chronicle = await getWorldChronicle(w.id).catch(() => [])
       const legends = chronicle.map((e) => e.text).filter((t) => t.trim()).slice(0, perWorld)
       return legends.length ? { worldName: w.name, legends } : null
+    }),
+  )
+
+  return echoes.filter((e): e is WorldEcho => e !== null)
+}
+
+/**
+ * Echoes from a world's EXPLICIT links (fold 2): legends from each hand-picked
+ * world, bundled per source, rating-gated the same way as the pool. Bounded so
+ * prompts stay small. A world with no links gets nothing.
+ */
+export async function getLinkedEchoes(
+  links: WorldLink[],
+  { maxRating, maxWorlds = 4, perWorld = 2 }: { maxRating?: ContentRating; maxWorlds?: number; perWorld?: number } = {},
+): Promise<WorldEcho[]> {
+  const ceiling = maxRating ? ratingRank(maxRating) : null
+  const picked = links.slice(0, maxWorlds)
+
+  const echoes = await Promise.all(
+    picked.map(async (link) => {
+      const world = await getWorld(link.worldId).catch(() => null)
+      if (!world) return null
+      // Rating safety: never pull from a world more mature than this one.
+      if (ceiling !== null && ratingRank(world.rating ?? 'Everyone') > ceiling) return null
+      const chronicle = await getWorldChronicle(link.worldId).catch(() => [])
+      const legends = chronicle.map((e) => e.text).filter((t) => t.trim()).slice(0, perWorld)
+      if (!legends.length) return null
+      const nexus = link.nexus?.trim()
+      return { worldName: world.name, ...(nexus ? { nexus } : {}), legends }
     }),
   )
 

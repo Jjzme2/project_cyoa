@@ -9,8 +9,10 @@ import {
   createSagaTree,
   getWorld,
   getMultiverseEchoes,
+  getLinkedEchoes,
   checkAndAwardAchievements,
 } from '@/lib/firestore-helpers'
+import { mergeEchoes } from '@/lib/multiverse'
 import { CreditManager } from '@/lib/credit-manager'
 import { creditFailureResponse } from '@/lib/credit-response'
 import { generateSagaOpening, buildWorldContext, PromptRejectedError } from '@/lib/ai'
@@ -124,9 +126,15 @@ export async function POST(req: NextRequest) {
     // Multiverse pool: a fresh saga carries no chronicle of its own (the reader
     // just arrived), but the WORLD's declared multiverse is canon — so its
     // sibling worlds' legends may drift in as clearly-foreign echoes.
-    const echoes = world.multiverse?.id
-      ? await getMultiverseEchoes(world.multiverse.id, worldId, { maxRating: effectiveRating }).catch(() => [])
-      : []
+    const [poolEchoes, linkEchoes] = await Promise.all([
+      world.multiverse?.id
+        ? getMultiverseEchoes(world.multiverse.id, worldId, { maxRating: effectiveRating }).catch(() => [])
+        : Promise.resolve([]),
+      world.links?.length
+        ? getLinkedEchoes(world.links, { maxRating: effectiveRating }).catch(() => [])
+        : Promise.resolve([]),
+    ])
+    const echoes = mergeEchoes(poolEchoes, linkEchoes)
     // Assembled through the single audited seam: this context can only ever carry
     // THIS world's data plus the echoes its own multiverse membership opted into.
     const worldCtx = buildWorldContext(world, {
