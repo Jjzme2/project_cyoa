@@ -1,5 +1,7 @@
-import type { ContentRating, DirectorPersona, Protagonist, StoryCharacter, StoryPathSegment, WorldBible } from '@/types'
+import type { ContentRating, DirectorPersona, Protagonist, StoryCharacter, StoryPathSegment, WorldBible, WorldStorySettings } from '@/types'
 import { describeDirector } from '@/lib/director'
+import { formatCast } from './context-budget'
+import { worldStyleBlock } from './world-style'
 
 export interface WorldContext {
   name: string
@@ -15,6 +17,8 @@ export interface WorldContext {
   chronicle?: string[]
   /** The world's procedurally generated canon (factions, figures, history). */
   genesis?: WorldBible
+  /** World-level storytelling rules (prose mandate, style pool, motifs). */
+  storySettings?: WorldStorySettings
 }
 
 /** Injects the world's generated canon so stories draw on its powers, figures, and history. */
@@ -44,20 +48,9 @@ function directorBlock(d?: DirectorPersona): string {
   return `\nDIRECTOR'S VISION (shape HOW this chapter is directed — its craft and sensibility, always within the CONTENT RATING above):\n${notes.map((n) => `- ${n}`).join('\n')}\n`
 }
 
+/** Dense, budget-aware protagonist + cast block (see context-budget.ts). */
 function castBlock(world: WorldContext): string {
-  const lines: string[] = []
-  if (world.protagonist?.name) {
-    lines.push(
-      `PROTAGONIST (the character the reader plays as — refer to them by name, not "you"): ${world.protagonist.name}${world.protagonist.description ? ` — ${world.protagonist.description}` : ''}`,
-    )
-  }
-  if (world.characters && world.characters.length > 0) {
-    const cast = world.characters
-      .map((c) => `- ${c.name}${c.status ? ` [${c.status}]` : ''}${c.description ? `: ${c.description}` : ''}`)
-      .join('\n')
-    lines.push(`ESTABLISHED CHARACTERS (canon — keep them perfectly consistent):\n${cast}`)
-  }
-  return lines.length > 0 ? `\n${lines.join('\n\n')}\n` : ''
+  return formatCast(world.protagonist, world.characters)
 }
 
 function ratingGuidance(rating: ContentRating | undefined): string {
@@ -107,7 +100,7 @@ WORLD RULES: ${world.rules}
 TONE: ${world.tone}
 
 ${ratingGuidance(world.rating)}
-${castBlock(world)}${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${directorBlock(world.director)}
+${castBlock(world)}${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${directorBlock(world.director)}${worldStyleBlock(world.storySettings, storyPath.length)}
 STORY PATH SO FAR:
 ${pathContent}
 
@@ -185,7 +178,7 @@ WORLD RULES: ${world.rules}
 TONE: ${world.tone}
 
 ${ratingGuidance(world.rating)}
-${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${directorBlock(world.director)}${sagaPremise.trim() ? `\nSAGA PREMISE (the overall situation this saga drops the reader into — honor it):\n${sagaPremise.trim()}\n` : ''}
+${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${directorBlock(world.director)}${worldStyleBlock(world.storySettings, 0)}${sagaPremise.trim() ? `\nSAGA PREMISE (the overall situation this saga drops the reader into — honor it):\n${sagaPremise.trim()}\n` : ''}
 THIS ENTRY POINT — one of several doorways into the saga the reader could have chosen:
 - How it was offered to the reader: "${entry.label}"
 - What this opening must establish: ${entry.premise}

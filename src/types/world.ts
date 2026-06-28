@@ -1,6 +1,19 @@
 import type { ContentRating } from './content'
 import type { WorldTheme } from './themes'
 
+/**
+ * Authored, world-level storytelling rules that shape HOW every chapter in the
+ * world is written (distinct from the per-story Director). Optional throughout.
+ */
+export interface WorldStorySettings {
+  /** A mandate honored in every chapter (e.g. "Every chapter must contain at least one line of poetic prose"). */
+  mandate?: string
+  /** A pool of prose styles; the engine selects one per chapter for variety. */
+  proseStyles?: string[]
+  /** Recurring motifs/imagery the world returns to, woven in where they fit. */
+  motifs?: string[]
+}
+
 export interface World {
   id: string
   name: string
@@ -23,6 +36,8 @@ export interface World {
   seed?: number
   /** Procedurally generated, cross-referenced canon (regions, factions, characters, history). */
   genesis?: WorldBible
+  /** World-level storytelling rules (prose mandate, style pool, motifs). */
+  storySettings?: WorldStorySettings
   createdAt: string
 }
 

@@ -123,6 +123,7 @@ export async function POST(req: NextRequest) {
       rating: effectiveRating,
       director: safeDirector ?? undefined,
       genesis: world.genesis,
+      storySettings: world.storySettings,
     }
 
     // Render every entry point's opening. If any single one is rejected by the

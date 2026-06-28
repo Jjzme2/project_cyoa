@@ -23,7 +23,32 @@ const CreateWorldSchema = z.object({
   rating: z.enum(CONTENT_RATINGS).catch(DEFAULT_CONTENT_RATING),
   seed: z.union([z.number(), z.string()]).nullish(),
   theme: z.custom<WorldTheme>().optional(),
+  storySettings: z
+    .object({
+      mandate: z.string().optional(),
+      proseStyles: z.array(z.string()).optional(),
+      motifs: z.array(z.string()).optional(),
+    })
+    .optional(),
 })
+
+/** Trim + bound the world story settings; drop it entirely if nothing is set. */
+function sanitizeStorySettings(
+  s: { mandate?: string; proseStyles?: string[]; motifs?: string[] } | undefined,
+): { mandate?: string; proseStyles?: string[]; motifs?: string[] } | null {
+  if (!s) return null
+  const mandate = s.mandate?.trim().slice(0, 300) || undefined
+  const clean = (arr?: string[]) =>
+    (arr ?? []).map((x) => x.trim().slice(0, 120)).filter(Boolean).slice(0, 8)
+  const proseStyles = clean(s.proseStyles)
+  const motifs = clean(s.motifs)
+  const out = {
+    ...(mandate ? { mandate } : {}),
+    ...(proseStyles.length ? { proseStyles } : {}),
+    ...(motifs.length ? { motifs } : {}),
+  }
+  return Object.keys(out).length > 0 ? out : null
+}
 
 export async function GET(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
@@ -58,6 +83,7 @@ export async function POST(req: NextRequest) {
   const parsed = await parseJson(req, CreateWorldSchema)
   if (!parsed.ok) return parsed.response
   const { name, description, lore, rules, tone, tags, rating: safeRating, seed, theme } = parsed.data
+  const storySettings = sanitizeStorySettings(parsed.data.storySettings)
 
   const effectiveTone = tone ?? 'Epic Fantasy'
   // Every world gets a stable seed, so its genesis + simulation are reproducible.
@@ -76,6 +102,7 @@ export async function POST(req: NextRequest) {
     ratingOverriddenBy: null,
     seed: effectiveSeed,
     ...(theme ? { theme } : {}),
+    ...(storySettings ? { storySettings } : {}),
   })
 
   revalidateTag('worlds', 'max')

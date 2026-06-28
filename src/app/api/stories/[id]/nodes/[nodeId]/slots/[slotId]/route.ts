@@ -170,6 +170,7 @@ export async function POST(
       director: story.director,
       chronicle: chronicle.map((e) => e.text),
       genesis: world.genesis,
+      storySettings: world.storySettings,
     }
 
     // Autonomous Editor: void genuinely illegitimate / world-breaking entries
