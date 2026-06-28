@@ -2,6 +2,7 @@ import type { ContentRating, DirectorPersona, Protagonist, StoryCharacter, Story
 import { describeDirector } from '@/lib/director'
 import { formatCast } from './context-budget'
 import { worldStyleBlock } from './world-style'
+import { formatStoryPath } from './story-memory'
 
 export interface WorldContext {
   name: string
@@ -71,16 +72,10 @@ export function buildPrompt(
   includeImage: boolean,
   systemNarrativeEvents: string = '',
 ): string {
-  // Format the story path so far
-  const pathContent = storyPath
-    .map((node, index) => {
-      const chapterNum = index + 1
-      const prefix = node.choiceText 
-        ? `The reader chose: "${node.choiceText}"\nChapter ${chapterNum}:` 
-        : `Chapter ${chapterNum} (Beginning):`
-      return `${prefix}\n${node.content}`
-    })
-    .join('\n\n')
+  // Format the story so far — budget-aware: opening + recent chapters verbatim,
+  // the middle condensed (see story-memory.ts) so long stories stay coherent
+  // without unbounded prompt growth.
+  const pathContent = formatStoryPath(storyPath)
 
   // Set strict constraints on length to ensure it fits the book page layout
   // If there's an illustration, the vertical space is significantly reduced.
