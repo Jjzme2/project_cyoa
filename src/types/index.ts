@@ -11,6 +11,7 @@ export * from './social'
 export * from './story'
 export * from './world'
 export * from './themes'
+export * from './season'
 
 // EngineState lives in ./engine but is surfaced via @/types for convenience.
 export type { EngineState } from './engine'

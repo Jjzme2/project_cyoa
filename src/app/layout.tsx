@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { Providers } from '@/components/Providers'
 import { Header } from '@/components/layout/Header'
+import { SeasonBanner } from '@/components/season/SeasonBanner'
 import { VerifyEmailBanner } from '@/components/auth/VerifyEmailBanner'
 import { TwoFactorGate } from '@/components/auth/TwoFactorGate'
 import { APP_CONFIG } from '@/lib/config'
@@ -94,6 +95,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <Providers>
           <Header />
+          <SeasonBanner />
           <VerifyEmailBanner />
           <TwoFactorGate>{children}</TwoFactorGate>
         </Providers>
