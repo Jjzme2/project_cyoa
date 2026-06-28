@@ -12,6 +12,7 @@ import { WorldLore } from '@/components/world/WorldLore'
 import { WorldGenesis } from '@/components/world/WorldGenesis'
 import { GenerateGenesisButton } from '@/components/world/GenerateGenesisButton'
 import { OutsiderRegard } from '@/components/world/OutsiderRegard'
+import { MultiverseSettings } from '@/components/world/MultiverseSettings'
 import { WorldPortal } from '@/components/world/WorldPortal'
 import { themeForTone, DEFAULT_WORLD_THEME } from '@/components/world/world-theme'
 import { getWorld, getStoriesByWorld, getWorldChronicle, getWorldLegends, getWorldOutsiderRegard } from '@/lib/firestore-helpers'
@@ -172,6 +173,13 @@ async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
         )}
 
         {outsiders && <OutsiderRegard regard={outsiders} />}
+
+        <MultiverseSettings
+          worldId={world.id}
+          authorId={world.authorId}
+          initialMultiverseName={world.multiverse?.name ?? ''}
+          initialLinks={world.links ?? []}
+        />
 
         <WorldLore chronicle={chronicle} legends={legends} />
 

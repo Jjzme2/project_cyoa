@@ -4,7 +4,7 @@ import { revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import { parseJson } from '@/lib/api-validation'
 import { adminAuth } from '@/lib/firebase-admin'
-import { createWorld, getWorld, getWorldsByAuthor, checkAndAwardAchievements, setWorldGenesis } from '@/lib/firestore-helpers'
+import { createWorld, getWorldsByAuthor, checkAndAwardAchievements, setWorldGenesis, resolveWorldLinks } from '@/lib/firestore-helpers'
 import { analytics } from '@/lib/telemetry'
 import { buildGenesisSkeleton } from '@/lib/engine/world-genesis'
 import { SeededRNG } from '@/lib/engine/seed-rng'
@@ -114,20 +114,9 @@ export async function POST(req: NextRequest) {
   const multiverseId = multiverseName ? toMultiverseId(multiverseName) : null
   const multiverse = multiverseId ? { id: multiverseId, name: multiverseName } : null
 
-  // Resolve explicit links: validate each target exists and take its REAL name
-  // server-side (never a client-supplied label), deduped, capped.
-  const linkInputs = (parsed.data.links ?? []).slice(0, 8)
-  const seenLinks = new Set<string>()
-  const resolvedLinks: { worldId: string; worldName: string; nexus?: string }[] = []
-  for (const l of linkInputs) {
-    if (seenLinks.has(l.worldId)) continue
-    seenLinks.add(l.worldId)
-    const target = await getWorld(l.worldId).catch(() => null)
-    if (!target) continue
-    const nexus = l.nexus?.trim().slice(0, 120)
-    resolvedLinks.push({ worldId: l.worldId, worldName: target.name, ...(nexus ? { nexus } : {}) })
-    if (resolvedLinks.length >= 5) break
-  }
+  // Resolve explicit links through the shared resolver (validate, real names,
+  // dedupe, cap). The new world has no id yet, so there's no self-link to exclude.
+  const resolvedLinks = await resolveWorldLinks(parsed.data.links ?? [])
   const links = resolvedLinks.length ? resolvedLinks : null
 
   const effectiveTone = tone ?? 'Epic Fantasy'

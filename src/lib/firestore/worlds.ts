@@ -1,6 +1,6 @@
 import { adminDb } from '../firebase-admin'
 import { cacheLife, cacheTag } from 'next/cache'
-import type { World, ContentRating } from '@/types'
+import type { World, ContentRating, WorldMultiverse, WorldLink } from '@/types'
 import { ratingRank } from '../ratings'
 import { storyRef } from './refs'
 import { getStoriesByWorld } from './stories'
@@ -10,6 +10,22 @@ import { getStoriesByWorld } from './stories'
 /** Store a world's generated canon (the "world bible"). */
 export async function setWorldGenesis(worldId: string, genesis: import('@/types').WorldBible): Promise<void> {
   await adminDb.collection('worlds').doc(worldId).set({ genesis }, { merge: true })
+}
+
+/**
+ * Update a world's multiverse membership and explicit links. Lets EXISTING worlds
+ * opt into (or out of) the multiverse system, not just newly-created ones — pass
+ * null to clear either. Stories inherit automatically: generation reads the live
+ * world doc, so this takes effect on the next chapter.
+ */
+export async function setWorldMultiverse(
+  worldId: string,
+  patch: { multiverse: WorldMultiverse | null; links: WorldLink[] | null },
+): Promise<void> {
+  await adminDb
+    .collection('worlds')
+    .doc(worldId)
+    .set({ multiverse: patch.multiverse, links: patch.links }, { merge: true })
 }
 
 export async function getWorld(id: string): Promise<World | null> {
