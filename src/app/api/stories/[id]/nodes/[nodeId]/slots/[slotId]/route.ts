@@ -29,7 +29,7 @@ import {
 } from '@/lib/firestore-helpers'
 import { CreditManager } from '@/lib/credit-manager'
 import { creditFailureResponse } from '@/lib/credit-response'
-import { generateStoryNode, generateStoryImage, reviewContribution, judgeContent, PromptRejectedError } from '@/lib/ai'
+import { generateStoryNode, generateStoryImage, reviewContribution, judgeContent, buildWorldContext, PromptRejectedError } from '@/lib/ai'
 import { trackGenerationCompleted, trackGenerationFailed } from '@/lib/generation-telemetry'
 import type { ModerationResult } from '@/lib/moderation'
 import { validatePromptLocal } from '@/lib/validate'
@@ -158,21 +158,17 @@ export async function POST(
     // The world's chronicle is shared lore — injected for every story so
     // characters are aware of the legends that prior personal sagas wrote.
     const chronicle = await getWorldChronicle(story.worldId).catch(() => [])
-    const worldCtx = {
-      name: world.name,
-      description: world.description,
-      lore: world.lore,
-      rules: world.rules,
-      tone: world.tone,
+    // Assembled through the single audited seam (buildWorldContext): the chronicle
+    // is read with story.worldId and passed in here, so only THIS world's legends
+    // can reach the prompt — never another world's.
+    const worldCtx = buildWorldContext(world, {
       rating: effectiveRating,
       protagonist,
       characters: story.characters,
       director: story.director,
       chronicle: chronicle.map((e) => e.text),
-      genesis: world.genesis,
-      storySettings: world.storySettings,
       styleChoices: story.styleChoices,
-    }
+    })
 
     // Autonomous Editor: void genuinely illegitimate / world-breaking entries
     // (no chapter is generated for them), and silently fix typos & grammar while

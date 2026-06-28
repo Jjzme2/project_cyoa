@@ -403,7 +403,9 @@ export default function NewSagaPage() {
               </div>
             )}
             <p className="text-[11px] text-muted-foreground/45">
-              Your standing carries across every saga in this world — its people remember how you&apos;ve treated them.
+              Your standing and this world&apos;s legends carry across every saga set in{' '}
+              <strong>{selectedWorld?.name ?? 'this world'}</strong> — and nowhere else. Each world is
+              self-contained: what happens here never bleeds into another.
             </p>
           </div>
 
