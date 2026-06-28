@@ -49,6 +49,7 @@ export default function NewSagaPage() {
   ])
   const [shared, setShared] = useState(true)
   const [director, setDirector] = useState<DirectorPersona>(emptyDirector)
+  const [styleChoices, setStyleChoices] = useState<Record<string, string>>({})
   const [coverTheme, setCoverTheme] = useState<CoverTheme>(DEFAULT_COVER)
   const [readingTheme, setReadingTheme] = useState<ReadingTheme>({ pageStyle: 'parchment', ambientEffect: 'none' })
   const [hasDraft, setHasDraft] = useState(false)
@@ -150,6 +151,9 @@ export default function NewSagaPage() {
           shared,
           premise: premise.trim() || null,
           entryPoints: readyEntries.map((ep) => ({ label: ep.label.trim(), premise: ep.premise.trim() })),
+          styleChoices: styleOptions.length > 0
+            ? Object.fromEntries(styleOptions.map((o) => [o.label, styleChoices[o.label] ?? o.choices[0]]))
+            : undefined,
           director: isDirectorMeaningful(director)
             ? { ...director, vision: (director.vision ?? '').trim() }
             : undefined,
@@ -202,6 +206,8 @@ export default function NewSagaPage() {
       </main>
     )
   }
+
+  const styleOptions = worlds.find((w) => w.id === worldId)?.storySettings?.styleOptions ?? []
 
   const worldRating = worlds.find((w) => w.id === worldId)?.rating
   const allowedRatings = worldRating
@@ -434,6 +440,34 @@ export default function NewSagaPage() {
         <div className="glass-card rounded-xl p-6 space-y-4">
           <DirectorControls value={director} onChange={setDirector} />
         </div>
+
+        {styleOptions.length > 0 && (
+          <div className="glass-card rounded-xl p-6 space-y-3">
+            <div>
+              <Label className="text-sm font-medium text-foreground/65 block">This world&apos;s style choices</Label>
+              <p className="text-[11px] text-muted-foreground/45 mt-1">
+                {worlds.find((w) => w.id === worldId)?.name} lets each saga pick how these are handled.
+              </p>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {styleOptions.map((opt) => (
+                <div key={opt.label} className="space-y-1.5">
+                  <Label htmlFor={`style-${opt.label}`} className="text-xs text-muted-foreground/60">{opt.label}</Label>
+                  <select
+                    id={`style-${opt.label}`}
+                    value={styleChoices[opt.label] ?? opt.choices[0]}
+                    onChange={(e) => setStyleChoices((prev) => ({ ...prev, [opt.label]: e.target.value }))}
+                    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    {opt.choices.map((c) => (
+                      <option key={c} value={c} className="bg-background">{c}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ── Share ── */}
         <div className="glass-card rounded-xl p-6 space-y-2">

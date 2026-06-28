@@ -7,6 +7,7 @@ import { adminAuth } from '@/lib/firebase-admin'
 import { getStories, createStory, getWorld, checkAndAwardAchievements } from '@/lib/firestore-helpers'
 import { clampRating } from '@/lib/ratings'
 import { sanitizeDirector } from '@/lib/director'
+import { sanitizeStyleChoices } from '@/lib/story-style'
 import { analytics } from '@/lib/telemetry'
 import { CONTENT_RATINGS, DEFAULT_CONTENT_RATING } from '@/types'
 import type { CoverTheme, ReadingTheme, ResourceDefinition } from '@/types'
@@ -31,6 +32,7 @@ const CreateStorySchema = z.object({
     .loose()
     .optional(),
   director: z.unknown().optional(),
+  styleChoices: z.record(z.string(), z.string()).optional(),
   youMode: z.boolean().optional(),
   shared: z.boolean().optional(),
   goapEnabled: z.boolean().optional(),
@@ -59,7 +61,7 @@ export async function POST(req: NextRequest) {
 
   const parsed = await parseJson(req, CreateStorySchema)
   if (!parsed.ok) return parsed.response
-  const { title, description, worldId, worldName, coverGradient, resources, tags, coverTheme, readingTheme, rating, protagonist, director, youMode, shared, goapEnabled, implementQuests } = parsed.data
+  const { title, description, worldId, worldName, coverGradient, resources, tags, coverTheme, readingTheme, rating, protagonist, director, styleChoices, youMode, shared, goapEnabled, implementQuests } = parsed.data
 
   // Authored director persona (optional). Axes are clamped to [-1, 1]; only kept
   // if the author actually set something.
@@ -78,6 +80,9 @@ export async function POST(req: NextRequest) {
   // A story can never be rated more mature than the world that contains it.
   const world = await getWorld(worldId).catch(() => null)
   const safeRating = world?.rating ? clampRating(rating, world.rating) : rating
+  // The story's picks for the world's configurable style options — kept only
+  // when they match an offered choice.
+  const safeStyleChoices = sanitizeStyleChoices(styleChoices, world?.storySettings?.styleOptions)
 
   // Seed the opening cast from the world's genesis canon, so stories begin
   // grounded in the world's real figures (emergent characters still grow on top).
@@ -107,6 +112,7 @@ export async function POST(req: NextRequest) {
     // In "You" mode there's no authored protagonist — the reader is the hero.
     ...(safeProtagonist && !youMode ? { protagonist: safeProtagonist } : {}),
     ...(safeDirector ? { director: safeDirector } : {}),
+    ...(safeStyleChoices ? { styleChoices: safeStyleChoices } : {}),
     tags: Array.isArray(tags) ? tags.slice(0, 5) : [],
     ...(coverTheme   ? { coverTheme }   : {}),
     ...(readingTheme ? { readingTheme } : {}),

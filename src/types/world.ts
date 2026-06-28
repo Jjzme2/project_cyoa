@@ -2,6 +2,18 @@ import type { ContentRating } from './content'
 import type { WorldTheme } from './themes'
 
 /**
+ * A configurable stylistic parameter the world defines (e.g. "Rhyme scheme")
+ * and the choices it offers (e.g. ABAB / ABBA / AABB / Free verse). Each story
+ * in the world picks one choice per option at creation time.
+ */
+export interface WorldStyleOption {
+  /** What's being configured, e.g. "Rhyme scheme". */
+  label: string
+  /** The choices a story may select from. */
+  choices: string[]
+}
+
+/**
  * Authored, world-level storytelling rules that shape HOW every chapter in the
  * world is written (distinct from the per-story Director). Optional throughout.
  */
@@ -12,6 +24,8 @@ export interface WorldStorySettings {
   proseStyles?: string[]
   /** Recurring motifs/imagery the world returns to, woven in where they fit. */
   motifs?: string[]
+  /** Configurable parameters each story chooses from at creation (see WorldStyleOption). */
+  styleOptions?: WorldStyleOption[]
 }
 
 export interface World {

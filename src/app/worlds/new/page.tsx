@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Globe, Loader2, ChevronRight, Sparkles, RotateCcw, Palette } from 'lucide-react'
+import { Globe, Loader2, ChevronRight, Sparkles, RotateCcw, Palette, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -16,6 +16,7 @@ import type { WorldAssistResult } from '@/components/ai/AIAssistModal'
 import { WorldThemeDesigner } from '@/components/world/WorldThemeDesigner'
 import { DEFAULT_WORLD_THEME, themeForTone } from '@/components/world/world-theme'
 import { useDraft } from '@/hooks/useDraft'
+import { STYLE_OPTION_PRESETS, CURATED_STYLE_BUNDLES, applyBundle } from '@/lib/world-style-presets'
 
 const TONE_OPTIONS = [
   'Epic Fantasy',
@@ -53,6 +54,7 @@ interface WorldDraft {
   theme: WorldTheme
 }
 
+
 export default function NewWorldPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
@@ -73,6 +75,9 @@ export default function NewWorldPage() {
   const [mandate, setMandate] = useState('')
   const [proseStyles, setProseStyles] = useState('') // one per line
   const [motifs, setMotifs] = useState('') // comma- or newline-separated
+  // Configurable style parameters each story in this world will choose from
+  // (e.g. label "Rhyme scheme", choices "ABAB, ABBA, AABB, Free verse").
+  const [styleOptions, setStyleOptions] = useState<{ label: string; choices: string }[]>([])
 
   const draft = useDraft<WorldDraft>('chronicle:draft:world')
 
@@ -133,6 +138,9 @@ export default function NewWorldPage() {
             mandate: mandate.trim() || undefined,
             proseStyles: proseStyles.split('\n').map((s) => s.trim()).filter(Boolean),
             motifs: motifs.split(/[,\n]/).map((s) => s.trim()).filter(Boolean),
+            styleOptions: styleOptions
+              .map((o) => ({ label: o.label.trim(), choices: o.choices.split(',').map((c) => c.trim()).filter(Boolean) }))
+              .filter((o) => o.label && o.choices.length > 0),
           },
         }),
       })
@@ -394,6 +402,94 @@ export default function NewWorldPage() {
               value={motifs}
               onChange={(e) => setMotifs(e.target.value)}
             />
+          </div>
+
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground/60">
+                Style options{' '}
+                <span className="text-muted-foreground/45">— each story picks one choice per option at creation</span>
+              </Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setStyleOptions((prev) => [...prev, { label: '', choices: '' }])}
+                className="text-xs gap-1 border-white/10 hover:bg-white/5 h-7"
+              >
+                <Plus className="h-3 w-3" /> Add option
+              </Button>
+            </div>
+
+            {/* Curated profiles — one click configures several coherent options. */}
+            <div className="space-y-1.5">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground/40 font-sans">Curated profiles</p>
+              <div className="flex flex-wrap gap-1.5">
+                {CURATED_STYLE_BUNDLES.map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    title={b.description}
+                    onClick={() => setStyleOptions((prev) => applyBundle(prev, b))}
+                    className="px-2.5 py-1 rounded-md text-[11px] font-sans border border-white/10 text-muted-foreground/65 hover:border-violet-500/30 hover:text-violet-200/85 transition-all"
+                  >
+                    {b.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Single quick-add options. */}
+            <div className="flex flex-wrap gap-1.5">
+              {STYLE_OPTION_PRESETS.map((p) => {
+                const added = styleOptions.some((o) => o.label.trim().toLowerCase() === p.label.toLowerCase())
+                return (
+                  <button
+                    key={p.label}
+                    type="button"
+                    disabled={added}
+                    onClick={() => setStyleOptions((prev) => [...prev, { label: p.label, choices: p.choices }])}
+                    className={`px-2 py-1 rounded-md text-[11px] font-sans border transition-all ${
+                      added
+                        ? 'border-white/5 text-muted-foreground/30 cursor-default'
+                        : 'border-white/10 text-muted-foreground/60 hover:border-amber-500/25 hover:text-amber-200/80'
+                    }`}
+                  >
+                    + {p.label}
+                  </button>
+                )
+              })}
+            </div>
+
+            {styleOptions.map((opt, i) => (
+              <div key={i} className="flex gap-2 items-start">
+                <Input
+                  placeholder="Label — e.g. Rhyme scheme"
+                  value={opt.label}
+                  onChange={(e) =>
+                    setStyleOptions((prev) => prev.map((o, j) => (j === i ? { ...o, label: e.target.value } : o)))
+                  }
+                  className="w-44 h-9 text-xs"
+                />
+                <Input
+                  placeholder="Choices, comma-separated — e.g. ABAB, ABBA, AABB, Free verse"
+                  value={opt.choices}
+                  onChange={(e) =>
+                    setStyleOptions((prev) => prev.map((o, j) => (j === i ? { ...o, choices: e.target.value } : o)))
+                  }
+                  className="flex-1 h-9 text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setStyleOptions((prev) => prev.filter((_, j) => j !== i))}
+                  className="h-9 px-2 text-red-400/70 hover:text-red-300 hover:bg-red-500/10"
+                >
+                  ×
+                </Button>
+              </div>
+            ))}
           </div>
         </div>
 
