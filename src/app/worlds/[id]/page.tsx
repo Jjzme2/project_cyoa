@@ -14,6 +14,7 @@ import { GenerateGenesisButton } from '@/components/world/GenerateGenesisButton'
 import { OutsiderRegard } from '@/components/world/OutsiderRegard'
 import { MultiverseSettings } from '@/components/world/MultiverseSettings'
 import { WorldPortal } from '@/components/world/WorldPortal'
+import { ShareImageButton } from '@/components/share/ShareImageButton'
 import { themeForTone, DEFAULT_WORLD_THEME } from '@/components/world/world-theme'
 import { getWorld, getStoriesByWorld, getWorldChronicle, getWorldLegends, getWorldOutsiderRegard } from '@/lib/firestore-helpers'
 import { APP_CONFIG } from '@/lib/config'
@@ -132,13 +133,19 @@ async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
           </div>
         )}
 
-        <div className="flex gap-3 pt-1">
+        <div className="flex gap-3 pt-1 flex-wrap items-center">
           <Link href={`/stories/new?world=${encodeURIComponent(world.id)}`}>
             <Button className="gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300">
               <Plus className="h-4 w-4" />
               Start a story here
             </Button>
           </Link>
+          <ShareImageButton
+            cardUrl={`/api/share-card/world/${world.id}`}
+            filename={`chronicle-world-${world.id}`}
+            shareTitle={world.name}
+            label="Share this world"
+          />
         </div>
       </section>
 

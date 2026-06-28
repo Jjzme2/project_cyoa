@@ -18,7 +18,9 @@ interface OgImageOptions {
   subtitle?: string
 }
 
-function clamp(text: string, max: number): string {
+/** Trim `text` to at most `max` chars, appending an ellipsis when cut. Shared
+ * with the portrait Share Card renderer. */
+export function clamp(text: string, max: number): string {
   const t = text.trim()
   return t.length <= max ? t : t.slice(0, max - 1).trimEnd() + '…'
 }
