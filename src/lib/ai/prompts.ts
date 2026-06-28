@@ -64,23 +64,31 @@ function chronicleBlock(chronicle?: string[]): string {
 
 /**
  * Injects legends from explicitly-connected worlds — the multiverse layer. These
- * are clearly framed as foreign: they may surface only as distant rumour or myth,
- * never as this world's own history, and never override its canon. Renders
- * nothing unless the world declared a connection AND that world has legends, so
- * an unconnected world stays fully isolated.
+ * are clearly framed as foreign: a sparse reservoir of distant rumour the model
+ * may dip into rarely, never as this world's own history and never overriding its
+ * canon. Renders nothing unless the world declared a connection AND that world
+ * has legends, so an unconnected world stays fully isolated.
+ *
+ * Two readability tunings: only a small window of rumours is shown per chapter
+ * (a faint drift, not a digest), and the window ROTATES by chapter index so a
+ * long story hears different rumours over time instead of the same ones repeating.
  */
-function multiverseBlock(echoes?: WorldEcho[]): string {
+function multiverseBlock(echoes: WorldEcho[] | undefined, chapterIndex = 0): string {
   if (!echoes || echoes.length === 0) return ''
-  const lines = echoes
-    .slice(0, 3)
-    .flatMap((e) => {
-      const legends = (e.legends ?? []).filter((l) => l.trim()).slice(0, 2)
-      if (legends.length === 0) return []
-      const via = e.nexus?.trim() ? ` (linked by ${e.nexus.trim()})` : ''
-      return legends.map((l) => `- From ${e.worldName}${via}: ${l}`)
-    })
+  // Flatten to candidate rumour lines, each tagged with its source world.
+  const lines = echoes.flatMap((e) => {
+    const via = e.nexus?.trim() ? ` (linked by ${e.nexus.trim()})` : ''
+    return (e.legends ?? [])
+      .filter((l) => l.trim())
+      .map((l) => `- From ${e.worldName}${via}: ${l.trim()}`)
+  })
   if (lines.length === 0) return ''
-  return `\nMULTIVERSE ECHOES (faint legends drifting in from OTHER worlds connected to this one — they are from ELSEWHERE: reference them only as distant rumour, myth, or a traveller's tale, NEVER as this world's own history, and never let them contradict or override the canon above):\n${lines.join('\n')}\n`
+  // Surface at most two, rotating the starting point by chapter so the rumours a
+  // reader hears change as the story goes on.
+  const start = ((chapterIndex % lines.length) + lines.length) % lines.length
+  const shown =
+    lines.length <= 2 ? lines : [lines[start], lines[(start + 1) % lines.length]]
+  return `\nMULTIVERSE ECHOES (a reservoir of distant rumour drifting in from OTHER worlds linked to this one — they are from ELSEWHERE. Draw on them SPARINGLY: most chapters should not touch them at all. At most, let ONE surface as a passing rumour, myth, or traveller's tale, and only where it already fits — otherwise ignore them this chapter. Never present them as this world's own history, and never let them contradict or override the canon above):\n${shown.join('\n')}\n`
 }
 
 /** Translate the authored director persona into directorial guidance for the prompt. */
@@ -136,7 +144,7 @@ WORLD RULES: ${world.rules}
 TONE: ${world.tone}
 
 ${ratingGuidance(world.rating)}
-${castBlock(world)}${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${multiverseBlock(world.echoes)}${directorBlock(world.director)}${worldStyleBlock(world.storySettings, storyPath.length, world.styleChoices)}
+${castBlock(world)}${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${multiverseBlock(world.echoes, storyPath.length)}${directorBlock(world.director)}${worldStyleBlock(world.storySettings, storyPath.length, world.styleChoices)}
 STORY PATH SO FAR:
 ${pathContent}
 
