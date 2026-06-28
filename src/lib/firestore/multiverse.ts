@@ -5,6 +5,30 @@ import type { WorldEcho } from '@/lib/ai/prompts'
 import type { ContentRating, WorldLink } from '@/types'
 
 /**
+ * Validate and normalize explicit link inputs into stored WorldLinks: each
+ * target must exist, its REAL name is taken from the loaded world (never a
+ * client label), self-links are dropped, deduped, and capped. Shared by world
+ * creation and editing so both resolve links identically.
+ */
+export async function resolveWorldLinks(
+  inputs: { worldId: string; nexus?: string }[],
+  { excludeWorldId, cap = 5 }: { excludeWorldId?: string; cap?: number } = {},
+): Promise<WorldLink[]> {
+  const seen = new Set<string>()
+  const out: WorldLink[] = []
+  for (const l of inputs.slice(0, 8)) {
+    if (!l.worldId || l.worldId === excludeWorldId || seen.has(l.worldId)) continue
+    seen.add(l.worldId)
+    const target = await getWorld(l.worldId).catch(() => null)
+    if (!target) continue
+    const nexus = l.nexus?.trim().slice(0, 120)
+    out.push({ worldId: l.worldId, worldName: target.name, ...(nexus ? { nexus } : {}) })
+    if (out.length >= cap) break
+  }
+  return out
+}
+
+/**
  * Gather the multiverse pool's echoes for ONE world: the legends of the OTHER
  * worlds that share this world's multiverse, bundled per source world. Bounded
  * (a few worlds, a couple of legends each) so prompts stay small. Returns an
