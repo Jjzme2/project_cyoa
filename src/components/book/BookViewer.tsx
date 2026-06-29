@@ -11,6 +11,7 @@ import { SaveSlotPicker, loadSaveSlots, getActiveSlotId, upsertSaveSlot } from '
 import { SharePathButton } from './SharePathButton'
 import { BeginSagaControl } from './BeginSagaControl'
 import { LivingWorldPanel } from './LivingWorldPanel'
+import { EndingReveal } from './EndingReveal'
 import { BookmarkButton } from './BookmarkButton'
 import { GalleryButton } from './GalleryButton'
 import { AmbientBackground } from './AmbientBackground'
@@ -141,7 +142,12 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
       props: { storyId: story.id, nodeId: n.id, isNew },
     })
     if (!isNew) return
-    const next = [...prev, { id: n.id, excerpt: (n.content || '').slice(0, 140) }]
+    const next = [...prev, {
+      id: n.id,
+      excerpt: (n.content || '').slice(0, 140),
+      ...(n.endingTitle ? { title: n.endingTitle } : {}),
+      ...(n.endingType ? { type: n.endingType } : {}),
+    }]
     saveDiscoveredEndings(story.id, next)
     setDiscoveredEndings(next)
     toast.success(endingCount ? `Ending discovered! (${next.length}/${endingCount})` : 'Ending discovered!')
@@ -811,24 +817,37 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
                 className="absolute top-4 right-4 w-8 h-8 opacity-15 pointer-events-none select-none"
                 style={{ backgroundImage: 'radial-gradient(circle at top right, oklch(0.45 0.10 60) 0%, transparent 70%)' }}
               />
-              {node.worldPulse && (
-                <div className="mb-4">
-                  <LivingWorldPanel pulse={node.worldPulse} />
-                </div>
+              {node.isEnding ? (
+                <EndingReveal
+                  storyId={story.id}
+                  nodeId={node.id}
+                  title={node.endingTitle ?? 'The End'}
+                  type={node.endingType ?? 'bittersweet'}
+                  discovered={discoveredEndings.length}
+                  total={endingCount}
+                />
+              ) : (
+                <>
+                  {node.worldPulse && (
+                    <div className="mb-4">
+                      <LivingWorldPanel pulse={node.worldPulse} />
+                    </div>
+                  )}
+                  <ChoiceSlots
+                    storyId={story.id}
+                    nodeId={node.id}
+                    slots={node.slots}
+                    onChoiceSelect={goToNode}
+                    onSlotFilled={handleSlotFilled}
+                    onModerated={refreshCurrentNode}
+                    currentResources={resources}
+                    storyResources={story.resources}
+                    storyCharacters={story.characters}
+                    protagonist={story.protagonist}
+                    isSaga={!!story.youMode}
+                  />
+                </>
               )}
-              <ChoiceSlots
-                storyId={story.id}
-                nodeId={node.id}
-                slots={node.slots}
-                onChoiceSelect={goToNode}
-                onSlotFilled={handleSlotFilled}
-                onModerated={refreshCurrentNode}
-                currentResources={resources}
-                storyResources={story.resources}
-                storyCharacters={story.characters}
-                protagonist={story.protagonist}
-                isSaga={!!story.youMode}
-              />
               <p className="mt-4 text-center text-[10px] font-sans opacity-20 tracking-widest select-none">
                 — {pageNumber * 2} —
               </p>

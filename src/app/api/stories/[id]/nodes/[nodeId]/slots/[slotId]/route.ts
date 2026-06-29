@@ -41,6 +41,7 @@ import { validatePromptLocal } from '@/lib/validate'
 import { moderateText, moderationToNodeFields } from '@/lib/moderation'
 import { NarrativeBuilder } from '@/lib/engine/narrative-builder'
 import { buildWorldPulse } from '@/lib/engine/world-pulse'
+import { endingDirective } from '@/lib/engine/ending'
 import type { WorldPulse } from '@/types'
 import type { WorldState } from '@/types/goap'
 import type { AgentMemory } from '@/types/goap'
@@ -264,13 +265,18 @@ export async function POST(
       nodeWorldPulse = buildWorldPulse(context, nextState)
     }
 
-    const { content, choices, model, newCharacters, location } = await generateStoryNode(
+    // Decide whether the engine invites the story to conclude this chapter
+    // (rare, earned — see endingDirective). The model still chooses to take it.
+    const endDirective = endingDirective(parentNode.depth + 1, updatedEngineState)
+
+    const { content, choices, model, newCharacters, location, ending } = await generateStoryNode(
       worldCtx,
       storyPath,
       editedPrompt,
       uid,
       includeImage,
-      systemNarrativeEvents
+      systemNarrativeEvents,
+      endDirective,
     )
 
     // Moderate the generated prose. The rules-based check is the reliable floor;
@@ -345,6 +351,7 @@ export async function POST(
           ...(location ? { location } : {}),
           ...(updatedEngineState ? { engineState: updatedEngineState } : {}),
           ...(nodeWorldPulse ? { worldPulse: nodeWorldPulse } : {}),
+          ...(ending ? { isEnding: true, endingTitle: ending.title, endingType: ending.type } : {}),
         },
         choices,
         moderationFields,

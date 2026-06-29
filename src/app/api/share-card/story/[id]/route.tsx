@@ -1,5 +1,15 @@
 import { getStory, getStoryNode } from '@/lib/firestore-helpers'
 import { renderShareCard, rarityStat, type ShareCardStat } from '@/lib/share-card'
+import type { EndingType } from '@/types'
+
+/** Per-ending-type label + accent for the share card (mirrors the in-app reveal). */
+const ENDING_CARD_META: Record<EndingType, { label: string; accent: string }> = {
+  triumphant: { label: 'A triumphant ending', accent: '#f5d896' },
+  tragic: { label: 'A tragic ending', accent: '#f08a8a' },
+  bittersweet: { label: 'A bittersweet ending', accent: '#c4a3e8' },
+  mysterious: { label: 'A mysterious ending', accent: '#7fd1d1' },
+  secret: { label: 'A secret ending', accent: '#6ee7b7' },
+}
 
 /**
  * Portrait Share Card for a story, or — with `?node=<id>` — for a specific
@@ -27,14 +37,19 @@ export async function GET(
       if (rarity) stats.push(rarity)
       stats.push({ value: `${node.depth + 1}`, label: node.depth === 0 ? 'chapter' : 'chapters deep' })
 
+      // A definitive, typed ending gets its own title, type label, and colour —
+      // the high-virality share card. Falls back to the generic ending framing.
+      const meta = node.isEnding && node.endingType ? ENDING_CARD_META[node.endingType] : null
+
       return renderShareCard({
         kind: 'ending',
-        eyebrow: 'An ending of',
-        title: story.title,
-        subtitle: node.choiceText ? `“${node.choiceText}”` : story.description,
+        eyebrow: meta ? meta.label : 'An ending of',
+        title: node.isEnding && node.endingTitle ? node.endingTitle : story.title,
+        subtitle: node.isEnding && node.endingTitle ? `${story.title} · ${story.worldName}` : (node.choiceText ? `“${node.choiceText}”` : story.description),
         imageUrl: node.imageUrl ?? undefined,
         stats,
         footerNote: `in ${story.worldName}`,
+        ...(meta ? { accent: meta.accent } : {}),
       })
     }
   }

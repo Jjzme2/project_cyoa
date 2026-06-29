@@ -231,6 +231,9 @@ export async function createStoryNode(
     moderationFields?.moderation ?? { status: 'approved', reviewedBy: null, reviewedAt: null }
   await ref.set({ ...data, published, moderation, createdAt: new Date().toISOString() })
 
+  // A definitive ending is terminal — it gets no onward choice slots.
+  if (data.isEnding) return ref.id
+
   const batch = adminDb.batch()
   for (let i = 0; i < 3; i++) {
     const slotRef = slotsRef(data.storyId, ref.id).doc()

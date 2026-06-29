@@ -1,10 +1,13 @@
-import type { StoryNode } from '@/types'
+import type { StoryNode, EndingType } from '@/types'
 
 export type ResourceMap = Record<string, number | string | string[] | number[]>
 
 export interface DiscoveredEnding {
   id: string
   excerpt: string
+  /** Set for an authored, definitive ending (vs. an unwritten frontier). */
+  title?: string
+  type?: EndingType
 }
 
 const ENDINGS_KEY = (storyId: string) => `cyoa:endings:${storyId}`

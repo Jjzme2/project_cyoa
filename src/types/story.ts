@@ -3,6 +3,12 @@ import type { Protagonist, StoryCharacter, DirectorPersona } from './characters'
 import type { CoverTheme, ReadingTheme } from './themes'
 import type { EngineState } from './engine'
 
+// ─── Endings ─────────────────────────────────────────────────────────────────
+/** The emotional register of a story's conclusion — drives the reveal animation,
+ * the share card's look, and ending-based achievements. */
+export const ENDING_TYPES = ['triumphant', 'tragic', 'bittersweet', 'mysterious', 'secret'] as const
+export type EndingType = (typeof ENDING_TYPES)[number]
+
 // ─── Living World pulse (reader-facing simulation snapshot) ──────────────────
 /** A compact, human-readable snapshot of the engine at a chapter, for the
  * reader's "Living World" panel. Built server-side; the client only renders it. */
@@ -154,6 +160,13 @@ export interface StoryNode {
    * (tension, factions, economy, cast mood) — computed server-side from the
    * engine so the reader can SEE the world move. */
   worldPulse?: WorldPulse
+  /** When true, this chapter is a definitive conclusion: no choice slots, a
+   * "The End" reveal, and a place in the endings collector. */
+  isEnding?: boolean
+  /** A short, evocative title for the ending (e.g. "The Crown Reforged"). */
+  endingTitle?: string
+  /** The ending's emotional register — drives the reveal + share card. */
+  endingType?: EndingType
   /** Serialised simulation state at this node (factions, economy, agent memories). */
   engineState?: EngineState
   /** Content Judge craft score (0-100); informational, for future ranking. */

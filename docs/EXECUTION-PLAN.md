@@ -46,6 +46,15 @@ The prioritized backlog. Companion to `ROADMAP.md` (history), `GROWTH-STRATEGY.m
 
 ## Tier 2 — Stickiness & growth
 
+- [x] **Story endings (v1).** Stories can now genuinely *conclude*. The engine
+  invites an ending — rarely, only when earned — past a minimum depth and when
+  the plot through-line resolves, the path runs long, or tension spikes and
+  settles; the model writes a final chapter and emits `ENDING: title | type`
+  (triumphant / tragic / bittersweet / mysterious / secret). The node is terminal
+  (no slots), gets an **animated, type-themed "The End" reveal** in the reader,
+  and a **type-coloured share card** (the viral payoff). +8 tests.
+  _v2 follow-up: author win/lose conditions (resource thresholds → forced
+  triumphant/tragic endings) need resource-condition plumbing + author UI._
 - [ ] **9. Narrative-aware achievements** (secret endings, NPC bonds, faction
   outcomes, "path chosen by N readers") — each auto-generating a share card.
 - [ ] **10. In-app discovery** — a public-rooms lobby and a bounty-board page
