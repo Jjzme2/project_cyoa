@@ -144,6 +144,8 @@ export async function POST(req: NextRequest) {
         appearance,
       }).catch(() => {})
     }
+    // Refresh the cached character directory + this world's cast.
+    revalidateTag('characters', 'max')
   })
 
   revalidateTag('stories', 'max')

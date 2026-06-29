@@ -1,4 +1,5 @@
 import { adminDb } from '../firebase-admin'
+import { cacheLife, cacheTag } from 'next/cache'
 import { characterId } from '../characters'
 import type { Character, CharacterAppearance, CharacterScope } from '@/types'
 
@@ -11,6 +12,10 @@ function charactersCollection() {
 }
 
 export async function getCharacter(id: string): Promise<Character | null> {
+  'use cache'
+  cacheLife('minutes')
+  cacheTag(`character-${id}`, 'characters')
+
   const doc = await charactersCollection().doc(id).get()
   if (!doc.exists) return null
   return { id: doc.id, ...doc.data() } as Character
@@ -18,12 +23,20 @@ export async function getCharacter(id: string): Promise<Character | null> {
 
 /** Directory listing, most-recently-active first. */
 export async function listCharacters(limit = 60): Promise<Character[]> {
+  'use cache'
+  cacheLife('minutes')
+  cacheTag('characters')
+
   const snap = await charactersCollection().orderBy('updatedAt', 'desc').limit(limit).get()
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Character))
 }
 
 /** Characters that have appeared in a given world (canon figures + visiting heroes). */
 export async function getCharactersByWorld(worldId: string, limit = 40): Promise<Character[]> {
+  'use cache'
+  cacheLife('minutes')
+  cacheTag(`characters-world-${worldId}`, 'characters')
+
   const snap = await charactersCollection().where('worldIds', 'array-contains', worldId).limit(limit).get()
   return snap.docs
     .map((d) => ({ id: d.id, ...d.data() } as Character))

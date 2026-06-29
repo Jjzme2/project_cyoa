@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, connection } from 'next/server'
 import { getLiveSeasons } from '@/lib/firestore-helpers'
 
 /**
@@ -7,6 +7,7 @@ import { getLiveSeasons } from '@/lib/firestore-helpers'
  * be seen by everyone.
  */
 export async function GET() {
+  await connection() // depends on current time — never prerender
   const seasons = await getLiveSeasons()
   return NextResponse.json(
     { seasons },

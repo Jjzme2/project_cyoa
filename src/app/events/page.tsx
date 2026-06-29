@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
+import { connection } from 'next/server'
 import Link from 'next/link'
 import { Sparkles, CalendarRange, Feather } from 'lucide-react'
 import { getLiveSeasons } from '@/lib/firestore-helpers'
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
 }
 
 async function EventsContent() {
+  await connection() // live data — render at request time (Cache Components)
   const seasons = await getLiveSeasons()
   const now = new Date()
 
