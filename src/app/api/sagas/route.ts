@@ -10,9 +10,11 @@ import {
   getWorld,
   getMultiverseEchoes,
   getLinkedEchoes,
+  getMultiverseCameos,
+  getLinkedCameos,
   checkAndAwardAchievements,
 } from '@/lib/firestore-helpers'
-import { mergeEchoes } from '@/lib/multiverse'
+import { mergeEchoes, mergeCameos } from '@/lib/multiverse'
 import { CreditManager } from '@/lib/credit-manager'
 import { creditFailureResponse } from '@/lib/credit-response'
 import { generateSagaOpening, buildWorldContext, PromptRejectedError } from '@/lib/ai'
@@ -126,22 +128,30 @@ export async function POST(req: NextRequest) {
     // Multiverse pool: a fresh saga carries no chronicle of its own (the reader
     // just arrived), but the WORLD's declared multiverse is canon — so its
     // sibling worlds' legends may drift in as clearly-foreign echoes.
-    const [poolEchoes, linkEchoes] = await Promise.all([
+    const [poolEchoes, linkEchoes, poolCameos, linkCameos] = await Promise.all([
       world.multiverse?.id
         ? getMultiverseEchoes(world.multiverse.id, worldId, { maxRating: effectiveRating }).catch(() => [])
         : Promise.resolve([]),
       world.links?.length
         ? getLinkedEchoes(world.links, { maxRating: effectiveRating }).catch(() => [])
         : Promise.resolve([]),
+      world.multiverse?.id
+        ? getMultiverseCameos(world.multiverse.id, worldId, { maxRating: effectiveRating }).catch(() => [])
+        : Promise.resolve([]),
+      world.links?.length
+        ? getLinkedCameos(world.links, { maxRating: effectiveRating }).catch(() => [])
+        : Promise.resolve([]),
     ])
     const echoes = mergeEchoes(poolEchoes, linkEchoes)
+    const cameos = mergeCameos(poolCameos, linkCameos)
     // Assembled through the single audited seam: this context can only ever carry
-    // THIS world's data plus the echoes its own multiverse membership opted into.
+    // THIS world's data plus the echoes/cameos its own multiverse membership opted into.
     const worldCtx = buildWorldContext(world, {
       rating: effectiveRating,
       director: safeDirector ?? undefined,
       styleChoices: safeStyleChoices ?? undefined,
       echoes,
+      cameos,
     })
 
     // Render every entry point's opening. If any single one is rejected by the

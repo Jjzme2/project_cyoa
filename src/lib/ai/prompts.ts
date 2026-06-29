@@ -28,6 +28,12 @@ export interface WorldContext {
    * connection; otherwise the world is fully isolated.
    */
   echoes?: WorldEcho[]
+  /**
+   * Notable figures from OTHER worlds this world is explicitly connected to, who
+   * may RARELY appear as a crossing guest. Present only on a declared connection
+   * (same gating as echoes); otherwise the world is fully isolated.
+   */
+  cameos?: CharacterCameo[]
 }
 
 /** A bundle of legends echoing in from one connected world. */
@@ -38,6 +44,16 @@ export interface WorldEcho {
   nexus?: string
   /** A few of that world's legends, to surface only as distant rumor. */
   legends: string[]
+}
+
+/** A bundle of notable figures from one connected world who may cameo as guests. */
+export interface CharacterCameo {
+  /** The connected world's name. */
+  worldName: string
+  /** How it is linked to this world, in-world (e.g. "a shimmering rift"). */
+  nexus?: string
+  /** A few of that world's figures, surfaced only as rare crossing visitors. */
+  figures: { name: string; note?: string }[]
 }
 
 /** Injects the world's generated canon so stories draw on its powers, figures, and history. */
@@ -89,6 +105,31 @@ function multiverseBlock(echoes: WorldEcho[] | undefined, chapterIndex = 0): str
   const shown =
     lines.length <= 2 ? lines : [lines[start], lines[(start + 1) % lines.length]]
   return `\nMULTIVERSE ECHOES (a reservoir of distant rumour drifting in from OTHER worlds linked to this one — they are from ELSEWHERE. Draw on them SPARINGLY: most chapters should not touch them at all. At most, let ONE surface as a passing rumour, myth, or traveller's tale, and only where it already fits — otherwise ignore them this chapter. Never present them as this world's own history, and never let them contradict or override the canon above):\n${shown.join('\n')}\n`
+}
+
+/**
+ * Injects notable figures from explicitly-connected worlds — the character-cameo
+ * layer, the people-counterpart to {@link multiverseBlock}. Same isolation rule:
+ * renders nothing unless the world declared a connection AND that world has
+ * figures, so an unconnected world stays fully isolated. A crossing visitor is a
+ * rare event, framed as plainly foreign — never a native of this world, never
+ * overriding its canon. Sparse and rotating by chapter index, like the echoes.
+ */
+function cameoBlock(cameos: CharacterCameo[] | undefined, chapterIndex = 0): string {
+  if (!cameos || cameos.length === 0) return ''
+  const lines = cameos.flatMap((c) => {
+    const via = c.nexus?.trim() ? ` (linked by ${c.nexus.trim()})` : ''
+    return (c.figures ?? [])
+      .filter((f) => f.name?.trim())
+      .map((f) => {
+        const note = f.note?.trim() ? ` — ${f.note.trim()}` : ''
+        return `- ${f.name.trim()}, of ${c.worldName}${via}${note}`
+      })
+  })
+  if (lines.length === 0) return ''
+  const start = ((chapterIndex % lines.length) + lines.length) % lines.length
+  const shown = lines.length <= 2 ? lines : [lines[start], lines[(start + 1) % lines.length]]
+  return `\nCROSSWORLD VISITORS (figures from OTHER worlds linked to this one — they are NATIVES OF ELSEWHERE, not of this world. A crossing is RARE: most chapters should not touch them at all. At most, let ONE arrive as an unexpected guest, and only where it already fits — otherwise ignore them this chapter. Never present them as belonging to this world, and never let them override the canon above):\n${shown.join('\n')}\n`
 }
 
 /** Translate the authored director persona into directorial guidance for the prompt. */
@@ -144,7 +185,7 @@ WORLD RULES: ${world.rules}
 TONE: ${world.tone}
 
 ${ratingGuidance(world.rating)}
-${castBlock(world)}${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${multiverseBlock(world.echoes, storyPath.length)}${directorBlock(world.director)}${worldStyleBlock(world.storySettings, storyPath.length, world.styleChoices)}
+${castBlock(world)}${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${multiverseBlock(world.echoes, storyPath.length)}${cameoBlock(world.cameos, storyPath.length)}${directorBlock(world.director)}${worldStyleBlock(world.storySettings, storyPath.length, world.styleChoices)}
 STORY PATH SO FAR:
 ${pathContent}
 
@@ -225,7 +266,7 @@ WORLD RULES: ${world.rules}
 TONE: ${world.tone}
 
 ${ratingGuidance(world.rating)}
-${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${multiverseBlock(world.echoes)}${directorBlock(world.director)}${worldStyleBlock(world.storySettings, 0, world.styleChoices)}${sagaPremise.trim() ? `\nSAGA PREMISE (the overall situation this saga drops the reader into — honor it):\n${sagaPremise.trim()}\n` : ''}
+${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${multiverseBlock(world.echoes)}${cameoBlock(world.cameos)}${directorBlock(world.director)}${worldStyleBlock(world.storySettings, 0, world.styleChoices)}${sagaPremise.trim() ? `\nSAGA PREMISE (the overall situation this saga drops the reader into — honor it):\n${sagaPremise.trim()}\n` : ''}
 THIS ENTRY POINT — one of several doorways into the saga the reader could have chosen:
 - How it was offered to the reader: "${entry.label}"
 - What this opening must establish: ${entry.premise}

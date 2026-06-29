@@ -28,8 +28,10 @@ import {
   appendWorldChronicle,
   getMultiverseEchoes,
   getLinkedEchoes,
+  getMultiverseCameos,
+  getLinkedCameos,
 } from '@/lib/firestore-helpers'
-import { mergeEchoes } from '@/lib/multiverse'
+import { mergeEchoes, mergeCameos } from '@/lib/multiverse'
 import { CreditManager } from '@/lib/credit-manager'
 import { creditFailureResponse } from '@/lib/credit-response'
 import { generateStoryNode, generateStoryImage, reviewContribution, judgeContent, buildWorldContext, PromptRejectedError } from '@/lib/ai'
@@ -164,15 +166,24 @@ export async function POST(
     // Multiverse pool: only if THIS world opted into a multiverse do we draw a
     // few legends from its sibling worlds — surfaced as clearly-foreign echoes.
     // An unconnected world is never queried, so nothing crosses in.
-    const [poolEchoes, linkEchoes] = await Promise.all([
+    const [poolEchoes, linkEchoes, poolCameos, linkCameos] = await Promise.all([
       world.multiverse?.id
         ? getMultiverseEchoes(world.multiverse.id, story.worldId, { maxRating: effectiveRating }).catch(() => [])
         : Promise.resolve([]),
       world.links?.length
         ? getLinkedEchoes(world.links, { maxRating: effectiveRating }).catch(() => [])
         : Promise.resolve([]),
+      // Character cameos: same opt-in gating as echoes (figures from connected
+      // worlds may rarely cross in). An unconnected world is never queried.
+      world.multiverse?.id
+        ? getMultiverseCameos(world.multiverse.id, story.worldId, { maxRating: effectiveRating }).catch(() => [])
+        : Promise.resolve([]),
+      world.links?.length
+        ? getLinkedCameos(world.links, { maxRating: effectiveRating }).catch(() => [])
+        : Promise.resolve([]),
     ])
     const echoes = mergeEchoes(poolEchoes, linkEchoes)
+    const cameos = mergeCameos(poolCameos, linkCameos)
     // Assembled through the single audited seam (buildWorldContext): the chronicle
     // is read with story.worldId and passed in here, so only THIS world's legends
     // can reach the prompt — never another world's (save for declared echoes above).
@@ -184,6 +195,7 @@ export async function POST(
       chronicle: chronicle.map((e) => e.text),
       styleChoices: story.styleChoices,
       echoes,
+      cameos,
     })
 
     // Autonomous Editor: void genuinely illegitimate / world-breaking entries

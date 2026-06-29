@@ -1,5 +1,5 @@
 import type { ContentRating, DirectorPersona, Protagonist, StoryCharacter, World } from '@/types'
-import type { WorldContext, WorldEcho } from './prompts'
+import type { WorldContext, WorldEcho, CharacterCameo } from './prompts'
 
 export interface WorldContextOptions {
   /** Effective content rating (e.g. a story's clamped rating); defaults to the world's own. */
@@ -21,6 +21,12 @@ export interface WorldContextOptions {
    * world — there is no implicit cross-world read here.
    */
   echoes?: WorldEcho[]
+  /**
+   * Notable figures from OTHER connected worlds who may cameo, ALREADY READ by
+   * the caller for this exact world's declared connections. Omitted for an
+   * unconnected world — no implicit cross-world read here.
+   */
+  cameos?: CharacterCameo[]
 }
 
 /**
@@ -51,5 +57,6 @@ export function buildWorldContext(world: World, opts: WorldContextOptions = {}):
     ...(opts.chronicle ? { chronicle: opts.chronicle } : {}),
     ...(opts.styleChoices ? { styleChoices: opts.styleChoices } : {}),
     ...(opts.echoes && opts.echoes.length ? { echoes: opts.echoes } : {}),
+    ...(opts.cameos && opts.cameos.length ? { cameos: opts.cameos } : {}),
   }
 }

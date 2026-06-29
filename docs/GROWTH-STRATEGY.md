@@ -113,10 +113,22 @@ per-world Cast section, a Characters nav link, and the character Share Card are
 live. Heroes (author-defined protagonists) and world genesis figures register on
 story creation. Portraits fall back to a name-derived monogram.
 
-**Fold 2+ (next):** generated portraits (reuse the cover-image pipeline);
-surfacing a character's *cameo* into another world's prompt assembly (the
-multiverse crossover); author-claimed/curated characters and community voting;
-richer `CreativeWork`/`Person` JSON-LD + a landscape OG image per character.
+**Fold 2a (shipped):** characters are now first-class *shareable IP* — a
+portrait Share Card, a landscape OG image per character (rich link previews),
+and `Person` JSON-LD.
+
+**Fold 2b (shipped) — the crossover engine:** a character can now *cameo* into
+another world's story. Built to mirror the multiverse echoes exactly: a
+`CharacterCameo` flows ONLY along an existing opt-in connection (shared
+multiverse or an explicit world link), rating-gated identically, and renders in
+a sparse, rotating, clearly-foreign `CROSSWORLD VISITORS` prompt block. The
+isolation invariant holds — an unconnected world gets nothing — and is locked by
+the world-isolation test suite. No new author UI; it rides the connections
+authors already declare.
+
+**Fold 2c (next):** generated portraits (reuse the cover-image pipeline);
+author-claimed/curated characters and community voting; an opt-in "guest star"
+control for hand-picked cameos beyond the automatic connection-based ones.
 
 ---
 
