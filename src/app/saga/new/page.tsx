@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Globe, Loader2, ChevronRight, ChevronLeft, Check, Plus, Palette, Feather, Sparkles, DoorOpen, Trash2, RotateCcw } from 'lucide-react'
@@ -14,7 +14,8 @@ import { STORY_TAGS, CONTENT_RATINGS, CONTENT_RATING_META, DEFAULT_CONTENT_RATIN
 import { ratingRank } from '@/lib/ratings'
 import { CoverDesigner, DEFAULT_COVER } from '@/components/book/CoverDesigner'
 import { useDraft } from '@/hooks/useDraft'
-import type { World, CoverTheme, ReadingTheme, ContentRating, DirectorPersona } from '@/types'
+import { SAGA_HANDOFF_KEY, type SagaHandoff } from '@/lib/saga-handoff'
+import type { World, CoverTheme, ReadingTheme, ContentRating, DirectorPersona, StoryCharacter } from '@/types'
 import { emptyDirector, isDirectorMeaningful } from '@/lib/director'
 import { DirectorControls } from '@/components/story/DirectorControls'
 import { ReadingThemePicker } from '@/components/book/ReadingThemePicker'
@@ -64,12 +65,50 @@ export default function NewSagaPage() {
   const [coverTheme, setCoverTheme] = useState<CoverTheme>(DEFAULT_COVER)
   const [readingTheme, setReadingTheme] = useState<ReadingTheme>({ pageStyle: 'parchment', ambientEffect: 'none' })
   const [hasDraft, setHasDraft] = useState(false)
+  // Canon cast carried over from a saved story, sent as seed characters on submit.
+  const [carriedCharacters, setCarriedCharacters] = useState<StoryCharacter[]>([])
 
   const draft = useDraft<{
     title: string; description: string; worldId: string; rating: ContentRating
     tags: string[]; premise: string; entryPoints: EntryPoint[]; shared: boolean
     director: DirectorPersona; coverTheme: CoverTheme; readingTheme: ReadingTheme
   }>('chronicle:draft:saga')
+
+  // One-shot transfer carried over from the story creator (or a saved story).
+  const handoff = useDraft<SagaHandoff>(SAGA_HANDOFF_KEY)
+  // Set synchronously on mount (before the async worlds fetch resolves) so the
+  // worlds effect can honour the carried-over world.
+  const handoffWorldRef = useRef<string | null>(null)
+
+  // Seed the form from a story handoff exactly once, on mount. The world id is
+  // captured synchronously (above) so it wins over the default selection; the
+  // remaining fields are applied on the next tick to keep the rule against
+  // synchronous setState-in-effect happy.
+  useEffect(() => {
+    const carried = handoff.load()
+    if (!carried) return
+    const d = carried.data
+    if (d.worldId) handoffWorldRef.current = d.worldId
+    handoff.clear()
+    const t = setTimeout(() => {
+      setTitle(d.title ?? '')
+      setDescription(d.description ?? '')
+      setRating(d.rating)
+      setTags(d.tags ?? [])
+      if (d.styleChoices) setStyleChoices(d.styleChoices)
+      if (d.director) setDirector({ ...emptyDirector(), ...d.director })
+      if (d.coverTheme) setCoverTheme(d.coverTheme)
+      if (d.readingTheme) setReadingTheme(d.readingTheme)
+      setShared(d.shared ?? true)
+      if (d.premise) setPremise(d.premise)
+      if (d.entryPoints?.length) {
+        setEntryPoints(d.entryPoints.length >= 2 ? d.entryPoints : [...d.entryPoints, { label: '', premise: '' }])
+      }
+      if (d.characters?.length) setCarriedCharacters(d.characters)
+      toast.success(d.source === 'story' ? 'Brought over from your story' : 'Brought over from your story draft')
+    }, 0)
+    return () => clearTimeout(t)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!loading && !user) router.replace('/')
@@ -118,11 +157,14 @@ export default function NewSagaPage() {
         const list: World[] = data.worlds ?? []
         setWorlds(list)
         if (list.length > 0) {
-          const preselect = new URLSearchParams(window.location.search).get('world')
+          // A world carried over from a story handoff wins over the ?world= param
+          // and the default; and we keep the handoff's rating rather than resetting.
+          const carriedWorld = handoffWorldRef.current
+          const preselect = carriedWorld ?? new URLSearchParams(window.location.search).get('world')
           const match = preselect ? list.find((w) => w.id === preselect) : undefined
           const chosen = match ?? list[0]
           setWorldId(chosen.id)
-          if (chosen.rating) setRating(chosen.rating)
+          if (chosen.rating && !carriedWorld) setRating(chosen.rating)
         }
       })
       .finally(() => setLoadingWorlds(false))
@@ -166,6 +208,7 @@ export default function NewSagaPage() {
           shared,
           premise: premise.trim() || null,
           entryPoints: readyEntries.map((ep) => ({ label: ep.label.trim(), premise: ep.premise.trim() })),
+          seedCharacters: carriedCharacters.length ? carriedCharacters : undefined,
           styleChoices: styleOptions.length > 0
             ? Object.fromEntries(styleOptions.map((o) => [o.label, styleChoices[o.label] ?? o.choices[0]]))
             : undefined,

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { signOut } from 'firebase/auth'
 import { toast } from 'sonner'
-import { BookOpen, Plus, LogOut, Sparkles, Menu, Wand2, KeyRound, Globe, LayoutDashboard, ShieldAlert, Library, User, Users } from 'lucide-react'
+import { BookOpen, Plus, LogOut, Sparkles, Menu, Wand2, KeyRound, Globe, LayoutDashboard, ShieldAlert, Library, User, Users, MessageSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -52,6 +52,10 @@ export function Header() {
       <Link href="/characters" className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
         <Users className="h-3.5 w-3.5 opacity-60" />
         Characters
+      </Link>
+      <Link href="/feedback" className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+        <MessageSquare className="h-3.5 w-3.5 opacity-60" />
+        Feedback
       </Link>
       {user && (
         <>

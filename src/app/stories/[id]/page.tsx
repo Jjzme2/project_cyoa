@@ -6,6 +6,7 @@ import { BookViewerClient } from '@/components/book/BookViewerClient'
 import { GatedStoryReader } from '@/components/book/GatedStoryReader'
 import { StoryRatingControl } from '@/components/story/StoryRatingControl'
 import { ReadTogetherButton } from '@/components/story/ReadTogetherButton'
+import { TurnIntoSagaButton } from '@/components/story/TurnIntoSagaButton'
 import { WorldStandingBadge } from '@/components/story/WorldStandingBadge'
 import { SeededBadge } from '@/components/ContentBadges'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -80,6 +81,7 @@ async function StoryContent({ params }: { params: Promise<{ id: string }> }) {
           {story.seeded && <SeededBadge />}
           <StoryRatingControl storyId={story.id} authorId={story.authorId} rating={story.rating} nodeCount={story.nodeCount} />
           <ReadTogetherButton storyId={story.id} />
+          <TurnIntoSagaButton story={story} />
           {story.youMode && <WorldStandingBadge worldId={story.worldId} worldName={story.worldName} />}
         </div>
       </div>

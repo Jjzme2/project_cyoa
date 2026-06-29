@@ -13,6 +13,7 @@ export * from './story'
 export * from './world'
 export * from './themes'
 export * from './season'
+export * from './feedback'
 
 // EngineState lives in ./engine but is surfaced via @/types for convenience.
 export type { EngineState } from './engine'

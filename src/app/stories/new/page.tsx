@@ -23,6 +23,7 @@ import { AIAssistModal } from '@/components/ai/AIAssistModal'
 import type { StoryAssistResult } from '@/components/ai/AIAssistModal'
 import { CreationWizard, type CreationMode, type WizardStep } from '@/components/creation/CreationWizard'
 import { useDraft } from '@/hooks/useDraft'
+import { SAGA_HANDOFF_KEY, type SagaHandoff } from '@/lib/saga-handoff'
 
 export default function NewStoryPage() {
   const { user, loading } = useAuth()
@@ -71,6 +72,43 @@ export default function NewStoryPage() {
     director: typeof director
     shared: boolean
   }>('chronicle:draft:story')
+
+  // One-shot transfer into the saga creator, so deciding to make a saga mid-way
+  // doesn't discard what's already been written.
+  const sagaHandoff = useDraft<SagaHandoff>(SAGA_HANDOFF_KEY)
+
+  function handoffToSaga() {
+    // Carry the written opening (or the description) as the saga's premise, and
+    // turn the authored protagonist into a seeded doorway — best-effort, since a
+    // saga is played in second person.
+    const seededPremise = (opening.trim() || description.trim()).slice(0, 1000)
+    const doorway = (protagonistDesc.trim() || opening.trim()).slice(0, 600)
+    const entryPoints = doorway
+      ? [
+          {
+            label: (protagonistName.trim() ? `In the path of ${protagonistName.trim()}` : 'Begin your tale').slice(0, 120),
+            premise: doorway,
+          },
+          { label: '', premise: '' },
+        ]
+      : []
+    sagaHandoff.save({
+      title: title.trim(),
+      description: description.trim(),
+      worldId,
+      rating,
+      tags,
+      director,
+      styleChoices,
+      coverTheme,
+      readingTheme,
+      shared,
+      premise: seededPremise,
+      entryPoints,
+      source: 'story-draft',
+    })
+    router.push('/saga/new')
+  }
 
   useEffect(() => {
     if (!loading && !user) router.replace('/')
@@ -442,10 +480,14 @@ export default function NewStoryPage() {
         <p className="text-[11px] text-muted-foreground/55 leading-relaxed">
           Want the reader to play as <em>themselves</em>, with a reputation that follows them across the
           world?{' '}
-          <Link href="/saga/new" className="text-amber-300/85 hover:underline font-medium">
-            Create a Personal Saga
-          </Link>{' '}
-          instead — it’s built for that.
+          <button
+            type="button"
+            onClick={handoffToSaga}
+            className="text-amber-300/85 hover:underline font-medium"
+          >
+            Turn this into a Personal Saga
+          </button>{' '}
+          instead — it’s built for that, and brings your work along.
         </p>
       </div>
     </div>
