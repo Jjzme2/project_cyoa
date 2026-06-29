@@ -40,6 +40,8 @@ import type { ModerationResult } from '@/lib/moderation'
 import { validatePromptLocal } from '@/lib/validate'
 import { moderateText, moderationToNodeFields } from '@/lib/moderation'
 import { NarrativeBuilder } from '@/lib/engine/narrative-builder'
+import { buildWorldPulse } from '@/lib/engine/world-pulse'
+import type { WorldPulse } from '@/types'
 import type { WorldState } from '@/types/goap'
 import type { AgentMemory } from '@/types/goap'
 import type { ChoiceRequirement, ChoiceEffect } from '@/types'
@@ -221,6 +223,7 @@ export async function POST(
     // context is folded into the single generation below.)
     let systemNarrativeEvents = ''
     let updatedEngineState = undefined
+    let nodeWorldPulse: WorldPulse | undefined = undefined
     {
       // Restore prior engine state from the parent node (server-side, not client-trusted)
       const priorEngineState = parentNode.engineState ?? undefined
@@ -257,6 +260,8 @@ export async function POST(
       )
       systemNarrativeEvents = builder.formatForPrompt(context)
       updatedEngineState = nextState
+      // Reader-facing snapshot of the living world at this chapter.
+      nodeWorldPulse = buildWorldPulse(context, nextState)
     }
 
     const { content, choices, model, newCharacters, location } = await generateStoryNode(
@@ -339,6 +344,7 @@ export async function POST(
           ...(qualityScore !== undefined ? { qualityScore } : {}),
           ...(location ? { location } : {}),
           ...(updatedEngineState ? { engineState: updatedEngineState } : {}),
+          ...(nodeWorldPulse ? { worldPulse: nodeWorldPulse } : {}),
         },
         choices,
         moderationFields,

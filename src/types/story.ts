@@ -3,6 +3,20 @@ import type { Protagonist, StoryCharacter, DirectorPersona } from './characters'
 import type { CoverTheme, ReadingTheme } from './themes'
 import type { EngineState } from './engine'
 
+// ─── Living World pulse (reader-facing simulation snapshot) ──────────────────
+/** A compact, human-readable snapshot of the engine at a chapter, for the
+ * reader's "Living World" panel. Built server-side; the client only renders it. */
+export interface WorldPulse {
+  /** 0 (calm) .. 1 (at a knife's edge) — the AI Director's tension. */
+  tension: number
+  /** "House A rises; House B falters." */
+  factions?: string
+  /** "Grain is scarce; iron runs cheap." */
+  economy?: string
+  /** "Kael has grown cold; Mara is warm toward you." */
+  cast?: string
+}
+
 // ─── Moderation ─────────────────────────────────────────────────────────────
 export type ModerationStatus = 'approved' | 'flagged' | 'rejected'
 
@@ -136,6 +150,10 @@ export interface StoryNode {
   /** How many readers have branched a personal saga from this chapter (a 4th,
    * non-community branch type). Surfaced in the reader. */
   sagaBranches?: number
+  /** A compact, reader-facing snapshot of the living simulation at this chapter
+   * (tension, factions, economy, cast mood) — computed server-side from the
+   * engine so the reader can SEE the world move. */
+  worldPulse?: WorldPulse
   /** Serialised simulation state at this node (factions, economy, agent memories). */
   engineState?: EngineState
   /** Content Judge craft score (0-100); informational, for future ranking. */

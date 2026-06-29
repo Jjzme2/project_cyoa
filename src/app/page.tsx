@@ -147,8 +147,8 @@ function HeroActionsFallback() {
 
 const HOW_IT_WORKS = [
   { icon: BookOpen, title: 'Read', body: 'Open any book and read a chapter — no account needed.' },
-  { icon: MousePointerClick, title: 'Choose', body: 'At each turn, pick a path others have written.' },
-  { icon: PenLine, title: 'Write', body: 'Hit an empty branch? Write what happens next for everyone.' },
+  { icon: PenLine, title: 'Choose your way', body: 'Follow a path others wrote — or write where you go next, and the AI brings your chapter to life.' },
+  { icon: MousePointerClick, title: 'Leave a trail', body: 'Every path you write becomes one the next reader can take. The world grows with you.' },
 ]
 
 function HowItWorks() {

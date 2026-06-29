@@ -10,6 +10,7 @@ import { NodeReactions } from './NodeReactions'
 import { SaveSlotPicker, loadSaveSlots, getActiveSlotId, upsertSaveSlot } from './SaveSlotPicker'
 import { SharePathButton } from './SharePathButton'
 import { BeginSagaControl } from './BeginSagaControl'
+import { LivingWorldPanel } from './LivingWorldPanel'
 import { BookmarkButton } from './BookmarkButton'
 import { GalleryButton } from './GalleryButton'
 import { AmbientBackground } from './AmbientBackground'
@@ -810,6 +811,11 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
                 className="absolute top-4 right-4 w-8 h-8 opacity-15 pointer-events-none select-none"
                 style={{ backgroundImage: 'radial-gradient(circle at top right, oklch(0.45 0.10 60) 0%, transparent 70%)' }}
               />
+              {node.worldPulse && (
+                <div className="mb-4">
+                  <LivingWorldPanel pulse={node.worldPulse} />
+                </div>
+              )}
               <ChoiceSlots
                 storyId={story.id}
                 nodeId={node.id}

@@ -30,13 +30,15 @@ The prioritized backlog. Companion to `ROADMAP.md` (history), `GROWTH-STRATEGY.m
 
 ## Tier 1 — The fun unlock (highest leverage)
 
-- [ ] **6. AI auto-continues empty frontiers.** When a reader hits an unwritten
-  branch, generate the next chapter instantly (cost-controlled); make
-  reader-authoring an optional "claim this path" upgrade. Align homepage copy to
-  the real loop. _(Removes the single biggest fun-killer.)_
-- [ ] **7. Surface the simulation.** A reader-facing "Living World" panel: tension
-  meter, faction standings, cast-affinity ("Kael has grown cold"), current plot
-  beat — all already computed/persisted on the node's engine state.
+- [x] **6. Frame the real loop (copy).** Product call: keep the CYOA — the reader
+  *chooses by writing* where they go, the AI brings the chapter to life, and it
+  becomes a community path the next reader can take. Homepage "How it works"
+  reworded to that loop (no silent auto-continue; authoring stays the point).
+- [x] **7. Surface the simulation.** A reader-facing **"Living World" panel** —
+  tension meter, faction standings, market state, and cast-affinity ("Kael has
+  grown cold") — built server-side into a compact `WorldPulse` on each chapter
+  (no engine classes shipped to the client) and rendered, page-themed and
+  collapsible, in the reader. (+4 tests.)
 - [x] **8. Turn the safe engine layers ON by default.** Drama/pacing,
   environment, factions, and economy now run for every story (GOAP agents +
   quests stay opt-in inside the builder). _Follow-up: reframe "Advanced" as a
