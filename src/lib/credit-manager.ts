@@ -1,6 +1,6 @@
 import { adminDb } from './firebase-admin'
 import { checkRateLimit, refundRateLimit } from './rate-limit'
-import { FieldValue } from 'firebase-admin/firestore'
+import { FieldValue, type Transaction } from 'firebase-admin/firestore'
 
 /**
  * Credit Manager
@@ -161,6 +161,22 @@ export class CreditManager {
     if (amount <= 0) return
     const ref = adminDb.collection('userSettings').doc(userId)
     await ref.set(
+      { purchasedCredits: FieldValue.increment(amount), updatedAt: new Date().toISOString() },
+      { merge: true },
+    )
+  }
+
+  /**
+   * Grant purchased credits as part of an EXISTING transaction, so a status
+   * change and its payout commit atomically — no window where a bounty is marked
+   * paid/refunded but the credits never landed (money integrity). The increment
+   * is a blind write, so it's safe to add after the transaction's reads.
+   */
+  public static grantCreditsInTxn(txn: Transaction, userId: string, amount: number): void {
+    if (amount <= 0) return
+    const ref = adminDb.collection('userSettings').doc(userId)
+    txn.set(
+      ref,
       { purchasedCredits: FieldValue.increment(amount), updatedAt: new Date().toISOString() },
       { merge: true },
     )

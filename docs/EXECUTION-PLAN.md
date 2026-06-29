@@ -1,64 +1,64 @@
 # Chronicle — Tiered Execution Plan
 
-A prioritized, tier-bucketed backlog of the work that remains, so the most
-important things ship first and the rest is legible (and exportable to an AI
-coding agent). Companion to `ROADMAP.md` (history), `GROWTH-STRATEGY.md` (the
-why), and `GAMEPLAY-SYSTEMS.md` (engine depth).
-
-Tiers: **T0** do-now / critical · **T1** next · **T2** later · **🔒 Ops** can't
-be done from the codebase alone.
-
-> Note on interpretation: "Tier 0" is read here as the top-priority execution
-> bucket — the work that hardens and completes what just shipped before we add
-> more surface area.
+The prioritized backlog. Companion to `ROADMAP.md` (history), `GROWTH-STRATEGY.md`
+(the why), and `GAMEPLAY-SYSTEMS.md` (engine depth). Status: `[x]` done · `[ ]` open.
 
 ---
 
-## T0 — now / critical
+## Tier 0 — Correctness & safety (do first)
 
-- [x] **Abuse-guard the new public write endpoints.** The feedback board and the
-  `/api/track` bridge are authenticated but otherwise unthrottled — a single
-  account could spam them. Add a lightweight, fail-open Redis throttle and apply
-  it to `POST /api/feedback` (a few posts/hour) and `POST /api/track` (drop
-  excess events silently). _(Was also flagged in `TODO.md` → abuse guard on
-  track.)_
-- [x] **Reconcile the docs.** Fold everything shipped recently (multiverse
-  echoes + character cameos, first-class Characters + portraits, Seasons/Events,
-  Share Cards, the feedback board, story→saga carry-over, saga branch-in) into
-  `ROADMAP.md`'s shipped section so the planning docs reflect reality.
-- [ ] 🔒 **Smoke-test the saga work** (manual, 2 accounts): branch a saga from a
-  chapter, confirm the one-saga-per-world block (409 → opens the existing one),
-  the per-chapter counter increments, and bounties no longer appear on sagas.
+- [x] **1. Encrypt with scrypt + per-record salt.** `src/lib/encrypt.ts` derived
+  the AES key by padding/truncating the secret (no KDF, no salt). Now scrypt with
+  a fresh random salt per record (`v2:salt:iv:tag:ct`); legacy ciphertexts still
+  decrypt. (+6 tests.)
+- [x] **2. Ownership / root-exists guard on `POST /api/stories/[id]/nodes`.** Root
+  creation now requires the author and that no root exists yet; a contribution
+  requires its parent to exist in the same story.
+- [x] **3. Bind 2FA to the session server-side.** A valid TOTP now stamps a
+  `twofaVerifiedAt` custom claim (server-authoritative, not client-trusted),
+  surfaced on `AuthContext`; the verify response asks the client to refresh its
+  token. _Follow-up: require a recent `twofaVerifiedAt` on the most sensitive
+  mutations + clear it on sign-out._
+- [x] **4. Shared error wrapper → JSON 500.** `apiHandler()` wraps a route so any
+  unhandled throw becomes a clean JSON 500. Applied to the money path (bounty)
+  and a community write (feedback). _Follow-up: roll out across the remaining
+  routes._
+- [x] **5. Atomic bounty/moderation credit grants.** Payouts/refunds now happen
+  inside the same transaction as the status change (`grantCreditsInTxn`), closing
+  the paid-but-not-credited window; the moderation-approve payout also re-reads to
+  prevent double-pay.
 
-## T1 — next
+## Tier 1 — The fun unlock (highest leverage)
 
-- [ ] **Feedback priority tiers + ranked export.** Let admins tag each feedback
-  item with a tier (T0–T3); have the JSON export order/filter by tier so the
-  coding agent gets the most important work first. (Directly extends the
-  export-to-agent workflow.)
-- [ ] **Feedback vote throttle + edit/delete.** Throttle vote toggling; let an
-  author edit or withdraw their own post; let admins remove abuse.
-- [ ] **Character Fold 2d.** Author-claimed / curated characters with community
-  voting; an opt-in "guest star" control for hand-picked cameos beyond the
-  automatic connection-based ones.
-- [ ] **Co-op rooms PR2** (planned in `ROADMAP.md`): frontier write-pause, host
-  kick, ended summary, stale-room cleanup.
+- [ ] **6. AI auto-continues empty frontiers.** When a reader hits an unwritten
+  branch, generate the next chapter instantly (cost-controlled); make
+  reader-authoring an optional "claim this path" upgrade. Align homepage copy to
+  the real loop. _(Removes the single biggest fun-killer.)_
+- [ ] **7. Surface the simulation.** A reader-facing "Living World" panel: tension
+  meter, faction standings, cast-affinity ("Kael has grown cold"), current plot
+  beat — all already computed/persisted on the node's engine state.
+- [x] **8. Turn the safe engine layers ON by default.** Drama/pacing,
+  environment, factions, and economy now run for every story (GOAP agents +
+  quests stay opt-in inside the builder). _Follow-up: reframe "Advanced" as a
+  "Living World" you tune down, not opt into._
 
-## T2 — later
+## Tier 2 — Stickiness & growth
 
-- [ ] **Global leaderboards** (most-loved / most-travelled paths, top writers) —
-  denormalized aggregate counters.
-- [ ] **Global bounty board** — discovery surface for open bounties
-  (collection-group query + index).
-- [ ] **Engine depth** (`GAMEPLAY-SYSTEMS.md`): per-agent world-state
-  namespacing, drama manager, relationship graph + gossip.
-- [ ] **Richer per-page SEO** — `CreativeWork`/`Article` + breadcrumb JSON-LD on
-  story/world pages.
+- [ ] **9. Narrative-aware achievements** (secret endings, NPC bonds, faction
+  outcomes, "path chosen by N readers") — each auto-generating a share card.
+- [ ] **10. In-app discovery** — a public-rooms lobby and a bounty-board page
+  (plumbing exists; both are dead without out-of-band links today).
+- [ ] **11. A season scheduler** so the live-ops heartbeat doesn't depend on an
+  operator remembering.
 
-## 🔒 Ops / deploy (not codeable here)
+## Tier 3 — Scale hardening (before traffic grows)
 
-- [ ] Host the brand logo; set `NEXT_PUBLIC_APP_URL`, `ADMIN_EMAILS`,
-  `NEXT_PUBLIC_LOGO_URL` in Vercel.
-- [ ] Deploy `firestore.indexes.json` + `firestore.rules`; run `npm run seed`.
-- [ ] Confirm Upstash Redis env is set in production (the throttle + rate limiter
-  fail safely without it, but it should be configured).
+- [ ] **12. Collapse the 3 sequential per-chapter LLM calls.**
+- [ ] **13. Denormalize node ancestry (pathIds)** + bound/paginate author reads +
+  sharded reaction counters.
+- [ ] **14. Cache the share-card / OG routes.**
+- [ ] **15. Handler/integration tests** for slot-fill and the Stripe webhook money
+  paths (reuse the proven `credit-manager.test.ts` firebase-admin mock).
+- [x] **16. Rate-limit non-credit write endpoints** — fail-open throttle on
+  `/api/feedback` and `/api/track`. _Remaining: meter world genesis, rate-limit
+  `/api/ai/assist` questions mode, allowlist `/api/track` event names._
