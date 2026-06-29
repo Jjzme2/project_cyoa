@@ -14,8 +14,11 @@ import { GenerateGenesisButton } from '@/components/world/GenerateGenesisButton'
 import { OutsiderRegard } from '@/components/world/OutsiderRegard'
 import { MultiverseSettings } from '@/components/world/MultiverseSettings'
 import { WorldPortal } from '@/components/world/WorldPortal'
+import { ShareImageButton } from '@/components/share/ShareImageButton'
 import { themeForTone, DEFAULT_WORLD_THEME } from '@/components/world/world-theme'
-import { getWorld, getStoriesByWorld, getWorldChronicle, getWorldLegends, getWorldOutsiderRegard } from '@/lib/firestore-helpers'
+import { getWorld, getStoriesByWorld, getWorldChronicle, getWorldLegends, getWorldOutsiderRegard, getCharactersByWorld } from '@/lib/firestore-helpers'
+import { CharacterPortrait } from '@/components/character/CharacterPortrait'
+import { isCrossWorld } from '@/lib/characters'
 import { APP_CONFIG } from '@/lib/config'
 
 interface Props {
@@ -58,11 +61,12 @@ async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
   const world = await getWorld(id).catch(() => null)
   if (!world) notFound()
 
-  const [stories, chronicle, legends, outsiders] = await Promise.all([
+  const [stories, chronicle, legends, outsiders, cast] = await Promise.all([
     getStoriesByWorld(id).catch(() => []),
     getWorldChronicle(id).catch(() => []),
     getWorldLegends(id).catch(() => ({ revered: [], reviled: [] })),
     getWorldOutsiderRegard(id).catch(() => null),
+    getCharactersByWorld(id).catch(() => []),
   ])
   const toneClass = TONE_COLORS[world.tone] ?? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
   // Legacy worlds (no saved theme) get a coherent look derived from their tone.
@@ -132,13 +136,19 @@ async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
           </div>
         )}
 
-        <div className="flex gap-3 pt-1">
+        <div className="flex gap-3 pt-1 flex-wrap items-center">
           <Link href={`/stories/new?world=${encodeURIComponent(world.id)}`}>
             <Button className="gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300">
               <Plus className="h-4 w-4" />
               Start a story here
             </Button>
           </Link>
+          <ShareImageButton
+            cardUrl={`/api/share-card/world/${world.id}`}
+            filename={`chronicle-world-${world.id}`}
+            shareTitle={world.name}
+            label="Share this world"
+          />
         </div>
       </section>
 
@@ -195,6 +205,31 @@ async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
           </div>
         ) : (
           <AgeFilteredStoryGrid stories={stories} />
+        )}
+
+        {cast.length > 0 && (
+          <div className="space-y-3 pt-2">
+            <h2 className="text-sm uppercase tracking-widest text-muted-foreground/50 font-sans">Cast</h2>
+            <ul className="flex flex-wrap gap-3">
+              {cast.slice(0, 12).map((c) => (
+                <li key={c.id}>
+                  <Link
+                    href={`/characters/${c.id}`}
+                    className="group flex items-center gap-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] pr-3.5 hover:border-amber-500/30 hover:bg-white/[0.04] transition-colors"
+                  >
+                    <CharacterPortrait name={c.name} portraitUrl={c.portraitUrl} size={40} rounded="rounded-l-xl rounded-r-none" />
+                    <div className="py-1.5 min-w-0">
+                      <div className="text-sm text-foreground/85 truncate group-hover:text-amber-200 transition-colors flex items-center gap-1.5">
+                        {c.name}
+                        {isCrossWorld(c) && <Map className="h-3 w-3 text-teal-400/70" />}
+                      </div>
+                      {c.tagline && <div className="text-[11px] text-muted-foreground/45 truncate">{c.tagline}</div>}
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </section>
     </>

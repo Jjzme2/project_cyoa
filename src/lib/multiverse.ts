@@ -8,7 +8,7 @@
  * still strictly opt-in (a world only pools if its creator named it in) and
  * rating-gated downstream. Returns null when the name has no usable characters.
  */
-import type { WorldEcho } from '@/lib/ai/prompts'
+import type { WorldEcho, CharacterCameo } from '@/lib/ai/prompts'
 
 /**
  * Merge pool echoes and explicit-link echoes into one list, deduped by source
@@ -19,6 +19,19 @@ export function mergeEchoes(...groups: WorldEcho[][]): WorldEcho[] {
   for (const echo of groups.flat()) {
     const key = echo.worldName.trim().toLowerCase()
     if (key && !byName.has(key)) byName.set(key, echo)
+  }
+  return Array.from(byName.values())
+}
+
+/**
+ * Merge pool cameos and explicit-link cameos into one list, deduped by source
+ * world name — the character-counterpart to {@link mergeEchoes}. Pure.
+ */
+export function mergeCameos(...groups: CharacterCameo[][]): CharacterCameo[] {
+  const byName = new Map<string, CharacterCameo>()
+  for (const cameo of groups.flat()) {
+    const key = cameo.worldName.trim().toLowerCase()
+    if (key && !byName.has(key)) byName.set(key, cameo)
   }
   return Array.from(byName.values())
 }

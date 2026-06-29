@@ -4,7 +4,7 @@ import { revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import { parseJson } from '@/lib/api-validation'
 import { adminAuth } from '@/lib/firebase-admin'
-import { getStories, createStory, getWorld, checkAndAwardAchievements } from '@/lib/firestore-helpers'
+import { getStories, createStory, getWorld, checkAndAwardAchievements, registerCharacterAppearance } from '@/lib/firestore-helpers'
 import { clampRating } from '@/lib/ratings'
 import { sanitizeDirector } from '@/lib/director'
 import { sanitizeStyleChoices } from '@/lib/story-style'
@@ -118,6 +118,34 @@ export async function POST(req: NextRequest) {
     ...(readingTheme ? { readingTheme } : {}),
     goapEnabled: !!goapEnabled || !!youMode, // "You" mode needs the social sim for reputation
     implementQuests: !!implementQuests,
+  })
+
+  // Promote authored characters into the first-class registry (best-effort):
+  // the protagonist is the author's collectible hero; the world's seeded canon
+  // figures are world-owned identities. Each records an appearance in this story.
+  after(async () => {
+    const appearance = { storyId: id, storyTitle: title, worldId, worldName, at: new Date().toISOString() }
+    if (safeProtagonist && !youMode) {
+      await registerCharacterAppearance({
+        scope: 'author',
+        ownerId: uid,
+        name: safeProtagonist.name,
+        description: safeProtagonist.description,
+        tagline: 'Protagonist',
+        appearance,
+      }).catch(() => {})
+    }
+    for (const c of seededCast) {
+      await registerCharacterAppearance({
+        scope: 'world',
+        ownerId: worldId,
+        name: c.name,
+        description: c.description,
+        appearance,
+      }).catch(() => {})
+    }
+    // Refresh the cached character directory + this world's cast.
+    revalidateTag('characters', 'max')
   })
 
   revalidateTag('stories', 'max')

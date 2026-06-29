@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { BookOpen, ChevronRight, ArrowLeft } from 'lucide-react'
 import { getStory, getStoryNode } from '@/lib/firestore-helpers'
+import { ShareImageButton } from '@/components/share/ShareImageButton'
 import type { StoryNode } from '@/types'
 
 interface Props {
@@ -137,13 +138,22 @@ async function ShareContent({
         <p className="text-sm text-muted-foreground/50" style={{ fontFamily: 'Georgia, serif' }}>
           This is one path through the story. Countless others remain unwritten.
         </p>
-        <Link
-          href={`/stories/${storyId}`}
-          className="inline-flex items-center gap-2 text-sm px-5 py-2.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 transition-colors"
-        >
-          <BookOpen className="h-4 w-4" />
-          Read and write your own path
-        </Link>
+        <div className="flex items-center justify-center gap-3 flex-wrap">
+          <Link
+            href={`/stories/${storyId}`}
+            className="inline-flex items-center gap-2 text-sm px-5 py-2.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 transition-colors"
+          >
+            <BookOpen className="h-4 w-4" />
+            Read and write your own path
+          </Link>
+          <ShareImageButton
+            cardUrl={`/api/share-card/story/${storyId}?node=${validNodes[validNodes.length - 1].id}`}
+            filename={`chronicle-${storyId}`}
+            shareTitle={story.title}
+            label="Share as image"
+            className="inline-flex items-center gap-2 text-sm px-5 py-2.5 rounded-lg border border-white/10 bg-white/[0.02] hover:bg-white/[0.05] text-foreground/70 transition-colors"
+          />
+        </div>
         <p className="text-[10px] text-muted-foreground/45 font-sans">Chronicle · Community CYOA</p>
       </div>
     </>

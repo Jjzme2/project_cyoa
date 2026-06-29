@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildWorldContext } from '@/lib/ai/world-context'
 import { buildPrompt, buildSagaOpeningPrompt } from '@/lib/ai/prompts'
-import { toMultiverseId, mergeEchoes } from '@/lib/multiverse'
+import { toMultiverseId, mergeEchoes, mergeCameos } from '@/lib/multiverse'
 import type { World, StoryPathSegment } from '@/types'
 
 /**
@@ -148,6 +148,83 @@ describe('multiverse echoes (the only sanctioned cross-world path)', () => {
     expect(early).not.toContain('L2')
     expect(later).toContain('L2')
     expect(later).not.toContain('L0')
+  })
+})
+
+describe('character cameos (cross-world figures, same gating as echoes)', () => {
+  it('an unconnected world renders no CROSSWORLD VISITORS block', () => {
+    const prompt = buildPrompt(buildWorldContext(makeWorld()), [], 'Walk on', false)
+    expect(prompt).not.toContain('CROSSWORLD VISITORS')
+  })
+
+  it('cameos appear only when the world declared a connection and figures are gathered', () => {
+    const ctx = buildWorldContext(makeWorld(), {
+      cameos: [{ worldName: 'Tartwater Reach', nexus: 'a shimmering rift', figures: [{ name: 'Sour Sal', note: 'the rift-walker' }] }],
+    })
+    const prompt = buildPrompt(ctx, [], 'Walk on', false)
+    expect(prompt).toContain('CROSSWORLD VISITORS')
+    expect(prompt).toContain('Sour Sal')
+    expect(prompt).toContain('Tartwater Reach')
+    expect(prompt).toContain('a shimmering rift')
+    expect(prompt).toContain('the rift-walker')
+    // Visitors are explicitly framed as natives of ELSEWHERE, not of this world.
+    expect(prompt).toContain('ELSEWHERE')
+  })
+
+  it('a cameo bundle with no usable figures renders nothing', () => {
+    const ctx = buildWorldContext(makeWorld(), { cameos: [{ worldName: 'Empty', figures: [{ name: '   ' }] }] })
+    expect(ctx.cameos).toBeDefined()
+    expect(buildPrompt(ctx, [], 'Walk on', false)).not.toContain('CROSSWORLD VISITORS')
+  })
+
+  it('injecting a foreign figure requires passing it in — it never appears on its own', () => {
+    const clean = buildPrompt(buildWorldContext(makeWorld()), [], 'Look around', false)
+    expect(clean).not.toContain('CROSSWORLD VISITORS')
+    const injected = buildPrompt(
+      buildWorldContext(makeWorld(), { cameos: [{ worldName: 'Elsewhere', figures: [{ name: FOREIGN }] }] }),
+      [],
+      'Look around',
+      false,
+    )
+    expect(injected).toContain(FOREIGN)
+  })
+
+  it('surfaces at most two figures per chapter (a rare crossing, not a parade)', () => {
+    const ctx = buildWorldContext(makeWorld(), {
+      cameos: [{ worldName: 'Reach', figures: [0, 1, 2, 3, 4].map((i) => ({ name: `Figure${i}` })) }],
+    })
+    const prompt = buildPrompt(ctx, path(0), 'go', false)
+    const shown = (prompt.match(/Figure\d/g) ?? []).length
+    expect(shown).toBe(2)
+  })
+
+  it('a saga opening surfaces cameos too when the world declares them', () => {
+    const ctx = buildWorldContext(makeWorld(), {
+      cameos: [{ worldName: 'Tartwater Reach', figures: [{ name: 'Sour Sal' }] }],
+    })
+    const prompt = buildSagaOpeningPrompt(ctx, '', { label: 'Arrive', premise: 'You step in.' })
+    expect(prompt).toContain('CROSSWORLD VISITORS')
+    expect(prompt).toContain('Sour Sal')
+  })
+})
+
+describe('mergeCameos (pool + explicit links)', () => {
+  it('combines both sources', () => {
+    const pool = [{ worldName: 'A', figures: [{ name: 'a' }] }]
+    const links = [{ worldName: 'B', figures: [{ name: 'b' }] }]
+    expect(mergeCameos(pool, links)).toHaveLength(2)
+  })
+
+  it('dedupes by source world name (first occurrence wins)', () => {
+    const pool = [{ worldName: 'Tartwater', figures: [{ name: 'from pool' }] }]
+    const links = [{ worldName: 'tartwater', nexus: 'a rift', figures: [{ name: 'from link' }] }]
+    const merged = mergeCameos(pool, links)
+    expect(merged).toHaveLength(1)
+    expect(merged[0].figures).toEqual([{ name: 'from pool' }])
+  })
+
+  it('is empty when neither source has cameos', () => {
+    expect(mergeCameos([], [])).toEqual([])
   })
 })
 

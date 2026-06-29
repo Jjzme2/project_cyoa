@@ -16,7 +16,7 @@ import { analytics } from './telemetry'
  */
 
 /** Which generation surface produced the event. */
-export type GenerationKind = 'assist' | 'cover' | 'chapter' | 'saga'
+export type GenerationKind = 'assist' | 'cover' | 'chapter' | 'saga' | 'portrait'
 
 /** Why a generation produced no usable content. */
 export type GenerationFailureReason =

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ShieldAlert, ShieldCheck, Loader2, ChevronRight, BookOpen, Globe, ClipboardList, Users, BarChart3, Sparkles, FlaskConical } from 'lucide-react'
+import { ShieldAlert, ShieldCheck, Loader2, ChevronRight, BookOpen, Globe, ClipboardList, Users, BarChart3, Sparkles, FlaskConical, CalendarRange } from 'lucide-react'
 import { useAuth } from '@/components/Providers'
 
 interface Overview {
@@ -118,6 +118,12 @@ export default function AdminDashboardPage() {
       description: 'A feed of notable signals — admin actions, milestones, and anomalies.',
       href: '/admin/insights',
       icon: Sparkles,
+    },
+    {
+      title: 'Seasons & Events',
+      description: 'Define time-boxed, themed events — the live-ops heartbeat that brings players back.',
+      href: '/admin/seasons',
+      icon: CalendarRange,
     },
     {
       title: 'Tests',
