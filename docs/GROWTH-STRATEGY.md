@@ -126,9 +126,14 @@ isolation invariant holds — an unconnected world gets nothing — and is locke
 the world-isolation test suite. No new author UI; it rides the connections
 authors already declare.
 
-**Fold 2c (next):** generated portraits (reuse the cover-image pipeline);
-author-claimed/curated characters and community voting; an opt-in "guest star"
-control for hand-picked cameos beyond the automatic connection-based ones.
+**Fold 2c (in progress):** generated portraits — *shipped*: an owner/admin
+control generates a character portrait via the existing cover-image pipeline
+(credit-gated, stored on the registry doc, cache-revalidated), replacing the
+monogram fallback and flowing straight into the Share Card / OG image.
+
+**Fold 2d (next):** author-claimed/curated characters and community voting; an
+opt-in "guest star" control for hand-picked cameos beyond the automatic
+connection-based ones.
 
 ---
 

@@ -104,3 +104,8 @@ export async function registerCharacterAppearance(params: RegisterCharacterParam
 
   return id
 }
+
+/** Set (or replace) a character's generated portrait. */
+export async function setCharacterPortrait(id: string, portraitUrl: string): Promise<void> {
+  await charactersCollection().doc(id).update({ portraitUrl, updatedAt: new Date().toISOString() })
+}

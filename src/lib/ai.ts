@@ -6,7 +6,7 @@
  */
 export { PromptRejectedError } from './ai/shared'
 export { buildWorldContext, type WorldContextOptions } from './ai/world-context'
-export { generateStoryImage, generateCoverImage } from './ai/images'
+export { generateStoryImage, generateCoverImage, generatePortraitImage } from './ai/images'
 export {
   generateWorldFromPrompt,
   generateStoryFromPrompt,

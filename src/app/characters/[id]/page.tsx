@@ -6,6 +6,7 @@ import { ArrowLeft, Globe, BookOpen } from 'lucide-react'
 import { getCharacter } from '@/lib/firestore-helpers'
 import { appearanceSummary, isCrossWorld } from '@/lib/characters'
 import { CharacterPortrait } from '@/components/character/CharacterPortrait'
+import { GeneratePortraitButton } from '@/components/character/GeneratePortraitButton'
 import { ShareImageButton } from '@/components/share/ShareImageButton'
 import { APP_CONFIG } from '@/lib/config'
 
@@ -78,6 +79,12 @@ async function CharacterDetail({ params }: Props) {
           filename={`chronicle-character-${c.id}`}
           shareTitle={c.name}
           label="Share character"
+        />
+        <GeneratePortraitButton
+          characterId={c.id}
+          scope={c.scope}
+          ownerId={c.ownerId}
+          hasPortrait={Boolean(c.portraitUrl)}
         />
       </div>
 
