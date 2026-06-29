@@ -1,6 +1,6 @@
 import { generateText, APICallError } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
-import type { ContentRating, StoryCharacter, StoryPathSegment, WorldBible } from '@/types'
+import type { ContentRating, EndingType, StoryCharacter, StoryPathSegment, WorldBible } from '@/types'
 import { PRIMARY_MODEL, OPENROUTER_MODEL, VALID_TONES, VALID_TAGS, parseAIResponse, tryParseJSON, pickStr } from './shared'
 import { buildPrompt, buildSagaOpeningPrompt, userInputBlock, type WorldContext } from './prompts'
 
@@ -155,8 +155,9 @@ export async function generateStoryNode(
   userId: string,
   includeImage: boolean,
   systemNarrativeEvents: string = '',
-): Promise<{ content: string; choices: string[]; model: string; newCharacters: StoryCharacter[]; location?: string }> {
-  const prompt = buildPrompt(world, storyPath, choiceText, includeImage, systemNarrativeEvents)
+  endingDirective: string = '',
+): Promise<{ content: string; choices: string[]; model: string; newCharacters: StoryCharacter[]; location?: string; ending?: { title: string; type: EndingType } }> {
+  const prompt = buildPrompt(world, storyPath, choiceText, includeImage, systemNarrativeEvents, endingDirective)
 
   try {
     const result = await generateText({

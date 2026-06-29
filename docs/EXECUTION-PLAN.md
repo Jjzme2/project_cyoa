@@ -46,7 +46,22 @@ The prioritized backlog. Companion to `ROADMAP.md` (history), `GROWTH-STRATEGY.m
 
 ## Tier 2 — Stickiness & growth
 
-- [ ] **9. Narrative-aware achievements** (secret endings, NPC bonds, faction
+- [x] **Story endings (v1).** Stories can now genuinely *conclude*. The engine
+  invites an ending — rarely, only when earned — past a minimum depth and when
+  the plot through-line resolves, the path runs long, or tension spikes and
+  settles; the model writes a final chapter and emits `ENDING: title | type`
+  (triumphant / tragic / bittersweet / mysterious / secret). The node is terminal
+  (no slots), gets an **animated, type-themed "The End" reveal** in the reader,
+  and a **type-coloured share card** (the viral payoff). +8 tests.
+  _v2 follow-up: author win/lose conditions (resource thresholds → forced
+  triumphant/tragic endings) need resource-condition plumbing + author UI._
+- [x] **9. Narrative-aware achievements.** Reaching a definitive ending now
+  awards in-fiction achievements (first ending, a *secret* ending, all five
+  ending types) — verified server-side from the node. Each earned achievement
+  has its own **share card** (`/api/share-card/achievement/[id]`), surfaced as a
+  hover-share on the profile and a toast on unlock. Endings-reached added to the
+  profile stats.
+- [ ] **9b. (more) Narrative-aware achievements** (secret endings, NPC bonds, faction
   outcomes, "path chosen by N readers") — each auto-generating a share card.
 - [ ] **10. In-app discovery** — a public-rooms lobby and a bounty-board page
   (plumbing exists; both are dead without out-of-band links today).

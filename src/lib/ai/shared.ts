@@ -1,4 +1,4 @@
-import type { StoryCharacter } from '@/types'
+import { ENDING_TYPES, type EndingType, type StoryCharacter } from '@/types'
 
 export const PRIMARY_MODEL = 'google/gemini-2.5-pro'
 export const OPENROUTER_MODEL = 'google/gemma-4-31b-it:free'
@@ -16,11 +16,16 @@ export function parseAIResponse(text: string): {
   choices: string[]
   newCharacters: StoryCharacter[]
   location?: string
+  ending?: { title: string; type: EndingType }
 } {
   const rejectionMatch = text.match(/^REJECTED:\s*(.+)/im)
   if (rejectionMatch) {
     throw new PromptRejectedError(rejectionMatch[1].trim())
   }
+
+  // A definitive conclusion: `ENDING: <title> | <type>`. When present, this
+  // chapter is terminal (we drop any choices the model also emitted).
+  const ending = parseEnding(text)
 
   // Where this chapter takes place — used for the world map / location tracking.
   const locMatch = text.match(/^LOCATION:\s*(.+)/im)
@@ -54,10 +59,29 @@ export function parseAIResponse(text: string): {
     .replace(/CHOICE_\d:.+/g, '')
     .replace(/NEW_CHARACTER:.+/gi, '')
     .replace(/^LOCATION:.+/gim, '')
+    .replace(/^ENDING:.+/gim, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 
-  return { content, choices: choices.slice(0, 3), newCharacters, location }
+  // A terminal chapter has no onward choices, even if the model emitted some.
+  return {
+    content,
+    choices: ending ? [] : choices.slice(0, 3),
+    newCharacters,
+    location,
+    ...(ending ? { ending } : {}),
+  }
+}
+
+/** Parse an `ENDING: <title> | <type>` line, coercing an unknown/blank type. */
+function parseEnding(text: string): { title: string; type: EndingType } | undefined {
+  const m = text.match(/^ENDING:\s*(.+)/im)
+  if (!m) return undefined
+  const [titleRaw, typeRaw] = m[1].split('|')
+  const title = (titleRaw ?? '').trim().slice(0, 80) || 'The End'
+  const t = (typeRaw ?? '').trim().toLowerCase()
+  const type = (ENDING_TYPES as readonly string[]).includes(t) ? (t as EndingType) : 'bittersweet'
+  return { title, type }
 }
 
 export const VALID_TONES = [

@@ -155,12 +155,29 @@ function ratingGuidance(rating: ContentRating | undefined): string {
   }
 }
 
+/**
+ * A block, included only when the engine deems the story eligible to conclude,
+ * inviting (or requiring) a real ending. Kept out of the prompt entirely
+ * otherwise, so endings stay rare and earned.
+ */
+export function endingBlock(directive: string | undefined): string {
+  if (!directive) return ''
+  return `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ENDING — ${directive}
+If this chapter brings the story to a genuine, EARNED close (a true climax and resolution, not a convenient stop), END IT: write the final chapter as a satisfying conclusion, and then, on its own line, output:
+ENDING: [a short, evocative title] | [type]
+— where [type] is EXACTLY one of: triumphant, tragic, bittersweet, mysterious, secret.
+When you end the story, output NO CHOICE_ lines at all. If it is not yet time to end, ignore this and continue normally with three choices.`
+}
+
 export function buildPrompt(
   world: WorldContext,
   storyPath: StoryPathSegment[],
   choiceText: string,
   includeImage: boolean,
   systemNarrativeEvents: string = '',
+  endingDirective: string = '',
 ): string {
   // Format the story so far — budget-aware: opening + recent chapters verbatim,
   // the middle condensed (see story-memory.ts) so long stories stay coherent
@@ -221,14 +238,14 @@ After the chapter, provide exactly 3 brief choice prompts (10 words or less each
 CHOICE_1: [choice text]
 CHOICE_2: [choice text]
 CHOICE_3: [choice text]
-
+${endingBlock(endingDirective)}
 Then, ONLY if this chapter introduces a brand-new named character not already listed above, add one line per new character (omit entirely if none):
 NEW_CHARACTER: [name] — [one-line description]
 
 Finally, name where this chapter takes place on its own line — prefer a Region from WORLD CANON above when the scene is there; otherwise a short place name (4 words max):
 LOCATION: [place]
 
-Write only the chapter, the three choices, any NEW_CHARACTER lines, and the LOCATION line. No meta-commentary.`
+Write only the chapter, then EITHER the three choices OR (if you ended the story) the ENDING line, any NEW_CHARACTER lines, and the LOCATION line. No meta-commentary.`
 }
 
 export function buildImagePrompt(world: WorldContext, storyContent: string, choiceText: string): string {

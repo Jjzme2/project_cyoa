@@ -34,10 +34,12 @@ export interface ShareCardOptions {
   stats?: ShareCardStat[]
   /** A small attribution line in the footer, e.g. "by Ada". */
   footerNote?: string
+  /** Override the per-kind accent (e.g. an ending's type colour). */
+  accent?: string
 }
 
 export function renderShareCard(opts: ShareCardOptions): ImageResponse {
-  const accent = accentFor(opts.kind)
+  const accent = opts.accent ?? accentFor(opts.kind)
   const stats = normalizeStats(opts.stats)
   const hasHero = Boolean(opts.imageUrl)
 
