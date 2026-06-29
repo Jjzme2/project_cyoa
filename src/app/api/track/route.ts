@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { parseJson } from '@/lib/api-validation'
 import { getAuthContext } from '@/lib/auth'
+import { throttle } from '@/lib/rate-limit'
 import { analytics, insights } from '@/lib/telemetry'
 
 // Invalid/missing channels fall back to analytics, matching the prior behavior.
@@ -24,6 +25,12 @@ export async function POST(req: NextRequest) {
   const parsed = await parseJson(req, TrackSchema)
   if (!parsed.ok) return parsed.response
   const { channel, name, props } = parsed.data
+
+  // Abuse guard: cap client-emitted events per minute. Excess is dropped
+  // silently — tracking is best-effort, so this stays a 200 either way.
+  if (!(await throttle(`track:${auth.uid}`, 120, 60))) {
+    return NextResponse.json({ ok: true, dropped: true })
+  }
 
   const emitter = channel === 'insights' ? insights : analytics
   await emitter.track(name, { uid: auth.uid, props })

@@ -10,6 +10,31 @@ GitHub trackers:
 
 ## ✅ Shipped
 
+### Growth & IP (see `GROWTH-STRATEGY.md`)
+- **Multiverse layer:** opt-in cross-world echoes (shared pool + explicit links),
+  rating-gated, plus **character cameos** across connected worlds — both governed
+  by the same isolation seam (an unconnected world gets nothing; locked by tests).
+- **First-class Characters:** a collectible registry aggregating appearances
+  across stories/worlds, directory + profiles + per-world cast, **generated
+  portraits** (cover-image pipeline), and shareable IP (portrait Share Card +
+  landscape OG + `Person` JSON-LD).
+- **Share Cards:** portrait, social-native cards for endings / worlds / stories /
+  characters.
+- **Seasons / Events:** an admin-defined live-ops layer (banner + `/events` +
+  admin screen).
+
+### Sagas
+- **Story → saga carry-over:** in-creation handoff (no cleared fields) + a
+  "Turn into a saga" action on saved stories (new, separate saga carrying the cast).
+- **Saga branch-in:** begin your own saga from any chapter (one per player per
+  world; seeded by a written prompt + the path read; per-chapter counter).
+- Sagas no longer carry bounties.
+
+### Community
+- **Feedback board** (`/feedback`): submit bugs/features/ideas, upvote to rank,
+  admin triage, and an admin **JSON task-list export** for an AI coding agent.
+- Abuse-guard throttle on the feedback + tracking write endpoints.
+
 ### SEO & discoverability
 - Per-route metadata, generated OG/Twitter images (home, story, world), `sitemap.ts`, `robots.ts`, `metadataBase`.
 - New `/worlds/[id]` route (world detail + its stories); world cards link to it.

@@ -4,6 +4,7 @@ import { parseJson } from '@/lib/api-validation'
 import { getAuthContext } from '@/lib/auth'
 import { createFeedback, listFeedback } from '@/lib/firestore-helpers'
 import { sortFeedback } from '@/lib/feedback'
+import { throttle } from '@/lib/rate-limit'
 import { insights } from '@/lib/telemetry'
 import { FEEDBACK_TYPES } from '@/types'
 
@@ -33,6 +34,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = await getAuthContext(req)
   if (!auth) return NextResponse.json({ error: 'Sign in to post feedback' }, { status: 401 })
+
+  // Abuse guard: a handful of new posts per hour per account.
+  if (!(await throttle(`feedback:${auth.uid}`, 6, 3600))) {
+    return NextResponse.json({ error: 'You’re posting a lot — try again in a bit.' }, { status: 429 })
+  }
 
   const parsed = await parseJson(req, FeedbackSchema)
   if (!parsed.ok) return parsed.response
