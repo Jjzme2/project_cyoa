@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { Sparkles, CalendarRange, Feather } from 'lucide-react'
 import { getLiveSeasons } from '@/lib/firestore-helpers'
@@ -10,10 +11,7 @@ export const metadata: Metadata = {
   alternates: { canonical: '/events' },
 }
 
-// Live data; never statically cached.
-export const dynamic = 'force-dynamic'
-
-export default async function EventsPage() {
+async function EventsContent() {
   const seasons = await getLiveSeasons()
   const now = new Date()
 
@@ -90,5 +88,23 @@ export default async function EventsPage() {
         </ul>
       )}
     </main>
+  )
+}
+
+function EventsSkeleton() {
+  return (
+    <main className="max-w-3xl mx-auto px-4 sm:px-6 py-12 space-y-8">
+      <div className="h-3 w-24 rounded bg-white/5 shimmer" />
+      <div className="h-9 w-2/3 rounded bg-white/5 shimmer" />
+      <div className="h-28 w-full rounded-2xl bg-white/5 shimmer" />
+    </main>
+  )
+}
+
+export default function EventsPage() {
+  return (
+    <Suspense fallback={<EventsSkeleton />}>
+      <EventsContent />
+    </Suspense>
   )
 }

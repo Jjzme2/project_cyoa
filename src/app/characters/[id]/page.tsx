@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, Globe, BookOpen } from 'lucide-react'
@@ -22,9 +23,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-export const dynamic = 'force-dynamic'
-
-export default async function CharacterPage({ params }: Props) {
+async function CharacterDetail({ params }: Props) {
   const { id } = await params
   const c = await getCharacter(id).catch(() => null)
   if (!c) notFound()
@@ -92,5 +91,28 @@ export default async function CharacterPage({ params }: Props) {
         </ul>
       </section>
     </main>
+  )
+}
+
+function CharacterSkeleton() {
+  return (
+    <main className="max-w-2xl mx-auto px-4 sm:px-6 py-12 space-y-8">
+      <div className="h-3 w-28 rounded bg-white/5 shimmer" />
+      <div className="flex items-start gap-5">
+        <div className="h-26 w-26 rounded-2xl bg-white/5 shimmer" style={{ width: 104, height: 104 }} />
+        <div className="flex-1 space-y-2 pt-2">
+          <div className="h-8 w-1/2 rounded bg-white/5 shimmer" />
+          <div className="h-4 w-1/3 rounded bg-white/5 shimmer" />
+        </div>
+      </div>
+    </main>
+  )
+}
+
+export default function CharacterPage({ params }: Props) {
+  return (
+    <Suspense fallback={<CharacterSkeleton />}>
+      <CharacterDetail params={params} />
+    </Suspense>
   )
 }

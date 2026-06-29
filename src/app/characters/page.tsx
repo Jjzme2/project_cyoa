@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { Users, Globe } from 'lucide-react'
 import { listCharacters } from '@/lib/firestore-helpers'
@@ -11,9 +12,7 @@ export const metadata: Metadata = {
   alternates: { canonical: '/characters' },
 }
 
-export const dynamic = 'force-dynamic'
-
-export default async function CharactersPage() {
+async function CharactersContent() {
   const characters = await listCharacters(60)
 
   return (
@@ -59,5 +58,27 @@ export default async function CharactersPage() {
         </ul>
       )}
     </main>
+  )
+}
+
+function CharactersSkeleton() {
+  return (
+    <main className="max-w-5xl mx-auto px-4 sm:px-6 py-12 space-y-8">
+      <div className="h-3 w-24 rounded bg-white/5 shimmer" />
+      <div className="h-9 w-1/2 rounded bg-white/5 shimmer" />
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="h-24 rounded-2xl bg-white/5 shimmer" />
+        ))}
+      </div>
+    </main>
+  )
+}
+
+export default function CharactersPage() {
+  return (
+    <Suspense fallback={<CharactersSkeleton />}>
+      <CharactersContent />
+    </Suspense>
   )
 }
