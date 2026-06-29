@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Trophy } from 'lucide-react'
 import { useAuth } from '@/components/Providers'
+import { ShareImageButton } from '@/components/share/ShareImageButton'
 import { ACHIEVEMENT_DEFS } from '@/types'
 
 interface EnrichedAchievement {
@@ -74,15 +75,21 @@ export function AchievementDisplay() {
                   <div
                     key={a.id}
                     title={`${a.name}: ${a.description}`}
-                    className="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.06] text-center group cursor-default"
+                    className="relative flex flex-col items-center gap-1.5 p-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.06] text-center group cursor-default"
                   >
                     <span className="text-2xl leading-none">{a.icon}</span>
                     <span className="text-[9px] font-sans font-semibold text-amber-300/80 leading-tight">
                       {a.name}
                     </span>
-                    <span className="text-[8px] font-sans text-muted-foreground/50 leading-tight hidden group-hover:block absolute bg-background border border-white/10 rounded-lg p-2 z-10 max-w-[140px] shadow-xl mt-16 text-left">
-                      {a.description}
-                    </span>
+                    <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <ShareImageButton
+                        cardUrl={`/api/share-card/achievement/${a.id}`}
+                        filename={`chronicle-achievement-${a.id}`}
+                        shareTitle={`Achievement: ${a.name}`}
+                        label=""
+                        className="inline-flex items-center justify-center h-6 w-6 rounded-md border border-amber-500/30 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 transition-colors"
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -120,7 +127,7 @@ export function AchievementDisplay() {
               { label: 'Bookmarks', value: counts.bookmarks ?? 0 },
               { label: 'Worlds created', value: counts.worlds ?? 0 },
               { label: 'Stories started', value: counts.stories ?? 0 },
-              { label: 'Illustrations', value: counts.illustrations ?? 0 },
+              { label: 'Endings reached', value: counts.endingsReached ?? 0 },
             ].map(({ label, value }) => (
               <div key={label} className="text-center space-y-0.5">
                 <p className="text-lg font-mono font-bold text-amber-300/80">{value}</p>

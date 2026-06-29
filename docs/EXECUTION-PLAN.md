@@ -55,7 +55,13 @@ The prioritized backlog. Companion to `ROADMAP.md` (history), `GROWTH-STRATEGY.m
   and a **type-coloured share card** (the viral payoff). +8 tests.
   _v2 follow-up: author win/lose conditions (resource thresholds → forced
   triumphant/tragic endings) need resource-condition plumbing + author UI._
-- [ ] **9. Narrative-aware achievements** (secret endings, NPC bonds, faction
+- [x] **9. Narrative-aware achievements.** Reaching a definitive ending now
+  awards in-fiction achievements (first ending, a *secret* ending, all five
+  ending types) — verified server-side from the node. Each earned achievement
+  has its own **share card** (`/api/share-card/achievement/[id]`), surfaced as a
+  hover-share on the profile and a toast on unlock. Endings-reached added to the
+  profile stats.
+- [ ] **9b. (more) Narrative-aware achievements** (secret endings, NPC bonds, faction
   outcomes, "path chosen by N readers") — each auto-generating a share card.
 - [ ] **10. In-app discovery** — a public-rooms lobby and a bounty-board page
   (plumbing exists; both are dead without out-of-band links today).

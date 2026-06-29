@@ -1,3 +1,5 @@
+import type { EndingType } from './story'
+
 export interface Bookmark {
   id: string
   userId: string
@@ -43,6 +45,10 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
   { id: 'explorer',     name: 'Explorer',        description: 'Read 5 different stories',           icon: '🔭' },
   { id: 'bookworm',     name: 'Bookworm',        description: 'Read 10 different stories',          icon: '🦉' },
   { id: 'librarian',    name: 'Librarian',       description: 'Bookmarked 10 stories',             icon: '🔖' },
+  // Narrative-aware — earned in-fiction, each a shareable card.
+  { id: 'the_end',      name: 'The End',         description: 'Reached your first true ending',     icon: '🏁' },
+  { id: 'secret_keeper', name: 'Secret Keeper',  description: 'Discovered a secret ending',         icon: '🗝️' },
+  { id: 'every_ending', name: 'All Roads',       description: 'Collected all five kinds of ending', icon: '🎭' },
 ]
 
 export interface UserAchievements {
@@ -54,6 +60,10 @@ export interface UserAchievements {
     worlds: number
     stories: number
     illustrations: number
+    /** Definitive endings reached. */
+    endingsReached?: number
+    /** Distinct ending types collected (for the "all kinds" achievement). */
+    endingTypes?: EndingType[]
   }
   updatedAt: string
 }

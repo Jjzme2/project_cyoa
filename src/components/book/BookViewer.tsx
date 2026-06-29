@@ -30,6 +30,7 @@ import {
   isAmbientOn,
   setAmbientOn,
 } from '@/lib/page-sound'
+import { ACHIEVEMENT_DEFS } from '@/types'
 import type { Story, StoryNode, ChoiceSlot, ChoiceEffect, SaveSlot, WorldBible } from '@/types'
 import {
   type DiscoveredEnding,
@@ -151,6 +152,29 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
     saveDiscoveredEndings(story.id, next)
     setDiscoveredEndings(next)
     toast.success(endingCount ? `Ending discovered! (${next.length}/${endingCount})` : 'Ending discovered!')
+
+    // A definitive, authored ending may earn narrative achievements — award them
+    // server-side (which re-verifies the node) and celebrate any new ones.
+    if (n.isEnding && user) {
+      void (async () => {
+        try {
+          const token = await user.getIdToken()
+          const res = await fetch('/api/achievements/ending', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ storyId: story.id, nodeId: n.id }),
+          })
+          if (!res.ok) return
+          const { newlyEarned }: { newlyEarned: string[] } = await res.json()
+          for (const id of newlyEarned ?? []) {
+            const def = ACHIEVEMENT_DEFS.find((d) => d.id === id)
+            if (def) toast.success(`${def.icon} Achievement unlocked — ${def.name}`)
+          }
+        } catch {
+          /* best-effort */
+        }
+      })()
+    }
   }
 
   function toggleSound() {
