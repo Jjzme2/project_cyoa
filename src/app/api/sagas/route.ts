@@ -49,6 +49,10 @@ const SagaSchema = z.object({
   entryPoints: z
     .array(z.object({ label: z.string().optional(), premise: z.string().optional() }).loose())
     .optional(),
+  // Canon cast carried over when spinning a saga off an existing story.
+  seedCharacters: z
+    .array(z.object({ name: z.string(), description: z.string().optional(), status: z.string().optional() }).loose())
+    .optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -82,6 +86,7 @@ export async function POST(req: NextRequest) {
     shared,
     premise,
     entryPoints,
+    seedCharacters,
   } = parsed.data
 
   // Sanitise the entry points — each is a doorway into the saga: a short label
@@ -175,8 +180,21 @@ export async function POST(req: NextRequest) {
       description: [c.role, c.faction ? `of ${c.faction}` : '', c.bio].filter(Boolean).join(' · ').slice(0, 200),
       status: 'alive' as const,
     }))
-    const emergent = openings.flatMap((o) => o.newCharacters ?? [])
     const seenNames = new Set(seededCast.map((c) => c.name.toLowerCase()))
+    // Carry the cast from the source story (when spun off one), so continuity
+    // holds. Genesis figures take precedence; deduped by name and bounded.
+    for (const c of seedCharacters ?? []) {
+      const name = typeof c?.name === 'string' ? c.name.trim().slice(0, 80) : ''
+      if (name && !seenNames.has(name.toLowerCase()) && seededCast.length < 40) {
+        seededCast.push({
+          name,
+          description: typeof c?.description === 'string' ? c.description.trim().slice(0, 200) : '',
+          status: (typeof c?.status === 'string' && c.status.trim() ? c.status.trim().slice(0, 40) : 'alive') as 'alive',
+        })
+        seenNames.add(name.toLowerCase())
+      }
+    }
+    const emergent = openings.flatMap((o) => o.newCharacters ?? [])
     for (const c of emergent) {
       if (c.name && !seenNames.has(c.name.toLowerCase())) {
         seededCast.push({ name: c.name, description: c.description ?? '', status: 'alive' })

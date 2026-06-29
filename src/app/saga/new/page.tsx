@@ -15,7 +15,7 @@ import { ratingRank } from '@/lib/ratings'
 import { CoverDesigner, DEFAULT_COVER } from '@/components/book/CoverDesigner'
 import { useDraft } from '@/hooks/useDraft'
 import { SAGA_HANDOFF_KEY, type SagaHandoff } from '@/lib/saga-handoff'
-import type { World, CoverTheme, ReadingTheme, ContentRating, DirectorPersona } from '@/types'
+import type { World, CoverTheme, ReadingTheme, ContentRating, DirectorPersona, StoryCharacter } from '@/types'
 import { emptyDirector, isDirectorMeaningful } from '@/lib/director'
 import { DirectorControls } from '@/components/story/DirectorControls'
 import { ReadingThemePicker } from '@/components/book/ReadingThemePicker'
@@ -65,6 +65,8 @@ export default function NewSagaPage() {
   const [coverTheme, setCoverTheme] = useState<CoverTheme>(DEFAULT_COVER)
   const [readingTheme, setReadingTheme] = useState<ReadingTheme>({ pageStyle: 'parchment', ambientEffect: 'none' })
   const [hasDraft, setHasDraft] = useState(false)
+  // Canon cast carried over from a saved story, sent as seed characters on submit.
+  const [carriedCharacters, setCarriedCharacters] = useState<StoryCharacter[]>([])
 
   const draft = useDraft<{
     title: string; description: string; worldId: string; rating: ContentRating
@@ -102,6 +104,7 @@ export default function NewSagaPage() {
       if (d.entryPoints?.length) {
         setEntryPoints(d.entryPoints.length >= 2 ? d.entryPoints : [...d.entryPoints, { label: '', premise: '' }])
       }
+      if (d.characters?.length) setCarriedCharacters(d.characters)
       toast.success(d.source === 'story' ? 'Brought over from your story' : 'Brought over from your story draft')
     }, 0)
     return () => clearTimeout(t)
@@ -205,6 +208,7 @@ export default function NewSagaPage() {
           shared,
           premise: premise.trim() || null,
           entryPoints: readyEntries.map((ep) => ({ label: ep.label.trim(), premise: ep.premise.trim() })),
+          seedCharacters: carriedCharacters.length ? carriedCharacters : undefined,
           styleChoices: styleOptions.length > 0
             ? Object.fromEntries(styleOptions.map((o) => [o.label, styleChoices[o.label] ?? o.choices[0]]))
             : undefined,

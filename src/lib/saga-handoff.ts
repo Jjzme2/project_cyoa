@@ -1,4 +1,4 @@
-import type { ContentRating, CoverTheme, DirectorPersona, ReadingTheme } from '@/types'
+import type { ContentRating, CoverTheme, DirectorPersona, ReadingTheme, StoryCharacter } from '@/types'
 
 /**
  * A one-shot payload that carries an in-progress story's authored data into the
@@ -31,6 +31,10 @@ export interface SagaHandoff {
   premise: string
   /** Seeded doorways (e.g. derived from the protagonist the author defined). */
   entryPoints: SagaHandoffEntry[]
+  /** Canon cast carried from a saved story, so continuity holds in the saga. */
+  characters?: StoryCharacter[]
+  /** The story this saga was spun off from, when it came from a saved story. */
+  sourceStoryId?: string
   /** Where the handoff originated, for the confirmation toast. */
   source: 'story-draft' | 'story'
 }
