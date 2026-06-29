@@ -7,6 +7,7 @@ import { getCharacter } from '@/lib/firestore-helpers'
 import { appearanceSummary, isCrossWorld } from '@/lib/characters'
 import { CharacterPortrait } from '@/components/character/CharacterPortrait'
 import { ShareImageButton } from '@/components/share/ShareImageButton'
+import { APP_CONFIG } from '@/lib/config'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -28,8 +29,19 @@ async function CharacterDetail({ params }: Props) {
   const c = await getCharacter(id).catch(() => null)
   if (!c) notFound()
 
+  // Structured data so a character can surface as a rich result / entity.
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Person',
+    name: c.name,
+    url: `${APP_CONFIG.site.url}/characters/${c.id}`,
+    ...(c.tagline ? { description: c.tagline } : c.description ? { description: c.description } : {}),
+    ...(c.portraitUrl ? { image: c.portraitUrl } : {}),
+  }
+
   return (
     <main className="max-w-2xl mx-auto px-4 sm:px-6 py-12 space-y-8">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <Link
         href="/characters"
         className="inline-flex items-center gap-1.5 text-xs text-amber-400/50 hover:text-amber-400 transition-colors"
