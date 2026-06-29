@@ -73,6 +73,24 @@ export async function POST(
   if (!parsed.ok) return parsed.response
   const { content, depth, parentId, choiceText, aiGenerated, aiModel, choices } = parsed.data
 
+  if (!parentId) {
+    // Creating the opening chapter (the root): only the author may, and only
+    // once — guard against hijacking or overwriting another story's root.
+    if (uid !== story.authorId) {
+      return NextResponse.json({ error: 'Only the author can create the opening chapter.' }, { status: 403 })
+    }
+    if (story.rootNodeId) {
+      return NextResponse.json({ error: 'This story already has an opening chapter.' }, { status: 409 })
+    }
+  } else {
+    // Contributing onto an existing chapter: the parent must exist in THIS story
+    // (no orphan nodes, no cross-story grafting).
+    const parent = await getStoryNode(storyId, parentId).catch(() => null)
+    if (!parent || parent.storyId !== storyId) {
+      return NextResponse.json({ error: 'Parent chapter not found.' }, { status: 404 })
+    }
+  }
+
   // Guideline check: rating-aware — hard-refuse disallowed content, flag
   // content that exceeds the story's rating, otherwise approve.
   const verdict = moderateText(content, story.rating ?? 'Mature')

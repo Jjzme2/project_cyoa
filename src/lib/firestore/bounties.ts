@@ -73,9 +73,10 @@ export async function cancelBounty(
     }
     refundAmount = b.reward
     txn.update(ref, { 'bounty.status': 'refunded' })
+    // Refund atomically with the status change — no paid-but-not-credited window.
+    CreditManager.grantCreditsInTxn(txn, requesterId, refundAmount)
   })
   if (error) return { ok: false, error }
-  if (refundAmount > 0) await CreditManager.grantCredits(requesterId, refundAmount)
   return { ok: true }
 }
 
@@ -93,33 +94,27 @@ export async function settleBountyOnFill(
   published: boolean,
 ): Promise<void> {
   const ref = slotRef(storyId, nodeId, slotId)
-  let payTo: string | null = null
-  let refundTo: string | null = null
-  let amount = 0
 
   await adminDb.runTransaction(async (txn) => {
     const doc = await txn.get(ref)
     const b = doc.data()?.bounty as SlotBounty | undefined
     if (!b || b.status !== 'open') return
-    amount = b.reward
     if (b.posterId === fillerId) {
-      // Can't claim your own bounty — refund the escrow.
+      // Can't claim your own bounty — refund the escrow, atomically.
       txn.update(ref, { 'bounty.status': 'refunded' })
-      refundTo = b.posterId
+      CreditManager.grantCreditsInTxn(txn, b.posterId, b.reward)
     } else if (published) {
+      // Pay the filler in the same transaction as marking it paid.
       txn.update(ref, {
         'bounty.status': 'paid',
         'bounty.pendingClaimBy': null,
         'bounty.pendingNodeId': null,
       })
-      payTo = fillerId
+      CreditManager.grantCreditsInTxn(txn, fillerId, b.reward)
     } else {
       // Flagged — hold the reward until an admin approves the route.
       txn.update(ref, { 'bounty.pendingClaimBy': fillerId, 'bounty.pendingNodeId': childNodeId })
     }
   })
-
-  if (payTo) await CreditManager.grantCredits(payTo, amount)
-  else if (refundTo) await CreditManager.grantCredits(refundTo, amount)
 }
 

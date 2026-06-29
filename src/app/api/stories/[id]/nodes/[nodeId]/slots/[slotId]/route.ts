@@ -40,6 +40,8 @@ import type { ModerationResult } from '@/lib/moderation'
 import { validatePromptLocal } from '@/lib/validate'
 import { moderateText, moderationToNodeFields } from '@/lib/moderation'
 import { NarrativeBuilder } from '@/lib/engine/narrative-builder'
+import { buildWorldPulse } from '@/lib/engine/world-pulse'
+import type { WorldPulse } from '@/types'
 import type { WorldState } from '@/types/goap'
 import type { AgentMemory } from '@/types/goap'
 import type { ChoiceRequirement, ChoiceEffect } from '@/types'
@@ -213,9 +215,16 @@ export async function POST(
     }
     const editedPrompt = review.text
 
+    // The narrative engine runs for EVERY story now. Its always-on subsystems —
+    // the AI Director (pacing/tension beats), procedural environment & encounters,
+    // and the autonomous faction + economy sim — need no per-story config. GOAP
+    // agents and procedural quests remain opt-in: they stay gated inside the
+    // builder by `goapEnabled` / `implementQuests`. (No extra AI call — the
+    // context is folded into the single generation below.)
     let systemNarrativeEvents = ''
     let updatedEngineState = undefined
-    if (story.goapEnabled || story.implementQuests) {
+    let nodeWorldPulse: WorldPulse | undefined = undefined
+    {
       // Restore prior engine state from the parent node (server-side, not client-trusted)
       const priorEngineState = parentNode.engineState ?? undefined
       const builder = new NarrativeBuilder(story, world, priorEngineState)
@@ -251,6 +260,8 @@ export async function POST(
       )
       systemNarrativeEvents = builder.formatForPrompt(context)
       updatedEngineState = nextState
+      // Reader-facing snapshot of the living world at this chapter.
+      nodeWorldPulse = buildWorldPulse(context, nextState)
     }
 
     const { content, choices, model, newCharacters, location } = await generateStoryNode(
@@ -333,6 +344,7 @@ export async function POST(
           ...(qualityScore !== undefined ? { qualityScore } : {}),
           ...(location ? { location } : {}),
           ...(updatedEngineState ? { engineState: updatedEngineState } : {}),
+          ...(nodeWorldPulse ? { worldPulse: nodeWorldPulse } : {}),
         },
         choices,
         moderationFields,

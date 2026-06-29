@@ -3,6 +3,7 @@ import { revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import { parseJson } from '@/lib/api-validation'
 import { getAuthContext } from '@/lib/auth'
+import { apiHandler } from '@/lib/api-handler'
 import { postBounty, cancelBounty, getStory } from '@/lib/firestore-helpers'
 
 const BountySchema = z.object({
@@ -11,10 +12,10 @@ const BountySchema = z.object({
 })
 
 /** Place a credit bounty on an empty slot (escrowed from purchased credits). */
-export async function POST(
+export const POST = apiHandler(async (
   req: NextRequest,
   { params }: { params: Promise<{ id: string; nodeId: string; slotId: string }> },
-) {
+) => {
   const { id: storyId, nodeId, slotId } = await params
   const auth = await getAuthContext(req)
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -40,13 +41,13 @@ export async function POST(
 
   revalidateTag(`node-${storyId}-${nodeId}`, 'max')
   return NextResponse.json({ ok: true })
-}
+})
 
 /** Cancel an open, unclaimed bounty and refund the poster. */
-export async function DELETE(
+export const DELETE = apiHandler(async (
   req: NextRequest,
   { params }: { params: Promise<{ id: string; nodeId: string; slotId: string }> },
-) {
+) => {
   const { id: storyId, nodeId, slotId } = await params
   const auth = await getAuthContext(req)
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -56,4 +57,4 @@ export async function DELETE(
 
   revalidateTag(`node-${storyId}-${nodeId}`, 'max')
   return NextResponse.json({ ok: true })
-}
+})

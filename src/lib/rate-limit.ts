@@ -22,6 +22,27 @@ export function dailyLimit(tier: 'FREE' | 'PREMIUM') {
   return tier === 'PREMIUM' ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT
 }
 
+/**
+ * Lightweight fixed-window throttle for abuse-guarding non-credit endpoints
+ * (feedback, client tracking). Returns true if the action is allowed.
+ *
+ * Fails OPEN: if Redis is unreachable we allow the action rather than block
+ * legitimate users — the opposite of the credit path (which fails closed),
+ * because here there is no per-call cost to protect, only spam to discourage.
+ */
+export async function throttle(bucket: string, max: number, windowSeconds: number): Promise<boolean> {
+  try {
+    const redis = getRedis()
+    const window = Math.floor(Date.now() / 1000 / windowSeconds)
+    const key = `cyoa:throttle:${bucket}:${window}`
+    const count = await redis.incr(key)
+    if (count === 1) await redis.expire(key, windowSeconds + 5)
+    return count <= max
+  } catch {
+    return true // fail open — never block a real user on a Redis hiccup
+  }
+}
+
 export async function checkRateLimit(
   userId: string,
   tier: 'FREE' | 'PREMIUM' = 'FREE',

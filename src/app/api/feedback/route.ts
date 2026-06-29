@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { parseJson } from '@/lib/api-validation'
 import { getAuthContext } from '@/lib/auth'
+import { apiHandler } from '@/lib/api-handler'
 import { createFeedback, listFeedback } from '@/lib/firestore-helpers'
 import { sortFeedback } from '@/lib/feedback'
+import { throttle } from '@/lib/rate-limit'
 import { insights } from '@/lib/telemetry'
 import { FEEDBACK_TYPES } from '@/types'
 
@@ -18,7 +20,7 @@ const FeedbackSchema = z.object({
  * each item's vote count and whether the (optional) viewer has voted. Voter ids
  * are never exposed.
  */
-export async function GET(req: NextRequest) {
+export const GET = apiHandler(async (req: NextRequest) => {
   const auth = await getAuthContext(req).catch(() => null)
   const items = sortFeedback(await listFeedback())
   const board = items.map(({ voters, authorId, ...rest }) => ({
@@ -27,12 +29,17 @@ export async function GET(req: NextRequest) {
     isMine: auth ? authorId === auth.uid : false,
   }))
   return NextResponse.json({ feedback: board })
-}
+})
 
 /** Submit a bug report, feature request, or piece of feedback. Sign-in required. */
-export async function POST(req: NextRequest) {
+export const POST = apiHandler(async (req: NextRequest) => {
   const auth = await getAuthContext(req)
   if (!auth) return NextResponse.json({ error: 'Sign in to post feedback' }, { status: 401 })
+
+  // Abuse guard: a handful of new posts per hour per account.
+  if (!(await throttle(`feedback:${auth.uid}`, 6, 3600))) {
+    return NextResponse.json({ error: 'You’re posting a lot — try again in a bit.' }, { status: 429 })
+  }
 
   const parsed = await parseJson(req, FeedbackSchema)
   if (!parsed.ok) return parsed.response
@@ -42,4 +49,4 @@ export async function POST(req: NextRequest) {
   await insights.track('feedback.created', { uid: auth.uid, props: { feedbackId: id, type } })
 
   return NextResponse.json({ id }, { status: 201 })
-}
+})

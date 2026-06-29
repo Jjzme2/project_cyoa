@@ -96,8 +96,18 @@ export async function setNodeModeration(
     for (const d of slotMatches.docs) {
       const b = d.data()?.bounty as SlotBounty | undefined
       if (b && b.status === 'open' && b.pendingNodeId === nodeId && b.pendingClaimBy) {
-        await d.ref.update({ 'bounty.status': 'paid', 'bounty.pendingClaimBy': null, 'bounty.pendingNodeId': null })
-        await CreditManager.grantCredits(b.pendingClaimBy, b.reward)
+        const claimer = b.pendingClaimBy
+        const reward = b.reward
+        // Mark paid AND grant the reward in one transaction. Re-read inside it so
+        // a racing approval can't double-pay, and there's no paid-but-not-credited
+        // window.
+        await adminDb.runTransaction(async (txn) => {
+          const fresh = await txn.get(d.ref)
+          const fb = fresh.data()?.bounty as SlotBounty | undefined
+          if (!fb || fb.status !== 'open' || fb.pendingNodeId !== nodeId) return
+          txn.update(d.ref, { 'bounty.status': 'paid', 'bounty.pendingClaimBy': null, 'bounty.pendingNodeId': null })
+          CreditManager.grantCreditsInTxn(txn, claimer, reward)
+        })
       }
     }
     return

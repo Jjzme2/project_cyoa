@@ -29,6 +29,9 @@ export interface AuthContext {
   age: number | null
   /** Highest content rank this viewer may see (see lib/ratings). */
   allowedRank: number
+  /** When the user last passed the 2FA gate (ms epoch), from a server-set claim;
+   * null if never. Lets sensitive routes require a recent second factor. */
+  twofaVerifiedAt: number | null
 }
 
 export function isAdminEmail(email: string | null | undefined): boolean {
@@ -67,6 +70,7 @@ export async function getAuthContext(req: Request): Promise<AuthContext | null> 
       age,
       // Admins bypass the age gate for moderation purposes.
       allowedRank: isAdmin ? RATING_RANK.Mature : allowedRankForAge(age),
+      twofaVerifiedAt: typeof decoded.twofaVerifiedAt === 'number' ? decoded.twofaVerifiedAt : null,
     }
   } catch {
     return null
