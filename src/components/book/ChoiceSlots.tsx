@@ -24,6 +24,8 @@ interface Props {
   storyResources?: ResourceDefinition[]
   storyCharacters?: StoryCharacter[]
   protagonist?: Protagonist
+  /** Sagas (the reader plays as themselves) don't carry bounties. */
+  isSaga?: boolean
 }
 
 function checkRequirements(slot: ChoiceSlot, currentRes: Record<string, number | string | string[] | number[]>): boolean {
@@ -39,6 +41,7 @@ export function ChoiceSlots({
   onModerated,
   currentResources,
   storyResources,
+  isSaga,
 }: Props) {
   const { user, tier, isAdmin, openAuthModal, aiUsesRemaining, updateAiUses } = useAuth()
   const [inputs, setInputs] = useState<Record<string, string>>({})
@@ -417,7 +420,7 @@ export function ChoiceSlots({
                   </span>
                 </div>
                 <div className="mt-2">
-                  <BountyControl storyId={storyId} nodeId={nodeId} slot={slot} readOnly />
+                  {!isSaga && <BountyControl storyId={storyId} nodeId={nodeId} slot={slot} readOnly />}
                 </div>
               </div>
             ) : user ? (
@@ -448,7 +451,9 @@ export function ChoiceSlots({
                         if (errors[slot.id]) setErrors((prev) => { const n = { ...prev }; delete n[slot.id]; return n })
                       }}
                       disabled={submitting === slot.id}
-                      className="text-[13px] min-h-[68px] resize-none focus-visible:ring-1 placeholder:opacity-50"
+                      // Override the base muted-gray placeholder (invisible on
+                      // light page colorings) with the adaptive page-text colour.
+                      className="text-[13px] min-h-[68px] resize-none focus-visible:ring-1 placeholder:text-[var(--page-text)] placeholder:opacity-60"
                       style={{
                         background: 'color-mix(in oklch, var(--page-text) 10%, transparent)',
                         borderColor: errors[slot.id]
@@ -523,7 +528,7 @@ export function ChoiceSlots({
                     </Button>
                   </>
                 )}
-                <BountyControl storyId={storyId} nodeId={nodeId} slot={slot} onChange={onModerated} />
+                {!isSaga && <BountyControl storyId={storyId} nodeId={nodeId} slot={slot} onChange={onModerated} />}
               </div>
             ) : (
               /* Logged-out: sign-in prompt */
@@ -544,7 +549,7 @@ export function ChoiceSlots({
                   </span>
                 </div>
               </button>
-              <BountyControl storyId={storyId} nodeId={nodeId} slot={slot} readOnly />
+              {!isSaga && <BountyControl storyId={storyId} nodeId={nodeId} slot={slot} readOnly />}
               </div>
             )}
           </motion.div>

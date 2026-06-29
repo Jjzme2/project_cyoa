@@ -3,7 +3,7 @@ import { revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import { parseJson } from '@/lib/api-validation'
 import { getAuthContext } from '@/lib/auth'
-import { postBounty, cancelBounty } from '@/lib/firestore-helpers'
+import { postBounty, cancelBounty, getStory } from '@/lib/firestore-helpers'
 
 const BountySchema = z.object({
   reward: z.coerce.number(),
@@ -21,6 +21,12 @@ export async function POST(
 
   const parsed = await parseJson(req, BountySchema)
   if (!parsed.ok) return parsed.response
+
+  // Sagas (the reader plays as themselves) don't carry bounties.
+  const story = await getStory(storyId).catch(() => null)
+  if (story?.youMode) {
+    return NextResponse.json({ error: 'Sagas don’t support bounties.' }, { status: 400 })
+  }
 
   const result = await postBounty(
     storyId,

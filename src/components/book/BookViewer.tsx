@@ -813,6 +813,7 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
                 storyResources={story.resources}
                 storyCharacters={story.characters}
                 protagonist={story.protagonist}
+                isSaga={!!story.youMode}
               />
               <p className="mt-4 text-center text-[10px] font-sans opacity-20 tracking-widest select-none">
                 — {pageNumber * 2} —
