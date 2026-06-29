@@ -9,6 +9,7 @@ import { ChoiceSlots } from './ChoiceSlots'
 import { NodeReactions } from './NodeReactions'
 import { SaveSlotPicker, loadSaveSlots, getActiveSlotId, upsertSaveSlot } from './SaveSlotPicker'
 import { SharePathButton } from './SharePathButton'
+import { BeginSagaControl } from './BeginSagaControl'
 import { BookmarkButton } from './BookmarkButton'
 import { GalleryButton } from './GalleryButton'
 import { AmbientBackground } from './AmbientBackground'
@@ -728,6 +729,13 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
             storyId={story.id}
             nodeHistory={history.map((n) => n.id)}
             currentNodeId={node.id}
+          />
+          <BeginSagaControl
+            storyId={story.id}
+            nodeId={node.id}
+            nodeHistory={history.map((n) => n.id)}
+            isSaga={!!story.youMode}
+            sagaBranches={node.sagaBranches}
           />
         </div>
       </div>

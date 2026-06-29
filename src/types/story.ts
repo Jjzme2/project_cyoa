@@ -133,6 +133,9 @@ export interface StoryNode {
   moderation?: NodeModeration
   /** How many times readers have arrived at this route (for reads/reputation). */
   traversals?: number
+  /** How many readers have branched a personal saga from this chapter (a 4th,
+   * non-community branch type). Surfaced in the reader. */
+  sagaBranches?: number
   /** Serialised simulation state at this node (factions, economy, agent memories). */
   engineState?: EngineState
   /** Content Judge craft score (0-100); informational, for future ranking. */

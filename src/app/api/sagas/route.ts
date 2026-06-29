@@ -13,6 +13,7 @@ import {
   getMultiverseCameos,
   getLinkedCameos,
   checkAndAwardAchievements,
+  getUserSagaInWorld,
 } from '@/lib/firestore-helpers'
 import { mergeEchoes, mergeCameos } from '@/lib/multiverse'
 import { CreditManager } from '@/lib/credit-manager'
@@ -115,6 +116,16 @@ export async function POST(req: NextRequest) {
 
   const world = await getWorld(worldId).catch(() => null)
   if (!world) return NextResponse.json({ error: 'World not found' }, { status: 404 })
+
+  // One saga per player, per world: send them to the one they already have.
+  const existingSaga = await getUserSagaInWorld(uid, worldId).catch(() => null)
+  if (existingSaga) {
+    return NextResponse.json(
+      { error: 'You already have a saga in this world.', existingId: existingSaga.id },
+      { status: 409 },
+    )
+  }
+
   const effectiveRating = world.rating ? clampRating(rating, world.rating) : rating
   // The saga's picks for the world's configurable style options.
   const safeStyleChoices = sanitizeStyleChoices(styleChoices, world.storySettings?.styleOptions)
