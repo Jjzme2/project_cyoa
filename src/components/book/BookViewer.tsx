@@ -9,6 +9,7 @@ import { ChoiceSlots } from './ChoiceSlots'
 import { NodeReactions } from './NodeReactions'
 import { SaveSlotPicker, loadSaveSlots, getActiveSlotId, upsertSaveSlot } from './SaveSlotPicker'
 import { SharePathButton } from './SharePathButton'
+import { BeginSagaControl } from './BeginSagaControl'
 import { BookmarkButton } from './BookmarkButton'
 import { GalleryButton } from './GalleryButton'
 import { AmbientBackground } from './AmbientBackground'
@@ -729,6 +730,13 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
             nodeHistory={history.map((n) => n.id)}
             currentNodeId={node.id}
           />
+          <BeginSagaControl
+            storyId={story.id}
+            nodeId={node.id}
+            nodeHistory={history.map((n) => n.id)}
+            isSaga={!!story.youMode}
+            sagaBranches={node.sagaBranches}
+          />
         </div>
       </div>
 
@@ -813,6 +821,7 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
                 storyResources={story.resources}
                 storyCharacters={story.characters}
                 protagonist={story.protagonist}
+                isSaga={!!story.youMode}
               />
               <p className="mt-4 text-center text-[10px] font-sans opacity-20 tracking-widest select-none">
                 — {pageNumber * 2} —

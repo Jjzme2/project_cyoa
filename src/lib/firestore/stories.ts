@@ -206,6 +206,18 @@ export async function getStoryCounts(): Promise<Record<string, number>> {
   return counts
 }
 
+/** The reader's existing personal saga in a world, if any (one saga per player
+ * per world). Reuses the author index — no extra composite index needed. */
+export async function getUserSagaInWorld(uid: string, worldId: string): Promise<Story | null> {
+  const mine = await getStoriesByAuthor(uid).catch(() => [])
+  return mine.find((s) => s.youMode === true && s.worldId === worldId) ?? null
+}
+
+/** A reader began a personal saga from this chapter — bump its branch counter. */
+export async function incrementSagaBranches(storyId: string, nodeId: string): Promise<void> {
+  await nodeRef(storyId, nodeId).update({ sagaBranches: FieldValue.increment(1) })
+}
+
 export async function getStoriesByAuthor(authorId: string): Promise<Story[]> {
   const snap = await adminDb
     .collection('stories')
