@@ -213,9 +213,15 @@ export async function POST(
     }
     const editedPrompt = review.text
 
+    // The narrative engine runs for EVERY story now. Its always-on subsystems —
+    // the AI Director (pacing/tension beats), procedural environment & encounters,
+    // and the autonomous faction + economy sim — need no per-story config. GOAP
+    // agents and procedural quests remain opt-in: they stay gated inside the
+    // builder by `goapEnabled` / `implementQuests`. (No extra AI call — the
+    // context is folded into the single generation below.)
     let systemNarrativeEvents = ''
     let updatedEngineState = undefined
-    if (story.goapEnabled || story.implementQuests) {
+    {
       // Restore prior engine state from the parent node (server-side, not client-trusted)
       const priorEngineState = parentNode.engineState ?? undefined
       const builder = new NarrativeBuilder(story, world, priorEngineState)
