@@ -9,6 +9,17 @@ import type { EngineState } from './engine'
 export const ENDING_TYPES = ['triumphant', 'tragic', 'bittersweet', 'mysterious', 'secret'] as const
 export type EndingType = (typeof ENDING_TYPES)[number]
 
+/** Author-defined win/lose condition: when a resource crosses a threshold, the
+ * story is brought to a definitive ending of the given type. */
+export interface EndingCondition {
+  resourceName: string
+  operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'not_contains'
+  value: number | string
+  type: EndingType
+  /** The ending's title when this condition fires. */
+  title: string
+}
+
 // ─── Living World pulse (reader-facing simulation snapshot) ──────────────────
 /** A compact, human-readable snapshot of the engine at a chapter, for the
  * reader's "Living World" panel. Built server-side; the client only renders it. */
@@ -131,6 +142,8 @@ export interface Story {
   initialWorldState?: Record<string, string | number | boolean>
   /** Market threshold rules: when a commodity becomes scarce or cheap, modify player resources. */
   economyEffects?: import('@/types/economy').EconomyResourceEffect[]
+  /** Author win/lose conditions: a resource threshold that forces a definitive ending. */
+  endingConditions?: EndingCondition[]
 }
 
 export interface StoryNode {

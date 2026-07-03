@@ -13,7 +13,7 @@ import { useAuth } from '@/components/Providers'
 import { STORY_TAGS, CONTENT_RATINGS, CONTENT_RATING_META, DEFAULT_CONTENT_RATING } from '@/types'
 import { ratingRank } from '@/lib/ratings'
 import { CoverDesigner, DEFAULT_COVER } from '@/components/book/CoverDesigner'
-import type { World, CoverTheme, ReadingTheme, ContentRating, DirectorPersona } from '@/types'
+import type { World, CoverTheme, ReadingTheme, ContentRating, DirectorPersona, EndingCondition } from '@/types'
 import { emptyDirector, isDirectorMeaningful } from '@/lib/director'
 import { DirectorControls } from '@/components/story/DirectorControls'
 import { StoryResourcesEditor, type StoryResourceDraft } from '@/components/story/StoryResourcesEditor'
@@ -60,6 +60,7 @@ export default function NewStoryPage() {
   const [implementQuests, setImplementQuests] = useState(false)
 
   const [economyEffects, setEconomyEffects] = useState<EconomyEffectRow[]>([])
+  const [endingConditions, setEndingConditions] = useState<EndingCondition[]>([])
   const [resources, setResources] = useState<StoryResourceDraft[]>([])
 
   const draft = useDraft<{
@@ -256,6 +257,9 @@ export default function NewStoryPage() {
             ? economyEffects
                 .filter((eff) => eff.resourceName.trim() !== '' && eff.value.trim() !== '')
                 .map((eff) => ({ ...eff, value: Number(eff.value) }))
+            : undefined,
+          endingConditions: endingConditions.length > 0
+            ? endingConditions.filter((c) => c.resourceName.trim() !== '' && c.title.trim() !== '')
             : undefined,
         }),
       })
@@ -642,6 +646,9 @@ export default function NewStoryPage() {
       setImplementQuests={setImplementQuests}
       economyEffects={economyEffects}
       setEconomyEffects={setEconomyEffects}
+      endingConditions={endingConditions}
+      setEndingConditions={setEndingConditions}
+      resourceNames={resources.map((r) => r.name.trim()).filter(Boolean)}
     />
   )
 

@@ -869,6 +869,7 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
                     storyCharacters={story.characters}
                     protagonist={story.protagonist}
                     isSaga={!!story.youMode}
+                    endingConditions={story.endingConditions}
                   />
                 </>
               )}

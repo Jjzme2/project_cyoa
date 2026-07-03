@@ -53,8 +53,13 @@ The prioritized backlog. Companion to `ROADMAP.md` (history), `GROWTH-STRATEGY.m
   (triumphant / tragic / bittersweet / mysterious / secret). The node is terminal
   (no slots), gets an **animated, type-themed "The End" reveal** in the reader,
   and a **type-coloured share card** (the viral payoff). +8 tests.
-  _v2 follow-up: author win/lose conditions (resource thresholds → forced
-  triumphant/tragic endings) need resource-condition plumbing + author UI._
+- [x] **Story endings (v2) — author win/lose conditions.** Authors define
+  resource thresholds (e.g. `Health <= 0 → tragic "The Last Breath"`) in the
+  story creator's Advanced Engine Features. When the reader's resources meet a
+  condition, the next chapter they write is forced into that definitive ending
+  (server guarantees it terminal). Pure evaluator `metEndingCondition` (+6
+  tests); persisted on the story; editor with resource/operator/threshold/
+  type/title rows.
 - [x] **9. Narrative-aware achievements.** Reaching a definitive ending now
   awards in-fiction achievements (first ending, a *secret* ending, all five
   ending types) — verified server-side from the node. Each earned achievement
