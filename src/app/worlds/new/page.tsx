@@ -77,6 +77,7 @@ export default function NewWorldPage() {
   const [mandate, setMandate] = useState('')
   const [proseStyles, setProseStyles] = useState('') // one per line
   const [motifs, setMotifs] = useState('') // comma- or newline-separated
+  const [narrativeMode, setNarrativeMode] = useState<'auto' | 'dramatic' | 'gentle'>('auto')
   // Configurable style parameters each story in this world will choose from
   // (e.g. label "Rhyme scheme", choices "ABAB, ABBA, AABB, Free verse").
   const [styleOptions, setStyleOptions] = useState<{ label: string; choices: string }[]>([])
@@ -188,6 +189,7 @@ export default function NewWorldPage() {
             mandate: mandate.trim() || undefined,
             proseStyles: proseStyles.split('\n').map((s) => s.trim()).filter(Boolean),
             motifs: motifs.split(/[,\n]/).map((s) => s.trim()).filter(Boolean),
+            ...(narrativeMode !== 'auto' ? { narrativeMode } : {}),
             styleOptions: styleOptions
               .map((o) => ({ label: o.label.trim(), choices: o.choices.split(',').map((c) => c.trim()).filter(Boolean) }))
               .filter((o) => o.label && o.choices.length > 0),
@@ -364,6 +366,27 @@ export default function NewWorldPage() {
         </Label>
         <p className="text-xs text-muted-foreground/45 mt-1">
           World-level rules that shape how every chapter is written — applied to every story in this world.
+        </p>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="narrativeMode" className="text-xs text-muted-foreground/60">
+          Narrative shape{' '}
+          <span className="text-muted-foreground/45">— what drives this world&apos;s stories</span>
+        </Label>
+        <select
+          id="narrativeMode"
+          value={narrativeMode}
+          onChange={(e) => setNarrativeMode(e.target.value as 'auto' | 'dramatic' | 'gentle')}
+          className="w-full h-9 px-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:border-ring"
+        >
+          <option value="auto">Auto — read it from my world&apos;s tone and rules</option>
+          <option value="dramatic">Dramatic — traditional arcs: conflict, stakes, reckonings</option>
+          <option value="gentle">Gentle — nothing bad here: wonder, friendship, and joy</option>
+        </select>
+        <p className="text-[11px] text-muted-foreground/40 leading-relaxed">
+          Gentle worlds get conflict-free story arcs — the climax is a shared wonder or a heartfelt moment, never a
+          threat. Auto detects this from your rules (e.g. &ldquo;no bad happens here&rdquo;).
         </p>
       </div>
 

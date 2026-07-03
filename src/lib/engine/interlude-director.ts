@@ -26,6 +26,16 @@ const DIRECTIVE: Record<InterludeKind, string> = {
     'Open with a short, symbolic DREAM the protagonist is having — charged with the story’s mood and a half-buried fear or hope — then have them wake into the present scene.',
 };
 
+/** Conflict-free interludes for GENTLE worlds — reverie instead of unease. */
+const GENTLE_DIRECTIVE: Record<InterludeKind, string> = {
+  flashback:
+    'Open this chapter as a warm FLASHBACK to a treasured earlier moment — let its glow colour the present, then return to the now and the pending choice.',
+  vision:
+    'Frame this chapter as a bright, imaginative REVERIE — a luminous glimpse of the wonderful thing taking shape — then surface back to the present at a moment of delighted decision.',
+  dream:
+    'Open with a short, sweet DREAM the protagonist is having — coloured by the story’s warmth and a cherished hope — then have them wake gently into the present scene.',
+};
+
 export const InterludeDirector = {
   decide(opts: {
     nodePath: string;
@@ -33,6 +43,7 @@ export const InterludeDirector = {
     lastInterlude?: number;
     plotBeatIndex: number;
     betrayalThisTurn: boolean;
+    mode?: 'dramatic' | 'gentle';
   }): InterludeDecision {
     const since = opts.turnCount - (opts.lastInterlude ?? -COOLDOWN - 1);
     if (since <= COOLDOWN) return { fired: false, directive: '' };
@@ -44,6 +55,7 @@ export const InterludeDirector = {
     else if (rng.nextFloat() < 0.12) kind = 'dream';
 
     if (!kind) return { fired: false, directive: '' };
-    return { fired: true, directive: DIRECTIVE[kind] };
+    const table = opts.mode === 'gentle' ? GENTLE_DIRECTIVE : DIRECTIVE;
+    return { fired: true, directive: table[kind] };
   },
 };

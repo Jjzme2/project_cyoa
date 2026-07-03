@@ -38,6 +38,7 @@ const CreateWorldSchema = z.object({
       styleOptions: z
         .array(z.object({ label: z.string(), choices: z.array(z.string()) }))
         .optional(),
+      narrativeMode: z.enum(['auto', 'dramatic', 'gentle']).optional(),
     })
     .optional(),
 })
@@ -48,6 +49,7 @@ type StorySettingsInput = {
   proseStyles?: string[]
   motifs?: string[]
   styleOptions?: StyleOptionInput[]
+  narrativeMode?: 'auto' | 'dramatic' | 'gentle'
 }
 
 /** Trim + bound the world story settings; drop it entirely if nothing is set. */
@@ -62,11 +64,14 @@ function sanitizeStorySettings(s: StorySettingsInput | undefined): StorySettings
     .map((o) => ({ label: (o.label ?? '').trim().slice(0, 60), choices: clean(o.choices) }))
     .filter((o) => o.label && o.choices.length > 0)
     .slice(0, 8)
+  // 'auto' is the implicit default — only persist an explicit override.
+  const narrativeMode = s.narrativeMode === 'gentle' || s.narrativeMode === 'dramatic' ? s.narrativeMode : undefined
   const out: StorySettingsInput = {
     ...(mandate ? { mandate } : {}),
     ...(proseStyles.length ? { proseStyles } : {}),
     ...(motifs.length ? { motifs } : {}),
     ...(styleOptions.length ? { styleOptions } : {}),
+    ...(narrativeMode ? { narrativeMode } : {}),
   }
   return Object.keys(out).length > 0 ? out : null
 }

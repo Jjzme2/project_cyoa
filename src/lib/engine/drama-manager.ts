@@ -51,8 +51,22 @@ export class DramaManager {
     }
   }
 
-  /** The pacing instruction handed to the AI for this beat. */
-  directive(beat: Beat): string {
+  /**
+   * The pacing instruction handed to the AI for this beat. In a GENTLE world the
+   * same curve drives anticipation instead of danger: an "escalation" is a
+   * delightful new development, a "respite" a savoring pause.
+   */
+  directive(beat: Beat, mode: 'dramatic' | 'gentle' = 'dramatic'): string {
+    if (mode === 'gentle') {
+      switch (beat) {
+        case 'escalate':
+          return 'The story has been drifting — stir it gently: introduce a delightful arrival, invitation, or small wonder that draws everyone into motion.'
+        case 'respite':
+          return 'Anticipation has crested — allow a soft, savoring pause: a shared quiet, a warm exchange, a breath before the moment arrives.'
+        default:
+          return 'Keep the warm momentum, letting the present moment deepen toward the next inviting choice.'
+      }
+    }
     switch (beat) {
       case 'escalate':
         return 'The story has been calm — raise the stakes now: introduce a complication, threat, or turn that demands action.'
