@@ -24,7 +24,16 @@ export const DifficultyManager = {
     return { level };
   },
 
-  directive(level: number): string {
+  /**
+   * In a GENTLE world the same curve measures how much the moment MEANS, not how
+   * dangerous it is — significance instead of peril.
+   */
+  directive(level: number, mode: 'dramatic' | 'gentle' = 'dramatic'): string {
+    if (mode === 'gentle') {
+      if (level >= 0.66) return 'This moment matters deeply — let its emotional weight be felt: something long-awaited, dearly hoped-for, or quietly profound.';
+      if (level >= 0.33) return 'The moment carries real meaning — let choices touch hearts and friendships in ways that matter.';
+      return 'Keep things light and easeful — small pleasures, low ceremony.';
+    }
     if (level >= 0.66) return 'The stakes are dire — make threats and obstacles genuinely dangerous and costly.';
     if (level >= 0.33) return 'The stakes are real — challenges should carry meaningful risk.';
     return 'The stakes are modest for now — keep dangers light.';

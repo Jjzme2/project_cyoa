@@ -3,6 +3,7 @@ import { describeDirector } from '@/lib/director'
 import { formatCast } from './context-budget'
 import { worldStyleBlock } from './world-style'
 import { formatStoryPath } from './story-memory'
+import { resolveNarrativeMode, gentleModeDirective } from '@/lib/engine/narrative-mode'
 
 export interface WorldContext {
   name: string
@@ -156,6 +157,16 @@ function ratingGuidance(rating: ContentRating | undefined): string {
 }
 
 /**
+ * The world's narrative shape, for prompts that don't run through the
+ * NarrativeBuilder (saga openings). Chapter generation gets this via the
+ * builder's system events instead, so it isn't duplicated there.
+ */
+function narrativeShapeBlock(world: WorldContext): string {
+  if (resolveNarrativeMode(world) !== 'gentle') return ''
+  return `\nNARRATIVE SHAPE (governs everything below): ${gentleModeDirective()}\n`
+}
+
+/**
  * A block, included only when the engine deems the story eligible to conclude,
  * inviting (or requiring) a real ending. Kept out of the prompt entirely
  * otherwise, so endings stay rare and earned.
@@ -283,7 +294,7 @@ WORLD RULES: ${world.rules}
 TONE: ${world.tone}
 
 ${ratingGuidance(world.rating)}
-${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${multiverseBlock(world.echoes)}${cameoBlock(world.cameos)}${directorBlock(world.director)}${worldStyleBlock(world.storySettings, 0, world.styleChoices)}${sagaPremise.trim() ? `\nSAGA PREMISE (the overall situation this saga drops the reader into — honor it):\n${sagaPremise.trim()}\n` : ''}
+${narrativeShapeBlock(world)}${genesisBlock(world.genesis)}${chronicleBlock(world.chronicle)}${multiverseBlock(world.echoes)}${cameoBlock(world.cameos)}${directorBlock(world.director)}${worldStyleBlock(world.storySettings, 0, world.styleChoices)}${sagaPremise.trim() ? `\nSAGA PREMISE (the overall situation this saga drops the reader into — honor it):\n${sagaPremise.trim()}\n` : ''}
 THIS ENTRY POINT — one of several doorways into the saga the reader could have chosen:
 - How it was offered to the reader: "${entry.label}"
 - What this opening must establish: ${entry.premise}

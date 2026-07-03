@@ -15,8 +15,11 @@ import { InterludeDirector } from './interlude-director';
 import { RelationshipGraph } from './relationship-graph';
 import { AgentAffect } from './agent-affect';
 import { BeliefModel } from './belief';
+import { resolveNarrativeMode, gentleModeDirective, type NarrativeMode } from './narrative-mode';
 
 export interface NarrativeContext {
+  /** Governs everything below it: the world's narrative shape (empty for dramatic). */
+  modeDirective: string;
   environmentalContext: string;
   activeEncounters: string[];
   npcActions: string[];
@@ -52,9 +55,20 @@ export interface NarrativeBuildResult {
  * Orchestrates GOAP, ProcGen, Factions, and Economy into a single AI prompt block.
  * Accepts an optional prior EngineState to restore from persistence; otherwise initialises fresh.
  */
+/** Conflict-free encounter hooks for gentle worlds — meetings, not ambushes. */
+const GENTLE_ENCOUNTERS = [
+  'A friendly traveller waves from the path, eager to share news of a nearby delight.',
+  'The smell of fresh baking drifts from somewhere close, an unspoken invitation.',
+  'A small animal pads over, curious and unafraid, clearly wanting company.',
+  'Someone nearby is putting up bunting — preparations for something joyful are underway.',
+  'A neighbour calls out warmly, asking for a small hand with a pleasant task.',
+  'A patch of remarkable flowers has bloomed overnight where none grew before.',
+];
+
 export class NarrativeBuilder {
   private story: Story;
   private world: World;
+  private mode: NarrativeMode;
   private envGen: EnvironmentGenerator;
   private encounterGen: EncounterGenerator;
   private questGen: QuestGenerator;
@@ -65,6 +79,9 @@ export class NarrativeBuilder {
   constructor(story: Story, world: World, priorState?: EngineState) {
     this.story = story;
     this.world = world;
+    // The world's narrative shape (author-set or derived from its own context)
+    // governs which arc pool, pacing language, and encounter flavour run below.
+    this.mode = resolveNarrativeMode(world);
 
     const baseSeed = world.seed ?? SeededRNG.hashString(story.title);
     const storySeed = SeededRNG.deriveSeed(baseSeed, story.id);
@@ -105,6 +122,7 @@ export class NarrativeBuilder {
    */
   public buildContext(nodePath: string, depth: number, currentState: WorldState, priorState?: EngineState, catchUpTicks: number = 0, readerStanding: number = 0, outsiderRegard: number = 0): NarrativeBuildResult {
     const context: NarrativeContext = {
+      modeDirective: this.mode === 'gentle' ? gentleModeDirective() : '',
       environmentalContext: '',
       activeEncounters: [],
       npcActions: [],
@@ -139,11 +157,19 @@ export class NarrativeBuilder {
     context.environmentalContext = env.ambientDescription;
 
     // 2. ProcGen: encounters — the Director suppresses them during respite and
-    // forces a complication when escalating out of a lull.
+    // forces a complication when escalating out of a lull. A gentle world draws
+    // from its own hook pool (meetings and small wonders, never ambushes).
     if (beat !== 'respite') {
-      const encounter = this.encounterGen.generateEncounter(nodePath, env.biome, currentState);
-      if (encounter) context.activeEncounters.push(encounter.narrativeHook);
-      else if (beat === 'escalate') context.activeEncounters.push('A sudden complication forces itself upon the scene.');
+      if (this.mode === 'gentle') {
+        const rng = new SeededRNG(SeededRNG.hashString(nodePath + '_gentle'));
+        if (beat === 'escalate' || rng.nextFloat() < 0.4) {
+          context.activeEncounters.push(rng.pick(GENTLE_ENCOUNTERS));
+        }
+      } else {
+        const encounter = this.encounterGen.generateEncounter(nodePath, env.biome, currentState);
+        if (encounter) context.activeEncounters.push(encounter.narrativeHook);
+        else if (beat === 'escalate') context.activeEncounters.push('A sudden complication forces itself upon the scene.');
+      }
     }
 
     // 3. ProcGen: quests (if toggled). Quests now run as a multi-beat arc
@@ -189,12 +215,16 @@ export class NarrativeBuilder {
       this.economyManager.tick(economy);
     }
     const updatedFactions = factions;
-    context.factionEvents = factionEvents.slice(0, 2); // cap to avoid prompt bloat
-    const factionStatus = FactionManager.getSummary(updatedFactions);
-    if (factionStatus) context.factionStatus = factionStatus;
+    // A gentle world keeps its simulation ticking (continuity) but never
+    // narrates rivalries, raids, or scarcity — that's imported hardship.
+    if (this.mode !== 'gentle') {
+      context.factionEvents = factionEvents.slice(0, 2); // cap to avoid prompt bloat
+      const factionStatus = FactionManager.getSummary(updatedFactions);
+      if (factionStatus) context.factionStatus = factionStatus;
 
-    const economySummary = EconomyManager.getSummary(economy);
-    if (economySummary) context.economySummary = economySummary;
+      const economySummary = EconomyManager.getSummary(economy);
+      if (economySummary) context.economySummary = economySummary;
+    }
 
     if (catchUpTicks > 0) {
       context.passageOfTime =
@@ -264,14 +294,15 @@ export class NarrativeBuilder {
       hostileNpc,
       combat: currentState['player.underAttack'] === true,
     });
-    context.pacingDirective = dm.directive(beat);
+    context.pacingDirective = dm.directive(beat, this.mode);
 
     // 7b. Dynamic difficulty: stakes escalate with depth, adapt to recent tension.
     const difficulty = DifficultyManager.update(depth, priorDirector.tension, priorState?.difficulty);
-    context.stakesDirective = DifficultyManager.directive(difficulty.level);
+    context.stakesDirective = DifficultyManager.directive(difficulty.level, this.mode);
 
     // 7c. Plot planner: advance the story's through-line one beat at a time.
-    const plot = PlotPlanner.advance(PlotPlanner.init(this.story.title, priorState?.plot, this.story.director));
+    // A gentle world draws only from the conflict-free arc pool.
+    const plot = PlotPlanner.advance(PlotPlanner.init(this.story.title, priorState?.plot, this.story.director, this.mode));
     context.plotDirective = PlotPlanner.directive(plot);
 
     const turnCount = (priorState?.turnCount ?? 0) + 1;
@@ -284,6 +315,7 @@ export class NarrativeBuilder {
       lastInterlude: priorState?.lastInterlude,
       plotBeatIndex: plot.beatIndex,
       betrayalThisTurn,
+      mode: this.mode,
     });
     context.interludeDirective = interlude.directive;
     const lastInterlude = interlude.fired ? turnCount : priorState?.lastInterlude;
@@ -329,7 +361,9 @@ export class NarrativeBuilder {
   public formatForPrompt(context: NarrativeContext): string {
     const lines: string[] = [];
 
-    // An interlude reframes the entire chapter, so it leads.
+    // The world's narrative shape governs everything below it, so it leads all.
+    if (context.modeDirective) lines.push(`**Narrative shape (governs everything below):** ${context.modeDirective}`);
+    // An interlude reframes the entire chapter, so it leads the events.
     if (context.interludeDirective) lines.push(`**Interlude (frame this chapter):** ${context.interludeDirective}`);
     if (context.environmentalContext) lines.push(`**Environment:** ${context.environmentalContext}`);
     if (context.activeEncounters.length > 0) lines.push(`**Encounters:** ${context.activeEncounters.join(' ')}`);

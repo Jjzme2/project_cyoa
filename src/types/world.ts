@@ -57,6 +57,13 @@ export interface WorldStorySettings {
   motifs?: string[]
   /** Configurable parameters each story chooses from at creation (see WorldStyleOption). */
   styleOptions?: WorldStyleOption[]
+  /**
+   * The narrative SHAPE of this world's stories: 'dramatic' (traditional
+   * conflict-driven arcs), 'gentle' (conflict-free — wonder, friendship, joy;
+   * for worlds where nothing bad happens), or 'auto' (default: derived from the
+   * world's tone/rules/lore — see lib/engine/narrative-mode).
+   */
+  narrativeMode?: 'auto' | 'dramatic' | 'gentle'
 }
 
 export interface World {

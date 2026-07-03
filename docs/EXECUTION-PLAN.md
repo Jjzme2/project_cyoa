@@ -66,6 +66,15 @@ The prioritized backlog. Companion to `ROADMAP.md` (history), `GROWTH-STRATEGY.m
   has its own **share card** (`/api/share-card/achievement/[id]`), surfaced as a
   hover-share on the profile and a toast on unlock. Endings-reached added to the
   profile stats.
+- [x] **Gentle narrative mode.** The engine no longer assumes a conflict arc.
+  Each world has a narrative SHAPE — `dramatic` (traditional) or `gentle`
+  (conflict-free: wonder, friendship, joy) — resolved from an explicit author
+  setting or derived from the world's own tone/rules/lore ("no bad happens
+  here" is decisive). Gentle worlds get their own arc pool (climaxes of shared
+  wonder / gathering / friendship / a labor of love), delight-flavoured pacing
+  & encounter hooks, meaning-not-danger stakes, reverie interludes, and no
+  faction-rivalry/scarcity narration; a governing prompt block leads the system
+  events (and saga openings). Author picker on `/worlds/new`. (+11 tests.)
 - [ ] **9b. (more) Narrative-aware achievements** (secret endings, NPC bonds, faction
   outcomes, "path chosen by N readers") — each auto-generating a share card.
 - [ ] **10. In-app discovery** — a public-rooms lobby and a bounty-board page
