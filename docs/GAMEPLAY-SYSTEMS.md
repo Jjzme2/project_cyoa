@@ -68,3 +68,65 @@ just reactive NPCs.
 1 → 2 → 5 → 3. Per-agent state makes NPCs feel alive; the Director paces the
 whole; the relationship graph makes consequences systemic; story grammars give
 quests shape. 6–10 are strong follow-ons once the core loop feels good.
+
+---
+
+# Narrative modes — evaluation & enhancement strategy
+
+*(added after shipping the gentle narrative mode)*
+
+## What shipped, and why it's sound
+
+Every world now has a **narrative shape** — `dramatic` (traditional conflict
+arcs) or `gentle` (conflict-free: wonder, friendship, joy) — resolved at ONE
+seam (`lib/engine/narrative-mode.ts`) from an explicit author setting or the
+world's own tone/rules/lore. The mode then reshapes the engine *systemically*,
+not just as a prose instruction: the arc pool, pacing language, encounter
+tables, stakes semantics, interlude flavour, and what the faction/economy sim is
+allowed to narrate. Strengths worth preserving:
+
+- **One resolver, many consumers.** Every subsystem asks the same function, so
+  a new shape is an additive change, and modes can never disagree mid-story.
+- **Conservative auto-detection.** Only explicit "no bad happens" declarations
+  flip a world alone; soft signals need corroboration + an Everyone rating. A
+  false "gentle" would be far worse than a missed one.
+- **Suppression at the source.** Faction raids and market scarcity still *tick*
+  (world continuity) but are never narrated in gentle mode — the model can't
+  weave in conflict it never sees.
+- **Family-locked arc chaining.** A long gentle story can never drift into a
+  betrayal arc on movement 2.
+
+## Known gaps (honest) and the strategy for each
+
+1. **Detection is English keyword matching.** A world declared gentle in
+   Spanish, or in idiosyncratic phrasing, won't auto-flip. *Enhancement:*
+   classify once at world creation with the existing AI assist path and cache
+   the result on the world doc (the explicit picker already covers the miss
+   today).
+2. **No per-story shape inside a dramatic world.** A gentle world locks all its
+   stories gentle (correct — that's the world's law), but a dramatic world
+   can't host one gentle story. *Enhancement:* a story-level `narrativeMode`
+   clamped by the world exactly like content ratings are (a gentle WORLD can
+   never be overridden dramatic).
+3. **GOAP cast can still act hostile in a gentle world** (opt-in feature; the
+   action library includes betray/attack/intimidate). The governing prompt
+   block suppresses it in prose, but the sim shouldn't plan it at all.
+   *Enhancement:* mode-filter the GOAP action library and goal set.
+4. **Residual dramatic wording in shared surfaces.** The base chapter prompt's
+   choice guidance ("one bold, one cautious, one cunning") and "moment of
+   decision or tension", the ending-invite metaphors ("the storm has passed"),
+   and the Living World panel's tension labels ("At a knife's edge") read
+   dramatic. *Enhancement:* small mode-aware variants; panel says
+   "Anticipation" in gentle worlds.
+5. **Two shapes today.** The architecture is ready for more: `melancholic`
+   (loss without villains), `mystery` (curiosity without danger), `slice-of-life`
+   (no arc pressure at all — beats become vignettes). Each is: an arc pool +
+   directive variants + (optionally) an encounter table. Add them as authors
+   ask, not speculatively.
+6. **No reader-facing signal.** A gentle world could show a small badge (nice
+   for parents choosing with kids) and be a library filter. *Enhancement:*
+   surface `resolveNarrativeMode` on world cards/detail.
+
+Suggested order: **2 → 4 → 3 → 6 → 1 → 5** — per-story shape and wording
+polish are cheap and immediately felt; GOAP filtering matters once gentle
+worlds enable the cast sim; new shapes ride demand.

@@ -82,6 +82,29 @@ The prioritized backlog. Companion to `ROADMAP.md` (history), `GROWTH-STRATEGY.m
 - [ ] **11. A season scheduler** so the live-ops heartbeat doesn't depend on an
   operator remembering.
 
+## Audit 2 — post-feature security & integrity pass *(all fixed inline)*
+
+Fresh pass over everything added since the Tier-0 hardening (endings, cameos,
+feedback, achievements, gentle mode, reset):
+
+- [x] **JSON-LD XSS (high).** Character-page structured data embedded raw
+  `JSON.stringify` in a `<script>` — a name containing `</script><script>…`
+  escaped the block. Fixed with `jsonLdSafe()` (escapes `<`, U+2028/9), used
+  uniformly (character page + root layout). +2 tests.
+- [x] **2FA brute force (high).** No attempt cap on the 6-digit TOTP space —
+  now 8 attempts / 5 min per user.
+- [x] **Feedback vote spam (med).** Toggle now throttled 30/min per user.
+- [x] **Share-card render cost (med).** All card image routes now send
+  `Cache-Control: public, s-maxage=300, stale-while-revalidate` so the CDN
+  absorbs repeats of the expensive satori renders.
+- [x] **Ending-achievement integrity (med).** Re-POSTing the same ending no
+  longer inflates `endingsReached` — counted keys tracked per user (idempotent).
+
+Reviewed and found sound: saga-branch node access (path-scoped refs prevent
+cross-story reads), reset authorization + escrow refunds, portrait route
+authorization + credit refund path, feedback voter-id privacy, seasons public
+read caching, prompt-injection delimiters on user text.
+
 ## Tier 3 — Scale hardening (before traffic grows)
 
 - [ ] **12. Collapse the 3 sequential per-chapter LLM calls.**
