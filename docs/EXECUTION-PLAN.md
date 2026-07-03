@@ -5,6 +5,83 @@ The prioritized backlog. Companion to `ROADMAP.md` (history), `GROWTH-STRATEGY.m
 
 ---
 
+## ⏱️ The Speed Queue — everything open, ordered by time-to-done
+
+The working order. Within each bucket, top-to-bottom is the suggested sequence;
+★ marks the highest-impact item regardless of speed.
+
+### ⚡ Quick wins (≤ ~1 hour each)
+
+- [ ] **Q1. Mode-aware wording polish.** The last dramatic-flavoured strings in
+  shared surfaces: the chapter prompt's choice guidance ("one bold, one
+  cautious, one cunning" / "moment of decision or tension"), the ending-invite
+  metaphors ("the storm has passed"), and the Living World panel's tension
+  labels — gentle worlds should read "Anticipation", not "At a knife's edge".
+- [ ] **Q2. Gentle-world badge.** Surface `resolveNarrativeMode` on world cards
+  and the world page (a small leaf/heart badge) so gentle worlds are visibly
+  gentle — useful for parents and for setting expectations before writing.
+- [ ] **Q3. `/api/track` event-name allowlist.** Client can currently emit any
+  event name into analytics; constrain to a known list.
+- [ ] **Q4. Meter the remaining AI surfaces.** Rate-limit `/api/ai/assist`
+  questions mode; meter world-genesis generation.
+
+### 🚶 Same-day items (roughly 2–5 hours each)
+
+- [ ] ★ **S1. "Jump Right In" mode — the newcomer's first five minutes.** The
+  app currently front-loads its depth (worlds, sagas, directors, engines) and
+  can overwhelm; the goal is: *one tap to reading, one nudge to writing.*
+  - **v1 scope:** a hero "Jump right in" action on the homepage that opens a
+    curated featured story instantly — no account, no choices about choices.
+  - A one-time, dismissible first-run whisper (not a tour): "Read. Choose.
+    When you reach an open path — write what happens next."
+  - At the first empty slot a newcomer meets, a warm nudge with a one-line
+    starter suggestion; sign-in is asked for only at submit, and their written
+    text survives the auth round-trip (draft-preserved).
+  - A "60-second start" for writers: pick a template world → prefilled
+    protagonist/opening via the existing AI-assist path → writing by minute two.
+  - Funnel telemetry: `onboarding.jumped_in` → first choice → first written
+    path → first story created.
+  - *Deeper v2 (multi-day, later):* personalized starting shelf, a guided
+    first-saga, homepage redesign around the flow.
+- [ ] **S2. Per-story narrative shape, clamped by the world.** A dramatic world
+  may host a gentle story; a gentle world can never be overridden dramatic
+  (same clamp philosophy as content ratings). Story-creator picker + clamp.
+- [ ] **S3. Season scheduler.** Auto-activate/rotate seasons so live-ops doesn't
+  depend on an operator remembering (extends `/admin/seasons`).
+- [ ] **S4. GOAP filtering in gentle worlds.** The cast sim shouldn't even PLAN
+  betray/attack/intimidate actions in a gentle world (today only the prose
+  layer suppresses them).
+- [ ] **S5. Feedback priority tiers + ranked export.** Admins tag items T0–T3;
+  the JSON task-list export orders by tier — feeding the coding-agent loop.
+- [ ] **S6. Money-path integration tests.** Slot-fill and Stripe-webhook
+  handler tests reusing the proven in-memory firestore/rate-limit fakes.
+
+### 🧗 Multi-day items
+
+- [ ] **M1. Rooms lobby + global bounty board.** In-app discovery for the two
+  social features that exist but are invisible (bounty board needs a
+  collection-group index → ops step).
+- [ ] **M2. Collapse the 3 sequential per-chapter LLM calls** (review → generate
+  → judge) into fewer round-trips — the biggest latency/cost lever; needs
+  careful behavioural testing.
+- [ ] **M3. Scale denormalization.** Node ancestry (`pathIds`), bounded/paginated
+  author reads, sharded reaction counters.
+- [ ] **M4. Characters Fold 2d.** Community curation/voting to surface the best
+  characters; hand-picked "guest star" cameos beyond connection-based ones.
+- [ ] **M5. Co-op rooms PR2.** Frontier write-pause, host kick, ended summary,
+  stale-room cleanup.
+- [ ] **M6. New narrative shapes + AI-assisted detection** (melancholic /
+  mystery / slice-of-life; classify-at-creation) — build as authors ask.
+
+### 🔒 Ops (not codeable from the repo)
+
+- [ ] **O1. Two-account smoke test:** saga branch-in, endings (incl. win/lose
+  conditions), story reset, bounty escrow flows, gentle-world generation.
+- [ ] **O2. Standing deploy list:** env vars, Firestore indexes/rules, seed,
+  brand logo hosting.
+
+---
+
 ## Tier 0 — Correctness & safety (do first)
 
 - [x] **1. Encrypt with scrypt + per-record salt.** `src/lib/encrypt.ts` derived
