@@ -42,6 +42,9 @@ export function renderShareCard(opts: ShareCardOptions): ImageResponse {
   const accent = opts.accent ?? accentFor(opts.kind)
   const stats = normalizeStats(opts.stats)
   const hasHero = Boolean(opts.imageUrl)
+  // Cards are expensive to render (satori) and served publicly — let the CDN
+  // absorb repeats. Stats drift a little within the window; that's fine.
+  const headers = { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600' }
 
   return new ImageResponse(
     (
@@ -174,6 +177,6 @@ export function renderShareCard(opts: ShareCardOptions): ImageResponse {
         </div>
       </div>
     ),
-    { ...shareCardSize },
+    { ...shareCardSize, headers },
   )
 }

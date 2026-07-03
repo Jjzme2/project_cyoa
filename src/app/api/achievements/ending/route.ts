@@ -27,6 +27,9 @@ export const POST = apiHandler(async (req: NextRequest) => {
     return NextResponse.json({ newlyEarned: [] })
   }
 
-  const newlyEarned = await checkAndAwardAchievements(auth.uid, 'ending_reached', { endingType: node.endingType })
+  const newlyEarned = await checkAndAwardAchievements(auth.uid, 'ending_reached', {
+    endingType: node.endingType,
+    endingKey: `${storyId}:${nodeId}`,
+  })
   return NextResponse.json({ newlyEarned })
 })

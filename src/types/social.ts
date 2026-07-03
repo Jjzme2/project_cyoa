@@ -60,10 +60,13 @@ export interface UserAchievements {
     worlds: number
     stories: number
     illustrations: number
-    /** Definitive endings reached. */
+    /** Definitive endings reached (distinct — see endingKeys). */
     endingsReached?: number
     /** Distinct ending types collected (for the "all kinds" achievement). */
     endingTypes?: EndingType[]
+    /** storyId:nodeId keys already counted, so re-reaching an ending is
+     * idempotent (capped). */
+    endingKeys?: string[]
   }
   updatedAt: string
 }

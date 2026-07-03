@@ -22,7 +22,7 @@ export async function getUserAchievements(userId: string): Promise<UserAchieveme
 export async function checkAndAwardAchievements(
   userId: string,
   event: 'contribution' | 'illustration' | 'world_created' | 'story_created' | 'story_read' | 'bookmark' | 'ending_reached',
-  meta?: { endingType?: EndingType },
+  meta?: { endingType?: EndingType; endingKey?: string },
 ): Promise<string[]> {
   const ref = achievementsRef(userId)
   const newlyEarned: string[] = []
@@ -47,11 +47,19 @@ export async function checkAndAwardAchievements(
     if (event === 'story_read') counts.storiesRead = (counts.storiesRead ?? 0) + 1
     if (event === 'bookmark') counts.bookmarks = (counts.bookmarks ?? 0) + 1
     if (event === 'ending_reached') {
-      counts.endingsReached = (counts.endingsReached ?? 0) + 1
-      if (meta?.endingType) {
-        const types = new Set(counts.endingTypes ?? [])
-        types.add(meta.endingType)
-        counts.endingTypes = Array.from(types)
+      // Idempotent per ending: re-reaching (or re-posting) the same ending never
+      // inflates the count. Keys are capped; overflow just stops dedup, which at
+      // that scale can't matter for the achievements.
+      const keys = counts.endingKeys ?? []
+      const alreadyCounted = !!meta?.endingKey && keys.includes(meta.endingKey)
+      if (!alreadyCounted) {
+        counts.endingsReached = (counts.endingsReached ?? 0) + 1
+        if (meta?.endingKey && keys.length < 500) counts.endingKeys = [...keys, meta.endingKey]
+        if (meta?.endingType) {
+          const types = new Set(counts.endingTypes ?? [])
+          types.add(meta.endingType)
+          counts.endingTypes = Array.from(types)
+        }
       }
     }
 

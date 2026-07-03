@@ -9,6 +9,7 @@ import { CharacterPortrait } from '@/components/character/CharacterPortrait'
 import { GeneratePortraitButton } from '@/components/character/GeneratePortraitButton'
 import { ShareImageButton } from '@/components/share/ShareImageButton'
 import { APP_CONFIG } from '@/lib/config'
+import { jsonLdSafe } from '@/lib/json-ld'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -42,7 +43,7 @@ async function CharacterDetail({ params }: Props) {
 
   return (
     <main className="max-w-2xl mx-auto px-4 sm:px-6 py-12 space-y-8">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdSafe(jsonLd) }} />
       <Link
         href="/characters"
         className="inline-flex items-center gap-1.5 text-xs text-amber-400/50 hover:text-amber-400 transition-colors"
