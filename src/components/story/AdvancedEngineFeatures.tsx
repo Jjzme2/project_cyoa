@@ -1,9 +1,12 @@
 'use client'
 
 import type { Dispatch, SetStateAction } from 'react'
-import { Plus, Sparkles } from 'lucide-react'
+import { Plus, Sparkles, Flag } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { ENDING_TYPES, type EndingCondition } from '@/types'
+
+const COND_OPERATORS: EndingCondition['operator'][] = ['>=', '<=', '>', '<', '==', '!=', 'contains', 'not_contains']
 
 export type EconomyEffectRow = {
   commodityId: string
@@ -33,6 +36,9 @@ export function AdvancedEngineFeatures({
   setImplementQuests,
   economyEffects,
   setEconomyEffects,
+  endingConditions,
+  setEndingConditions,
+  resourceNames,
 }: {
   goapEnabled: boolean
   setGoapEnabled: Dispatch<SetStateAction<boolean>>
@@ -40,6 +46,10 @@ export function AdvancedEngineFeatures({
   setImplementQuests: Dispatch<SetStateAction<boolean>>
   economyEffects: EconomyEffectRow[]
   setEconomyEffects: Dispatch<SetStateAction<EconomyEffectRow[]>>
+  endingConditions: EndingCondition[]
+  setEndingConditions: Dispatch<SetStateAction<EndingCondition[]>>
+  /** Resource names to condition on (for the dropdown). */
+  resourceNames?: string[]
 }) {
   return (
         <div className="glass-card rounded-xl p-6 space-y-5">
@@ -196,6 +206,124 @@ export function AdvancedEngineFeatures({
                 )}
               </div>
             )}
+
+            {/* Author win/lose endings — a resource threshold that ends the story */}
+            <div className="border-t border-white/[0.06] pt-5 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-500/80 font-sans flex items-center gap-1.5">
+                    <Flag className="h-3 w-3" /> Win / Lose Endings
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground/45 mt-0.5 leading-relaxed">
+                    Bring the story to a definitive close when a resource crosses a threshold.
+                  </p>
+                  <p className="text-[11px] text-muted-foreground/35 mt-1 italic">
+                    e.g. When <span className="not-italic">Health ≤ 0</span> → <span className="not-italic">tragic</span> “The Last Breath”.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEndingConditions((prev) => [
+                    ...prev,
+                    { resourceName: resourceNames?.[0] ?? '', operator: '<=', value: 0, type: 'tragic', title: '' },
+                  ])}
+                  className="text-xs gap-1 border-white/10 hover:bg-white/5 shrink-0"
+                >
+                  <Plus className="h-3 w-3" /> Add Ending
+                </Button>
+              </div>
+
+              {endingConditions.length > 0 && (
+                <div className="space-y-2">
+                  {endingConditions.map((cond, idx) => {
+                    function updateCond(patch: Partial<EndingCondition>) {
+                      setEndingConditions((prev) => {
+                        const next = [...prev]
+                        next[idx] = { ...next[idx], ...patch }
+                        return next
+                      })
+                    }
+                    return (
+                      <div key={idx} className="flex flex-wrap gap-2 items-center bg-white/[0.02] border border-white/[0.04] p-2.5 rounded-lg text-[11px]">
+                        <span className="text-muted-foreground/50 font-sans shrink-0">When</span>
+                        {resourceNames && resourceNames.length > 0 ? (
+                          <select
+                            value={cond.resourceName}
+                            title="Resource"
+                            onChange={(e) => updateCond({ resourceName: e.target.value })}
+                            className="h-7 px-1.5 rounded border border-input bg-background text-foreground text-[11px] focus:outline-none"
+                          >
+                            {resourceNames.map((n) => (
+                              <option key={n} value={n}>{n}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={cond.resourceName}
+                            placeholder="Resource name"
+                            onChange={(e) => updateCond({ resourceName: e.target.value })}
+                            className="h-7 px-1.5 rounded border border-input bg-background text-foreground text-[11px] w-28 focus:outline-none"
+                          />
+                        )}
+                        <select
+                          value={cond.operator}
+                          title="Operator"
+                          onChange={(e) => updateCond({ operator: e.target.value as EndingCondition['operator'] })}
+                          className="h-7 px-1.5 rounded border border-input bg-background text-foreground text-[11px] focus:outline-none"
+                        >
+                          {COND_OPERATORS.map((op) => (
+                            <option key={op} value={op}>{op}</option>
+                          ))}
+                        </select>
+                        <input
+                          type="text"
+                          value={String(cond.value)}
+                          title="Threshold"
+                          placeholder="0"
+                          onChange={(e) => {
+                            const raw = e.target.value
+                            const num = Number(raw)
+                            updateCond({ value: raw.trim() !== '' && !Number.isNaN(num) ? num : raw })
+                          }}
+                          className="h-7 px-1.5 rounded border border-input bg-background text-foreground text-[11px] w-16 focus:outline-none"
+                        />
+                        <span className="text-muted-foreground/50 font-sans shrink-0">→</span>
+                        <select
+                          value={cond.type}
+                          title="Ending type"
+                          onChange={(e) => updateCond({ type: e.target.value as EndingCondition['type'] })}
+                          className="h-7 px-1.5 rounded border border-input bg-background text-foreground text-[11px] focus:outline-none"
+                        >
+                          {ENDING_TYPES.map((t) => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                        <input
+                          type="text"
+                          value={cond.title}
+                          placeholder="Ending title"
+                          maxLength={80}
+                          onChange={(e) => updateCond({ title: e.target.value })}
+                          className="h-7 px-1.5 rounded border border-input bg-background text-foreground text-[11px] w-32 focus:outline-none"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEndingConditions((prev) => prev.filter((_, i) => i !== idx))}
+                          className="h-7 px-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 ml-auto"
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
   )

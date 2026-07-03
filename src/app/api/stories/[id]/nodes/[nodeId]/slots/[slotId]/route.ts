@@ -45,7 +45,7 @@ import { endingDirective } from '@/lib/engine/ending'
 import type { WorldPulse } from '@/types'
 import type { WorldState } from '@/types/goap'
 import type { AgentMemory } from '@/types/goap'
-import type { ChoiceRequirement, ChoiceEffect } from '@/types'
+import { ENDING_TYPES, type ChoiceRequirement, type ChoiceEffect } from '@/types'
 
 const IMAGE_CREDIT_COST = 3 // total credits when image is requested
 
@@ -58,6 +58,10 @@ const FillSlotSchema = z.object({
   requirements: z.custom<ChoiceRequirement[]>().optional(),
   effects: z.custom<ChoiceEffect[]>().optional(),
   worldState: z.custom<WorldState>().optional(),
+  // Author win/lose condition met on the reader's side → force a definitive
+  // ending of this type/title (the conditions are the author's own, so trusting
+  // the client signal here only lets a reader end their own playthrough).
+  forceEnding: z.object({ type: z.enum(ENDING_TYPES), title: z.string().trim().min(1).max(80) }).optional(),
 })
 
 export async function POST(
@@ -83,7 +87,7 @@ export async function POST(
   // Read and locally validate the prompt before acquiring any lock or consuming credits
   const parsed = await parseJson(req, FillSlotSchema)
   if (!parsed.ok) return parsed.response
-  const { promptText, includeImage } = parsed.data
+  const { promptText, includeImage, forceEnding } = parsed.data
   const requirements = parsed.data.requirements ?? []
   const effects = parsed.data.effects ?? []
   const worldState: WorldState = parsed.data.worldState ?? {}
@@ -265,9 +269,12 @@ export async function POST(
       nodeWorldPulse = buildWorldPulse(context, nextState)
     }
 
-    // Decide whether the engine invites the story to conclude this chapter
-    // (rare, earned — see endingDirective). The model still chooses to take it.
-    const endDirective = endingDirective(parentNode.depth + 1, updatedEngineState)
+    // An author win/lose condition met on the reader's side FORCES a conclusion;
+    // otherwise the engine may merely INVITE one (rare, earned — see
+    // endingDirective). The model writes the final chapter either way.
+    const endDirective = forceEnding
+      ? `a definitive ${forceEnding.type} ending has been reached. Conclude the story NOW with a final chapter that lands this ${forceEnding.type} ending titled "${forceEnding.title}".`
+      : endingDirective(parentNode.depth + 1, updatedEngineState)
 
     const { content, choices, model, newCharacters, location, ending } = await generateStoryNode(
       worldCtx,
@@ -351,7 +358,15 @@ export async function POST(
           ...(location ? { location } : {}),
           ...(updatedEngineState ? { engineState: updatedEngineState } : {}),
           ...(nodeWorldPulse ? { worldPulse: nodeWorldPulse } : {}),
-          ...(ending ? { isEnding: true, endingTitle: ending.title, endingType: ending.type } : {}),
+          // A forced (author-condition) ending is guaranteed terminal even if the
+          // model omitted the marker; otherwise use what the model emitted.
+          ...((ending ?? (forceEnding ? { title: forceEnding.title, type: forceEnding.type } : undefined))
+            ? {
+                isEnding: true,
+                endingTitle: (ending ?? forceEnding!).title,
+                endingType: (ending ?? forceEnding!).type,
+              }
+            : {}),
         },
         choices,
         moderationFields,

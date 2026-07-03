@@ -10,7 +10,7 @@ import { sanitizeDirector } from '@/lib/director'
 import { sanitizeStyleChoices } from '@/lib/story-style'
 import { analytics } from '@/lib/telemetry'
 import { CONTENT_RATINGS, DEFAULT_CONTENT_RATING } from '@/types'
-import type { CoverTheme, ReadingTheme, ResourceDefinition } from '@/types'
+import type { CoverTheme, ReadingTheme, ResourceDefinition, EndingCondition } from '@/types'
 
 // Opaque, author-supplied structures (resources, themes, director) were never
 // validated field-by-field here; `z.custom`/`z.unknown` preserve that
@@ -22,6 +22,7 @@ const CreateStorySchema = z.object({
   description: z.string().optional(),
   coverGradient: z.string().optional(),
   resources: z.custom<ResourceDefinition[]>().optional(),
+  endingConditions: z.custom<EndingCondition[]>().optional(),
   tags: z.array(z.string()).optional(),
   coverTheme: z.custom<CoverTheme>().optional(),
   readingTheme: z.custom<ReadingTheme>().optional(),
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
 
   const parsed = await parseJson(req, CreateStorySchema)
   if (!parsed.ok) return parsed.response
-  const { title, description, worldId, worldName, coverGradient, resources, tags, coverTheme, readingTheme, rating, protagonist, director, styleChoices, youMode, shared, goapEnabled, implementQuests } = parsed.data
+  const { title, description, worldId, worldName, coverGradient, resources, tags, coverTheme, readingTheme, rating, protagonist, director, styleChoices, youMode, shared, goapEnabled, implementQuests, endingConditions } = parsed.data
 
   // Authored director persona (optional). Axes are clamped to [-1, 1]; only kept
   // if the author actually set something.
@@ -107,6 +108,9 @@ export async function POST(req: NextRequest) {
     resources: resources ?? [],
     characters: seededCast,
     youMode: !!youMode,
+    ...(Array.isArray(endingConditions) && endingConditions.length
+      ? { endingConditions: endingConditions.slice(0, 10) }
+      : {}),
     // Default to shared/listed; only store `unlisted` when the author opts out.
     ...(shared === false ? { unlisted: true } : {}),
     // In "You" mode there's no authored protagonist — the reader is the hero.

@@ -10,8 +10,9 @@ import { BountyControl } from '@/components/book/BountyControl'
 import { useAuth } from '@/components/Providers'
 import { validatePromptLocal } from '@/lib/validate'
 import { CreatorResourceManager } from '@/lib/creator-resources'
+import { metEndingCondition } from '@/lib/engine/ending-conditions'
 import { SlotRequirementsEditor } from './SlotRequirementsEditor'
-import type { ChoiceSlot, ResourceDefinition, ChoiceRequirement, ChoiceEffect, StoryCharacter, Protagonist } from '@/types'
+import type { ChoiceSlot, ResourceDefinition, ChoiceRequirement, ChoiceEffect, StoryCharacter, Protagonist, EndingCondition } from '@/types'
 
 interface Props {
   storyId: string
@@ -26,6 +27,9 @@ interface Props {
   protagonist?: Protagonist
   /** Sagas (the reader plays as themselves) don't carry bounties. */
   isSaga?: boolean
+  /** Author win/lose conditions — when met by the reader's resources, the path
+   * they write becomes a definitive ending. */
+  endingConditions?: EndingCondition[]
 }
 
 function checkRequirements(slot: ChoiceSlot, currentRes: Record<string, number | string | string[] | number[]>): boolean {
@@ -42,6 +46,7 @@ export function ChoiceSlots({
   currentResources,
   storyResources,
   isSaga,
+  endingConditions,
 }: Props) {
   const { user, tier, isAdmin, openAuthModal, aiUsesRemaining, updateAiUses } = useAuth()
   const [inputs, setInputs] = useState<Record<string, string>>({})
@@ -140,6 +145,8 @@ export function ChoiceSlots({
       })
     }
 
+    const metCondition = metEndingCondition(endingConditions, currentResources)
+
     setSubmitting(slot.id)
     try {
       const token = await user.getIdToken()
@@ -152,6 +159,9 @@ export function ChoiceSlots({
           requirements: reqsToSend,
           effects: effsToSend,
           worldState: currentResources ?? {},
+          // Author win/lose: if the reader's resources already meet a condition,
+          // the chapter they're writing becomes that definitive ending.
+          ...(metCondition ? { forceEnding: { type: metCondition.type, title: metCondition.title } } : {}),
         }),
       })
       const data = await res.json()
