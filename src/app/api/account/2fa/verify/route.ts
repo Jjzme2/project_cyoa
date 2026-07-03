@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { parseJson } from '@/lib/api-validation'
 import { getAuthContext } from '@/lib/auth'
 import { adminDb, adminAuth } from '@/lib/firebase-admin'
+import { throttle } from '@/lib/rate-limit'
 import { verifyTotp, decryptSecret } from '@/lib/totp'
 
 const CodeSchema = z.object({ code: z.coerce.string().default('') })
@@ -11,6 +12,11 @@ const CodeSchema = z.object({ code: z.coerce.string().default('') })
 export async function POST(req: NextRequest) {
   const auth = await getAuthContext(req)
   if (!auth) return NextResponse.json({ ok: false }, { status: 401 })
+
+  // Brute-force guard: a 6-digit TOTP has only 1M combinations — cap attempts.
+  if (!(await throttle(`2fa:${auth.uid}`, 8, 300))) {
+    return NextResponse.json({ ok: false, error: 'Too many attempts — wait a few minutes.' }, { status: 429 })
+  }
 
   const parsed = await parseJson(req, CodeSchema)
   if (!parsed.ok) return parsed.response

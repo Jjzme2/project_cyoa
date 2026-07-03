@@ -7,6 +7,7 @@ import { SeasonBanner } from '@/components/season/SeasonBanner'
 import { VerifyEmailBanner } from '@/components/auth/VerifyEmailBanner'
 import { TwoFactorGate } from '@/components/auth/TwoFactorGate'
 import { APP_CONFIG } from '@/lib/config'
+import { jsonLdSafe } from '@/lib/json-ld'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] })
@@ -91,7 +92,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="antialiased">
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(STRUCTURED_DATA) }}
+          dangerouslySetInnerHTML={{ __html: jsonLdSafe(STRUCTURED_DATA) }}
         />
         <Providers>
           <Header />
