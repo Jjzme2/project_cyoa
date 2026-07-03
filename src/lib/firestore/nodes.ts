@@ -1,4 +1,5 @@
 import { adminDb } from '../firebase-admin'
+import { FieldValue } from 'firebase-admin/firestore'
 import { cacheLife, cacheTag } from 'next/cache'
 import type { ChoiceSlot, ModerationStatus, NodeModeration, SlotBounty, StoryNode, StoryPathSegment } from '@/types'
 import { CreditManager } from '../credit-manager'
@@ -344,6 +345,128 @@ export async function createSagaTree(
   await storyRef(storyId).update({ rootNodeId: rootId, nodeCount, updatedAt: now })
 
   return { rootNodeId: rootId, nodeCount }
+}
+
+/**
+ * Reset a story's sequence back to its beginning so it can be retried in place —
+ * without recreating the story or its world (e.g. rerunning a story authored
+ * before its world turned gentle).
+ *
+ * What is kept: the authored opening (root) — and for a saga, its entry-point
+ * openings too (they ARE the saga's beginnings). Everything below is deleted,
+ * and the kept frontier's choice slots are reopened to their pre-fill shape.
+ * New chapters then regenerate under the world's CURRENT settings.
+ *
+ * Money safety: any OPEN bounty escrowed on a slot that is about to be deleted
+ * is refunded to its poster atomically with being marked refunded, BEFORE the
+ * deletion pass — a partial failure can leave stray nodes, never lost escrow.
+ *
+ * Reader safety: stale saved progress pointing at deleted chapters fails its
+ * restore fetch and the reader simply starts at the opening (the restore path
+ * is try/caught client-side).
+ */
+export async function resetStoryTree(
+  storyId: string,
+): Promise<{ kept: number; deleted: number; frontierIds: string[] }> {
+  const storyDoc = await storyRef(storyId).get()
+  if (!storyDoc.exists) throw new Error('Story not found')
+  const rootId = storyDoc.data()?.rootNodeId as string | null | undefined
+  const youMode = storyDoc.data()?.youMode === true
+  if (!rootId) return { kept: 0, deleted: 0, frontierIds: [] }
+
+  const all = await nodesRef(storyId).get()
+  // Keep the root; a saga also keeps its depth-1 entry openings (children of the
+  // threshold root) — resetting deeper only, so its doorways stay intact.
+  const keep = new Set<string>([rootId])
+  if (youMode) {
+    all.docs.forEach((d) => {
+      if (d.data().parentId === rootId) keep.add(d.id)
+    })
+  }
+  const doomed = all.docs.filter((d) => !keep.has(d.id))
+
+  // 1) Refund open bounties on every slot being destroyed (atomic per slot).
+  for (const node of doomed) {
+    const slots = await slotsRef(storyId, node.id).get()
+    for (const s of slots.docs) {
+      const b = s.data().bounty as SlotBounty | undefined
+      if (b && b.status === 'open') {
+        await adminDb.runTransaction(async (txn) => {
+          const fresh = await txn.get(s.ref)
+          const fb = fresh.data()?.bounty as SlotBounty | undefined
+          if (!fb || fb.status !== 'open') return
+          txn.update(s.ref, { 'bounty.status': 'refunded' })
+          CreditManager.grantCreditsInTxn(txn, fb.posterId, fb.reward)
+        })
+      }
+    }
+  }
+
+  // 2) Delete doomed nodes and their slot subdocs, in bounded batches.
+  let batch = adminDb.batch()
+  let ops = 0
+  const flush = async () => {
+    if (ops > 0) await batch.commit()
+    batch = adminDb.batch()
+    ops = 0
+  }
+  for (const node of doomed) {
+    const slots = await slotsRef(storyId, node.id).get()
+    for (const s of slots.docs) {
+      batch.delete(s.ref)
+      if (++ops >= 400) await flush()
+    }
+    batch.delete(node.ref)
+    if (++ops >= 400) await flush()
+  }
+  await flush()
+
+  // 3) Reopen the kept frontier's slots to their pre-fill shape. For a story
+  // that's the root; for a saga, the entry openings (the threshold's own slots
+  // stay filled — they point at the kept entry nodes).
+  const frontier = youMode ? [...keep].filter((id) => id !== rootId) : [rootId]
+  for (const nodeId of frontier) {
+    const slots = await slotsRef(storyId, nodeId).get()
+    // A kept slot may carry an OPEN bounty (escrow on a still-empty slot) —
+    // refund it before the field is cleared, same atomic pattern as above.
+    for (const s of slots.docs) {
+      const b = s.data().bounty as SlotBounty | undefined
+      if (b && b.status === 'open') {
+        await adminDb.runTransaction(async (txn) => {
+          const fresh = await txn.get(s.ref)
+          const fb = fresh.data()?.bounty as SlotBounty | undefined
+          if (!fb || fb.status !== 'open') return
+          txn.update(s.ref, { 'bounty.status': 'refunded' })
+          CreditManager.grantCreditsInTxn(txn, fb.posterId, fb.reward)
+        })
+      }
+    }
+    const b2 = adminDb.batch()
+    slots.docs.forEach((s) => {
+      b2.update(s.ref, {
+        filled: false,
+        childNodeId: null,
+        submittedBy: null,
+        submitterName: null,
+        locked: false,
+        lockedBy: null,
+        lockedAt: null,
+        pendingReview: FieldValue.delete(),
+        childModeration: FieldValue.delete(),
+        childHasImage: FieldValue.delete(),
+        requirements: FieldValue.delete(),
+        effects: FieldValue.delete(),
+        traversals: FieldValue.delete(),
+        flagVoteCount: FieldValue.delete(),
+        // Settled (paid/refunded) escrow history is meaningless on a fresh slot.
+        bounty: FieldValue.delete(),
+      })
+    })
+    if (slots.docs.length > 0) await b2.commit()
+  }
+
+  await storyRef(storyId).update({ nodeCount: keep.size, updatedAt: new Date().toISOString() })
+  return { kept: keep.size, deleted: doomed.length, frontierIds: frontier }
 }
 
 // ─── Choice Slots ─────────────────────────────────────────────────────────────
