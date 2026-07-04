@@ -48,7 +48,7 @@ The working order. Within each bucket, top-to-bottom is the suggested sequence;
   (same clamp philosophy as content ratings). Story-creator picker + clamp.
 - [ ] **S3. Season scheduler.** Auto-activate/rotate seasons so live-ops doesn't
   depend on an operator remembering (extends `/admin/seasons`).
-- [ ] **S4. GOAP filtering in gentle worlds.** The cast sim shouldn't even PLAN
+- [x] **S4. GOAP filtering in gentle worlds.** The cast sim shouldn't even PLAN
   betray/attack/intimidate actions in a gentle world (today only the prose
   layer suppresses them).
 - [ ] **S5. Feedback priority tiers + ranked export.** Admins tag items T0–T3;

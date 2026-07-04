@@ -77,6 +77,26 @@ export function resolveStoryNarrativeMode(
   return story?.narrativeMode ?? worldMode
 }
 
+/** Actions the cast may never take — or even plan — in a gentle world. */
+const HOSTILE_ACTIONS = new Set(['social_betray', 'social_intimidate', 'combat_attack_player'])
+
+/**
+ * Strip hostility from a GOAP config for a gentle world: hostile actions leave
+ * the action set, and goals that work AGAINST the protagonist are dropped. An
+ * agent left goalless simply idles warmly (no planned action) — which is
+ * exactly right for a world where nothing bad happens. Applied at the single
+ * agent-registration chokepoint, so authored and default configs alike comply.
+ */
+export function gentleGoapFilter<
+  T extends { goals: Array<{ sentiment?: string }>; availableActions: string[] },
+>(config: T): T {
+  return {
+    ...config,
+    goals: config.goals.filter((g) => g.sentiment !== 'anti_protagonist'),
+    availableActions: config.availableActions.filter((a) => !HOSTILE_ACTIONS.has(a)),
+  }
+}
+
 /**
  * The overriding instruction block for a gentle world — leads the system-driven
  * narrative events so it governs everything after it (encounters, pacing,

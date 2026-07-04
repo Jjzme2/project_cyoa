@@ -15,7 +15,7 @@ import { InterludeDirector } from './interlude-director';
 import { RelationshipGraph } from './relationship-graph';
 import { AgentAffect } from './agent-affect';
 import { BeliefModel } from './belief';
-import { resolveStoryNarrativeMode, gentleModeDirective, type NarrativeMode } from './narrative-mode';
+import { resolveStoryNarrativeMode, gentleModeDirective, gentleGoapFilter, type NarrativeMode } from './narrative-mode';
 
 export interface NarrativeContext {
   /** Governs everything below it: the world's narrative shape (empty for dramatic). */
@@ -97,10 +97,14 @@ export class NarrativeBuilder {
     // Register a GOAP agent for every living character. Authored goapConfigs
     // are used as-is; everyone else (including emergent characters) gets a
     // synthesised default so enabling GOAP actually produces living behaviour.
+    // In a GENTLE world the cast never even PLANS hostility: hostile actions and
+    // anti-protagonist goals are stripped from every config (authored or
+    // default) at this single registration chokepoint.
     if (this.story.goapEnabled && this.story.characters) {
       for (const char of this.story.characters) {
         if (char.status && char.status.toLowerCase() === 'deceased') continue;
-        const config = char.goapConfig ?? defaultGoapConfig(char.name);
+        let config = char.goapConfig ?? defaultGoapConfig(char.name);
+        if (this.mode === 'gentle') config = gentleGoapFilter(config);
         const agent: GOAPAgent = {
           characterId: char.name,
           goals: config.goals,
