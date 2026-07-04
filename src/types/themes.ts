@@ -1,6 +1,6 @@
 // ─── Cover & Reading Themes ────────────────────────────────────────────────────
 
-export type CoverPattern = 'none' | 'stars' | 'grid' | 'dots' | 'lines' | 'diamonds' | 'waves' | 'crosshatch'
+export type CoverPattern = 'none' | 'stars' | 'grid' | 'dots' | 'lines' | 'diamonds' | 'waves' | 'crosshatch' | 'chevron' | 'hex'
 export type CoverFontStyle = 'serif' | 'gothic' | 'script' | 'mono'
 export type CoverBorderFrame = 'none' | 'single' | 'double' | 'ornate' | 'runic' | 'thorn' | 'celestial' | 'vine'
 export type PageStyle =

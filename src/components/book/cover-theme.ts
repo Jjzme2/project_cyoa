@@ -24,6 +24,10 @@ export const COLOR_PRESETS = [
   { label: 'Forest',    from: '#001a08', to: '#000703' },
   { label: 'Volcano',   from: '#3d0e00', to: '#150400' },
   { label: 'Midnight',  from: '#050520', to: '#02020c' },
+  { label: 'Amber',     from: '#3d2800', to: '#160f00' },
+  { label: 'Orchid',    from: '#3d0030', to: '#170012' },
+  { label: 'Teal',      from: '#002e2e', to: '#001010' },
+  { label: 'Storm',     from: '#12202e', to: '#060b10' },
 ]
 
 export const COVER_ICONS = [
@@ -33,6 +37,7 @@ export const COVER_ICONS = [
   '🚀', '🌌', '🤖', '💫', '🌀', '🌹', '✨', '🦊',
   '🐺', '🌪️', '⚓', '🗺️', '🪄', '🔥', '💎', '🌺',
   '🦁', '🐦', '⚜️', '🌠', '🏹', '🧪', '🌑', '🫀',
+  '🧿', '🪶', '🐲', '🏵️', '🦋', '🧭', '🪐', '🌵',
 ]
 
 export const PATTERNS: { id: CoverPattern; label: string }[] = [
@@ -44,6 +49,8 @@ export const PATTERNS: { id: CoverPattern; label: string }[] = [
   { id: 'diamonds',   label: 'Diamonds'   },
   { id: 'waves',      label: 'Waves'      },
   { id: 'crosshatch', label: 'Crosshatch' },
+  { id: 'chevron',    label: 'Chevron'    },
+  { id: 'hex',        label: 'Honeycomb'  },
 ]
 
 export const FONT_STYLES: { id: CoverFontStyle; label: string; sample: string }[] = [
@@ -62,6 +69,9 @@ export const ACCENT_PRESETS = [
   { label: 'Sapphire',color: '#60a5fa' },
   { label: 'Violet',  color: '#a78bfa' },
   { label: 'Rose',    color: '#fb7185' },
+  { label: 'Teal',    color: '#2dd4bf' },
+  { label: 'Indigo',  color: '#818cf8' },
+  { label: 'Coral',   color: '#fb923c' },
 ]
 
 // ── Pattern helper ─────────────────────────────────────────────────────────────
@@ -104,6 +114,18 @@ export function patternStyle(pattern: CoverPattern): React.CSSProperties {
       return {
         backgroundImage:
           'repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 1px, transparent 1px, transparent 16px), repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 1px, transparent 1px, transparent 16px)',
+      }
+    case 'chevron':
+      return {
+        backgroundImage:
+          'linear-gradient(45deg, rgba(255,255,255,0.05) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.05) 75%), linear-gradient(-45deg, rgba(255,255,255,0.05) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.05) 75%)',
+        backgroundSize: '24px 24px',
+      }
+    case 'hex':
+      return {
+        backgroundImage:
+          "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15z' fill='none' stroke='rgba(255,255,255,0.07)' stroke-width='1'/%3E%3C/svg%3E\")",
+        backgroundSize: '28px 49px',
       }
     default:
       return { backgroundImage: 'none' }

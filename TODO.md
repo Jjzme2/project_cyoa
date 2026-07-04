@@ -205,8 +205,14 @@ presets and makes ambient dynamic rather than a single static per-story pick.
   Aurora, Storm; 9→13) and 3 new ambient effects (Aurora, Lightning,
   Moonbeams; 9→12), each with a full-screen particle effect, a contained
   mini preview, and a synthesized ambient soundscape.
-- [ ] **More cover/world atmosphere presets** — more gradient/accent/emblem/
-  pattern presets + more `TONE_ATMOSPHERES` tone mappings.
+- [x] **More cover/world atmosphere presets** — 4 new gradients (Amber,
+  Orchid, Teal, Storm), 3 new accents (Teal, Indigo, Coral), 8 new
+  emblems/icons each for covers and worlds, and 2 new patterns (Chevron,
+  Honeycomb — a new `CoverPattern` value with its own `patternStyle()`
+  case). All 22 `VALID_TONES` were already 1:1 covered in
+  `TONE_ATMOSPHERES`, so no new tone mappings were needed. Also folded the
+  3 new ambient effects (aurora/lightning/moonbeams) into `rollWorldTheme`'s
+  pool, closing a gap left by the ReadingTheme preset expansion.
 - [ ] **Decouple ambient sound from ambient visual** — today one
   `ambientEffect` enum drives both 1:1; split into independent
   visual/sound fields.
