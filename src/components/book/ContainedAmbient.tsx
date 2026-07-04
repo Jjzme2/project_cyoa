@@ -30,8 +30,10 @@ function useMiniParticles(count: number): MiniParticle[] {
  * portals. Unlike the full-screen `AmbientBackground`, this fills its nearest
  * `relative` ancestor and uses container-scoped fall/rise animations.
  */
+const SPARSE_EFFECTS: AmbientEffect[] = ['mist', 'aurora', 'moonbeams']
+
 export function ContainedAmbient({ effect, density = 1 }: { effect: AmbientEffect; density?: number }) {
-  const particles = useMiniParticles(effect === 'mist' ? Math.round(4 * density) : Math.round(16 * density))
+  const particles = useMiniParticles(SPARSE_EFFECTS.includes(effect) ? Math.round(4 * density) : Math.round(16 * density))
   if (effect === 'none') return null
 
   return (
@@ -61,6 +63,14 @@ export function ContainedAmbient({ effect, density = 1 }: { effect: AmbientEffec
             return <span key={i} className="rounded-full" style={{ ...base, top: `${p.top}%`, width: p.size + 1, height: p.size + 1, background: `rgba(255,240,210,${p.op * 0.7})`, animationName: 'mote-float', animationTimingFunction: 'ease-in-out', animationDuration: `${4 + p.dur * 3}s` }} />
           case 'mist':
             return <span key={i} className="rounded-full" style={{ ...base, top: `${p.top}%`, left: `${p.left - 20}%`, width: p.size * 60 + 70, height: p.size * 26 + 26, background: `radial-gradient(ellipse, rgba(200,210,225,${p.op * 0.18}) 0%, transparent 70%)`, filter: 'blur(8px)', animationName: 'mist-drift', animationTimingFunction: 'ease-in-out', animationDuration: `${6 + p.dur * 5}s` }} />
+          case 'aurora':
+            return <span key={i} className="rounded-full" style={{ ...base, top: `${p.top * 0.4}%`, left: `${p.left - 15}%`, width: p.size * 50 + 60, height: p.size * 14 + 16, background: `hsla(${[170, 260, 140, 200, 300][i % 5]},80%,65%,${p.op * 0.22})`, filter: 'blur(6px)', animationName: 'mist-drift', animationTimingFunction: 'ease-in-out', animationDuration: `${8 + p.dur * 5}s` }} />
+          case 'moonbeams':
+            return <span key={i} style={{ ...base, top: '-10%', width: p.size * 10 + 14, height: '120%', background: 'linear-gradient(180deg, rgba(210,225,255,0.2) 0%, transparent 70%)', filter: 'blur(4px)', animationName: 'mist-drift', animationTimingFunction: 'ease-in-out', animationDuration: `${9 + p.dur * 5}s` }} />
+          case 'lightning':
+            return i === 0
+              ? <span key={i} className="absolute inset-0" style={{ animationDelay: base.animationDelay, animationIterationCount: 'infinite', background: 'rgba(220,225,255,0.85)', animationName: 'lightning-flash', animationTimingFunction: 'ease-out', animationDuration: `${5 + p.dur * 3}s` }} />
+              : <span key={i} style={{ ...base, top: '-10%', width: 1, height: `${p.size * 6 + 5}px`, background: `rgba(180,195,220,${p.op * 0.3})`, animationName: 'mini-fall', animationDuration: `${0.4 + p.dur * 0.5}s` }} />
           default:
             return null
         }

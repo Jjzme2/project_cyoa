@@ -9,6 +9,8 @@ import {
   WORLD_EMBLEMS,
   WORLD_PATTERNS,
 } from '@/components/world/world-theme'
+import { PAGE_STYLES, AMBIENT_EFFECTS } from '@/components/book/ReadingThemePicker'
+import { PAGE_PALETTES } from '@/components/book/book-viewer-internals'
 
 const VALID_BORDERS = ['none', 'single', 'double', 'ornate', 'runic', 'thorn', 'celestial', 'vine']
 const VALID_PATTERNS = ['none', 'stars', 'grid', 'dots', 'lines', 'diamonds', 'waves', 'crosshatch']
@@ -68,5 +70,20 @@ describe('world theme helpers', () => {
       expect(patterns.has(t.pattern)).toBe(true)
       expect(VALID_BORDERS).toContain(t.borderFrame)
     }
+  })
+})
+
+describe('reading theme presets', () => {
+  it('every PAGE_STYLES entry has a matching PAGE_PALETTES palette', () => {
+    for (const s of PAGE_STYLES) {
+      expect(PAGE_PALETTES[s.id]).toBeDefined()
+      expect(PAGE_PALETTES[s.id].bg).toBe(s.bg)
+      expect(PAGE_PALETTES[s.id].text).toBe(s.text)
+    }
+  })
+
+  it('has no duplicate page style or ambient effect ids', () => {
+    expect(new Set(PAGE_STYLES.map((s) => s.id)).size).toBe(PAGE_STYLES.length)
+    expect(new Set(AMBIENT_EFFECTS.map((e) => e.id)).size).toBe(AMBIENT_EFFECTS.length)
   })
 })

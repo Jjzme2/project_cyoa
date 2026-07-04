@@ -3,10 +3,13 @@
 export type CoverPattern = 'none' | 'stars' | 'grid' | 'dots' | 'lines' | 'diamonds' | 'waves' | 'crosshatch'
 export type CoverFontStyle = 'serif' | 'gothic' | 'script' | 'mono'
 export type CoverBorderFrame = 'none' | 'single' | 'double' | 'ornate' | 'runic' | 'thorn' | 'celestial' | 'vine'
-export type PageStyle = 'parchment' | 'sepia' | 'night' | 'forest' | 'ocean' | 'rose' | 'papyrus' | 'dusk' | 'slate'
+export type PageStyle =
+  | 'parchment' | 'sepia' | 'night' | 'forest' | 'ocean' | 'rose' | 'papyrus' | 'dusk' | 'slate'
+  | 'candlelight' | 'moonlit' | 'aurora' | 'storm'
 export type AmbientEffect =
   | 'none' | 'rain' | 'embers' | 'stars' | 'snow'
   | 'fireflies' | 'petals' | 'mist' | 'motes'
+  | 'aurora' | 'lightning' | 'moonbeams'
 
 export interface CoverTheme {
   fromColor: string

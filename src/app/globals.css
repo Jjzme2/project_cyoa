@@ -249,6 +249,16 @@
   100% { transform: translate(8px, -34px) scale(0.8); opacity: 0; }
 }
 
+/* A rare double-flicker on a long loop — aurora and moonbeams reuse
+   mist-drift's slow fade+drift for their own soft, colored bands. */
+@keyframes lightning-flash {
+  0%, 92% { opacity: 0; }
+  93%     { opacity: 0.55; }
+  94%     { opacity: 0.05; }
+  95%     { opacity: 0.4; }
+  100%    { opacity: 0; }
+}
+
 /* Container-scoped falls/rises for the in-card atmosphere preview (the
    full-screen effects use vh and overshoot a small box). */
 @keyframes mini-fall {

@@ -201,8 +201,10 @@ frames, a 21-tone → atmosphere preset map for worlds, and framer-motion
 already driving the page-flip and ending reveal. This pass expands the
 presets and makes ambient dynamic rather than a single static per-story pick.
 
-- [ ] **More ReadingTheme presets** — new page styles + ambient effects
-  beyond the current 9×9 (e.g. aurora, candlelight, moonlit, storm).
+- [x] **More ReadingTheme presets** — 4 new page styles (Candlelight, Moonlit,
+  Aurora, Storm; 9→13) and 3 new ambient effects (Aurora, Lightning,
+  Moonbeams; 9→12), each with a full-screen particle effect, a contained
+  mini preview, and a synthesized ambient soundscape.
 - [ ] **More cover/world atmosphere presets** — more gradient/accent/emblem/
   pattern presets + more `TONE_ATMOSPHERES` tone mappings.
 - [ ] **Decouple ambient sound from ambient visual** — today one

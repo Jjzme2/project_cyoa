@@ -180,6 +180,23 @@ export function startAmbient(effect: AmbientEffect): void {
       filter.frequency.value = 700
       gain.gain.value = 0.022
       break
+    case 'aurora':
+      filter.type = 'bandpass'
+      filter.frequency.value = 1400
+      filter.Q.value = 0.3
+      gain.gain.value = 0.02
+      break
+    case 'lightning':
+      filter.type = 'lowpass'
+      filter.frequency.value = 260
+      gain.gain.value = 0.07
+      break
+    case 'moonbeams':
+      filter.type = 'bandpass'
+      filter.frequency.value = 3200
+      filter.Q.value = 0.5
+      gain.gain.value = 0.018
+      break
     default:
       gain.gain.value = 0.03
   }
