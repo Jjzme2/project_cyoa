@@ -189,11 +189,11 @@ read caching, prompt-injection delimiters on user text.
 - [ ] **12. Collapse the 3 sequential per-chapter LLM calls.**
 - [ ] **13. Denormalize node ancestry (pathIds)** + bound/paginate author reads +
   sharded reaction counters.
-- [ ] **14. Cache the share-card / OG routes.** _Partial: the `/api/share-card/*`
-  routes already send `Cache-Control: public, s-maxage=300,
-  stale-while-revalidate` via the shared `share-card.tsx` helper. The Next.js
-  `opengraph-image.tsx` special routes (stories/worlds/characters/root) still
-  have no explicit cache header — that half remains open._
+- [x] **14. Cache the share-card / OG routes.** The `/api/share-card/*` routes
+  send `Cache-Control: public, s-maxage=300, stale-while-revalidate` via the
+  shared `share-card.tsx` helper; the `opengraph-image.tsx` routes
+  (root/stories/worlds/characters) now get the same header via the shared
+  `renderOgImage()` in `og.tsx`.
 - [x] **15. Handler/integration tests** for slot-fill and the Stripe webhook money
   paths (reuse the proven `credit-manager.test.ts` firebase-admin mock).
   _Done via S6 (`money-paths.test.ts`): exercises `postBounty`/`cancelBounty`/
