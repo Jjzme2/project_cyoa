@@ -61,10 +61,16 @@ export async function toggleFeedbackVote(id: string, uid: string): Promise<{ vot
   })
 }
 
-export async function setFeedbackStatus(id: string, status: FeedbackStatus, adminNote?: string): Promise<void> {
+export async function setFeedbackStatus(
+  id: string,
+  status: FeedbackStatus,
+  adminNote?: string,
+  tier?: 0 | 1 | 2 | 3,
+): Promise<void> {
   await feedbackCollection().doc(id).update({
     status,
     ...(adminNote !== undefined ? { adminNote: adminNote.slice(0, 500) } : {}),
+    ...(tier !== undefined ? { tier } : {}),
     updatedAt: new Date().toISOString(),
   })
 }

@@ -51,7 +51,7 @@ The working order. Within each bucket, top-to-bottom is the suggested sequence;
 - [x] **S4. GOAP filtering in gentle worlds.** The cast sim shouldn't even PLAN
   betray/attack/intimidate actions in a gentle world (today only the prose
   layer suppresses them).
-- [ ] **S5. Feedback priority tiers + ranked export.** Admins tag items T0–T3;
+- [x] **S5. Feedback priority tiers + ranked export.** Admins tag items T0–T3;
   the JSON task-list export orders by tier — feeding the coding-agent loop.
 - [ ] **S6. Money-path integration tests.** Slot-fill and Stripe-webhook
   handler tests reusing the proven in-memory firestore/rate-limit fakes.
