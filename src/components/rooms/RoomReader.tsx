@@ -186,7 +186,16 @@ export function RoomReader({ roomId }: { roomId: string }) {
         toast.success('The story continues, together!')
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not write this path')
+      const msg = e instanceof Error ? e.message : 'Could not write this path'
+      // Benign in a room: someone else got there first (filled the slot, or
+      // already advanced the room past it). The room's snapshot will pick up
+      // their write and move everyone on — not a real failure.
+      if (/already (filled|writing)|isn.t reachable/i.test(msg)) {
+        toast.message('Someone else in the room just wrote this path — the story continues any moment.')
+        setWriteText('')
+      } else {
+        toast.error(msg)
+      }
     } finally {
       setSubmittingWrite(false)
     }
