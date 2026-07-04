@@ -57,6 +57,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   let tier: 'FREE' | 'PREMIUM' = 'FREE'
   try {
     const decoded = await adminAuth.verifyIdToken(token)
+    if (decoded.firebase?.sign_in_provider === 'anonymous') {
+      return NextResponse.json({ error: 'Create a free account to branch a saga.' }, { status: 403 })
+    }
     uid = decoded.uid
     displayName = decoded.name ?? null
     tier = (decoded.tier as 'FREE' | 'PREMIUM') ?? 'FREE'

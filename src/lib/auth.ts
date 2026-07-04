@@ -32,6 +32,12 @@ export interface AuthContext {
   /** When the user last passed the 2FA gate (ms epoch), from a server-set claim;
    * null if never. Lets sensitive routes require a recent second factor. */
   twofaVerifiedAt: number | null
+  /**
+   * Signed in via Firebase Anonymous Auth — a "guest": can read (including
+   * joining a Read Together room) but never writes a path or uses any AI
+   * feature, credits or not. See {@link requireRegisteredAccount}.
+   */
+  isAnonymous: boolean
 }
 
 export function isAdminEmail(email: string | null | undefined): boolean {
@@ -71,8 +77,20 @@ export async function getAuthContext(req: Request): Promise<AuthContext | null> 
       // Admins bypass the age gate for moderation purposes.
       allowedRank: isAdmin ? RATING_RANK.Mature : allowedRankForAge(age),
       twofaVerifiedAt: typeof decoded.twofaVerifiedAt === 'number' ? decoded.twofaVerifiedAt : null,
+      isAnonymous: decoded.firebase?.sign_in_provider === 'anonymous',
     }
   } catch {
     return null
   }
+}
+
+/**
+ * Gate for every AI-consuming route: guests (Firebase Anonymous Auth) can read
+ * freely but must never touch AI generation, credited or not — that requires
+ * a registered account. Returns an error message to send as a 403, or `null`
+ * when the caller may proceed.
+ */
+export function requireRegisteredAccount(auth: AuthContext): string | null {
+  if (!auth.isAnonymous) return null
+  return 'Create a free account to use AI features.'
 }

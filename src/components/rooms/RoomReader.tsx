@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { toast } from 'sonner'
 import { Loader2, Users, Share2, LogOut, SkipForward, Check, Crown, BookOpen, BookOpenCheck, Feather, X } from 'lucide-react'
-import { db } from '@/lib/firebase-client'
+import { auth as firebaseAuth, db } from '@/lib/firebase-client'
 import { useAuth } from '@/components/Providers'
 import { trackEvent } from '@/lib/track-client'
 import { Button } from '@/components/ui/button'
@@ -214,6 +214,17 @@ export function RoomReader({ roomId }: { roomId: string }) {
     router.push('/stories')
   }
 
+  // Read-only guest access — no account needed to follow along, but a guest
+  // can never write a path or use AI (server-enforced, not just hidden here).
+  async function continueAsGuest() {
+    try {
+      const { signInAnonymously } = await import('firebase/auth')
+      await signInAnonymously(firebaseAuth)
+    } catch {
+      toast.error('Could not join as a guest — try signing in instead.')
+    }
+  }
+
   // Write a new path at a frontier (reuses the normal contribution endpoint),
   // then advance the whole room to it once it's published.
   async function submitWrite(slotId: string) {
@@ -268,6 +279,12 @@ export function RoomReader({ roomId }: { roomId: string }) {
       <Centered>
         <p className="text-sm text-muted-foreground/60">Sign in to join this reading room.</p>
         <Button size="sm" onClick={openAuthModal}>Sign in</Button>
+        <button
+          onClick={continueAsGuest}
+          className="text-xs text-muted-foreground/50 hover:text-amber-300 underline underline-offset-2 transition-colors"
+        >
+          Or continue as a guest (read-only)
+        </button>
       </Centered>
     )
   }
@@ -323,6 +340,8 @@ export function RoomReader({ roomId }: { roomId: string }) {
   const secondsLeft = Math.max(0, Math.ceil((new Date(room.roundEndsAt).getTime() - now) / 1000))
   const readyCount = members.filter(([uid]) => room.ready?.[uid]).length
   const myReady = !!room.ready?.[user.uid]
+  const guestCount = members.filter(([, m]) => m.guest).length
+  const isGuest = !!room.members[user.uid]?.guest
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
@@ -331,15 +350,22 @@ export function RoomReader({ roomId }: { roomId: string }) {
         <div className="flex items-center gap-2 min-w-0">
           <Users className="h-4 w-4 text-amber-400/70 shrink-0" />
           <span className="text-sm font-medium text-foreground/80 truncate">{room.storyTitle}</span>
-          <span className="text-[11px] text-muted-foreground/45 font-sans">· reading together</span>
+          <span className="text-[11px] text-muted-foreground/45 font-sans">
+            · {members.length} {members.length === 1 ? 'reader' : 'readers'}
+            {guestCount > 0 && ` (${guestCount} guest${guestCount === 1 ? '' : 's'}, ${members.length - guestCount} registered)`}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex -space-x-1.5">
             {members.slice(0, 6).map(([uid, m]) => (
               <span
                 key={uid}
-                title={m.name}
-                className="h-6 w-6 rounded-full bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-[9px] font-sans font-semibold text-amber-200"
+                title={m.guest ? `${m.name} (guest)` : m.name}
+                className={`h-6 w-6 rounded-full border flex items-center justify-center text-[9px] font-sans font-semibold ${
+                  m.guest
+                    ? 'bg-white/5 border-white/15 text-muted-foreground/70'
+                    : 'bg-amber-500/20 border-amber-400/30 text-amber-200'
+                }`}
               >
                 {initials(m.name)}
               </span>
@@ -423,6 +449,10 @@ export function RoomReader({ roomId }: { roomId: string }) {
           </p>
           {openSlots.length === 0 ? (
             <p className="text-sm text-muted-foreground/50 py-4 text-center">Waiting for an open path…</p>
+          ) : isGuest ? (
+            <p className="text-sm text-muted-foreground/50 py-4 text-center">
+              Reading as a guest — create a free account to write the next path.
+            </p>
           ) : (
             <div className="space-y-2">
               <Textarea
@@ -514,6 +544,7 @@ export function RoomReader({ roomId }: { roomId: string }) {
           >
             {room.hostId === uid && <Crown className="h-2.5 w-2.5 text-amber-400/70" />}
             {m.name}
+            {m.guest && <span className="text-muted-foreground/40">· guest</span>}
             {isHost && room.hostId !== uid && (
               <button
                 onClick={() => kick(uid)}

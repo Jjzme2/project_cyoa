@@ -11,6 +11,8 @@ export interface RoomMember {
   photo?: string | null
   /** ISO timestamp of the member's last heartbeat — used for presence. */
   lastSeen: string
+  /** Joined via Firebase Anonymous Auth — read-only, no writing, no AI. */
+  guest?: boolean
 }
 
 /** A live "read together" session: a group votes on each choice and advances in sync. */

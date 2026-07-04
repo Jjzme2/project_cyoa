@@ -100,6 +100,9 @@ export async function POST(req: NextRequest) {
   let displayName: string | null
   try {
     const decoded = await adminAuth.verifyIdToken(token)
+    if (decoded.firebase?.sign_in_provider === 'anonymous') {
+      return NextResponse.json({ error: 'Create a free account to build a world.' }, { status: 403 })
+    }
     uid = decoded.uid
     displayName = decoded.name ?? null
   } catch {

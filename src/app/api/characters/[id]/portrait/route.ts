@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidateTag } from 'next/cache'
-import { getAuthContext } from '@/lib/auth'
+import { getAuthContext, requireRegisteredAccount } from '@/lib/auth'
 import { getCharacter, setCharacterPortrait, getWorld } from '@/lib/firestore-helpers'
 import { CreditManager } from '@/lib/credit-manager'
 import { creditFailureResponse } from '@/lib/credit-response'
@@ -18,6 +18,8 @@ const PORTRAIT_COST = 3
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await getAuthContext(req)
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const guestBlock = requireRegisteredAccount(auth)
+  if (guestBlock) return NextResponse.json({ error: guestBlock }, { status: 403 })
 
   const { id } = await params
   const character = await getCharacter(id)

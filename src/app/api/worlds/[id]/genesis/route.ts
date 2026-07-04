@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidateTag } from 'next/cache'
-import { getAuthContext } from '@/lib/auth'
+import { getAuthContext, requireRegisteredAccount } from '@/lib/auth'
 import { throttle } from '@/lib/rate-limit'
 import { getWorld, setWorldGenesis } from '@/lib/firestore-helpers'
 import { buildGenesisSkeleton } from '@/lib/engine/world-genesis'
@@ -12,6 +12,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const auth = await getAuthContext(req)
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const guestBlock = requireRegisteredAccount(auth)
+  if (guestBlock) return NextResponse.json({ error: guestBlock }, { status: 403 })
 
   const world = await getWorld(id).catch(() => null)
   if (!world) return NextResponse.json({ error: 'World not found' }, { status: 404 })

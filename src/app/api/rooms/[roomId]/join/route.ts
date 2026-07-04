@@ -21,7 +21,7 @@ export async function POST(
     return NextResponse.json({ error: 'age_restricted', rating: story.rating ?? 'Mature' }, { status: 403 })
   }
 
-  const result = await joinRoom(roomId, { uid: auth.uid, name: auth.name })
+  const result = await joinRoom(roomId, { uid: auth.uid, name: auth.name, isAnonymous: auth.isAnonymous })
   if (result.error) return NextResponse.json({ error: result.error }, { status: 400 })
   return NextResponse.json({ ok: true })
 }

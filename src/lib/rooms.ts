@@ -99,6 +99,7 @@ interface Actor {
   uid: string
   name: string | null
   photo?: string | null
+  isAnonymous?: boolean
 }
 
 /** Filled paths a room can navigate to from a node. */
@@ -107,7 +108,12 @@ function navigableSlots(slots: ChoiceSlot[] | undefined): ChoiceSlot[] {
 }
 
 function member(actor: Actor): RoomMember {
-  return { name: actor.name ?? 'Anonymous', photo: actor.photo ?? null, lastSeen: new Date().toISOString() }
+  return {
+    name: actor.name ?? (actor.isAnonymous ? 'Guest' : 'Anonymous'),
+    photo: actor.photo ?? null,
+    lastSeen: new Date().toISOString(),
+    ...(actor.isAnonymous ? { guest: true } : {}),
+  }
 }
 
 export async function createRoom(
@@ -170,8 +176,13 @@ export async function joinRoom(roomId: string, actor: Actor): Promise<{ error?: 
     const revive: Revive = wasEmptyEnded ? { storyId: data.storyId, currentNodeId: data.currentNodeId } : null
 
     if (data.members[actor.uid]) {
-      // Already a member — just refresh presence.
+      // Already a member — just refresh presence. Also correct the guest flag
+      // in place: a guest who registered (Firebase account linking keeps the
+      // same uid) should stop showing as one without having to re-join.
       update[`members.${actor.uid}.lastSeen`] = now
+      if (!!data.members[actor.uid].guest !== !!actor.isAnonymous) {
+        update[`members.${actor.uid}.guest`] = !!actor.isAnonymous
+      }
       delete update.status // rejoining keeps the room alive
       delete update.endedReason
       txn.update(ref, update)
