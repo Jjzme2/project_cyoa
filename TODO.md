@@ -162,8 +162,10 @@ abuse guard below was also already covered by the Tier-3 throttle work.)
   presets alongside the built-in archetypes.
 - [ ] **"Surprise me" director** — a randomize button that lands on a coherent
   archetype with slight jitter, for authors who want a starting point.
-- [ ] **Director-aware cover art** — feed the director's vision/axes into the
-  cover-image generation prompt so the art matches the intended tone.
+- [x] **Director-aware cover art** — `describeDirectorForCoverArt()` translates
+  the persona's axes/vision into art-direction notes (palette, composition,
+  mood) folded into the cover-image prompt; wired from both `/stories/new`
+  and `/saga/new`.
 - [ ] **Funnel & retention in admin analytics** — a conversion view
   (worlds → stories → reads → purchases) and DAU/retention, beyond raw counts.
 - [ ] **Per-user activity drill-down** — from `/admin/users`, open a user's

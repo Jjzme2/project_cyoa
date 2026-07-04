@@ -3,6 +3,7 @@ import {
   emptyDirector,
   isDirectorMeaningful,
   describeDirector,
+  describeDirectorForCoverArt,
   sanitizeDirector,
   personaMatches,
 } from '@/lib/director'
@@ -31,6 +32,22 @@ describe('describeDirector', () => {
   })
   it('appends the stated vision as the final note', () => {
     const notes = describeDirector({ ...emptyDirector(), darkness: 1, vision: 'dread' })
+    expect(notes.length).toBe(2)
+    expect(notes[notes.length - 1]).toContain('dread')
+  })
+})
+
+describe('describeDirectorForCoverArt', () => {
+  it('emits nothing for a neutral persona', () => {
+    expect(describeDirectorForCoverArt(emptyDirector())).toEqual([])
+    expect(describeDirectorForCoverArt(null)).toEqual([])
+  })
+  it('only emits a note once an axis passes the threshold', () => {
+    expect(describeDirectorForCoverArt({ ...emptyDirector(), darkness: 0.2 })).toEqual([])
+    expect(describeDirectorForCoverArt({ ...emptyDirector(), darkness: 0.9 }).length).toBe(1)
+  })
+  it('appends the stated vision as the final note', () => {
+    const notes = describeDirectorForCoverArt({ ...emptyDirector(), darkness: 1, vision: 'dread' })
     expect(notes.length).toBe(2)
     expect(notes[notes.length - 1]).toContain('dread')
   })
