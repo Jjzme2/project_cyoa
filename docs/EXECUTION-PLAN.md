@@ -53,7 +53,7 @@ The working order. Within each bucket, top-to-bottom is the suggested sequence;
   layer suppresses them).
 - [x] **S5. Feedback priority tiers + ranked export.** Admins tag items T0–T3;
   the JSON task-list export orders by tier — feeding the coding-agent loop.
-- [ ] **S6. Money-path integration tests.** Slot-fill and Stripe-webhook
+- [x] **S6. Money-path integration tests.** Slot-fill and Stripe-webhook
   handler tests reusing the proven in-memory firestore/rate-limit fakes.
 
 ### 🧗 Multi-day items

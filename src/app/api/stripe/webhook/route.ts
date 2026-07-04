@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { StripeService, stripe } from '@/lib/stripe'
 import { adminDb } from '@/lib/firebase-admin'
+import { claimStripeEvent, markStripeEvent, releaseStripeEvent } from '@/lib/stripe-events'
 import { CreditManager } from '@/lib/credit-manager'
 import { analytics, insights } from '@/lib/telemetry'
 import type Stripe from 'stripe'
@@ -36,20 +37,11 @@ export async function POST(req: NextRequest) {
   // Idempotency. Stripe redelivers events (retries, at-least-once delivery);
   // processing `checkout.session.completed` twice would double-credit the user
   // because addCredits() increments. Atomically claim the event id before doing
-  // any work, and skip if it's already been claimed.
-  const eventRef = adminDb.collection('stripeEvents').doc(event.id)
+  // any work, and skip if it's already been claimed (see lib/stripe-events —
+  // extracted so the money-path tests can exercise it directly).
   let claimed = false
   try {
-    claimed = await adminDb.runTransaction(async (txn) => {
-      const existing = await txn.get(eventRef)
-      if (existing.exists) return false
-      txn.set(eventRef, {
-        type: event.type,
-        status: 'processing',
-        receivedAt: new Date().toISOString(),
-      })
-      return true
-    })
+    claimed = await claimStripeEvent(event.id, event.type)
   } catch (err) {
     // Fail closed: if we can't establish whether this event was already handled,
     // ask Stripe to retry rather than risk a double-grant.
@@ -134,13 +126,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Mark the event fully processed so future redeliveries are skipped.
-    await eventRef.set({ status: 'done', processedAt: new Date().toISOString() }, { merge: true })
+    await markStripeEvent(event.id, 'processed')
     return NextResponse.json({ received: true })
   } catch (err) {
     console.error('[Stripe Webhook Handler Error]:', err)
     // Release the claim so Stripe's retry can reprocess this event; otherwise a
     // transient failure would permanently skip a legitimate grant.
-    await eventRef.delete().catch(() => {})
+    await releaseStripeEvent(event.id).catch(() => {})
     return NextResponse.json(
       { error: 'Webhook event processing failed' },
       { status: 500 }
