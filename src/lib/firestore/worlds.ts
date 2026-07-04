@@ -28,6 +28,14 @@ export async function setWorldMultiverse(
     .set({ multiverse: patch.multiverse, links: patch.links }, { merge: true })
 }
 
+/** Set (or clear) a world's hand-picked guest-star Character ids (capped at 5). */
+export async function setWorldGuestStars(worldId: string, characterIds: string[]): Promise<void> {
+  await adminDb
+    .collection('worlds')
+    .doc(worldId)
+    .set({ guestStarCharacterIds: characterIds.slice(0, 5) }, { merge: true })
+}
+
 export async function getWorld(id: string): Promise<World | null> {
   'use cache'
   cacheLife('hours')
@@ -48,10 +56,11 @@ export async function getWorldsByMultiverse(multiverseId: string, limit = 12): P
   return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as World))
 }
 
-export async function getWorldsByAuthor(authorId: string): Promise<World[]> {
+export async function getWorldsByAuthor(authorId: string, limit = 100): Promise<World[]> {
   const snap = await adminDb
     .collection('worlds')
     .where('authorId', '==', authorId)
+    .limit(limit)
     .get()
 
   return snap.docs

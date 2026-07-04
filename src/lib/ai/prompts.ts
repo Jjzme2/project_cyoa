@@ -257,7 +257,10 @@ If the choice FAILS any criterion, respond with ONLY this line and nothing else:
 REJECTED: [one sentence explaining why it was rejected]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 2 — If the choice passes validation, write the next chapter. It MUST follow these rules strictly:
+STEP 2 — If the choice passes validation: first, if the reader's choice above has minor spelling, punctuation, or grammar errors, silently correct them while preserving its exact wording, intent, meaning, and voice (do not rewrite, rephrase, embellish, expand, or shorten). Begin your response with that corrected choice on its own line, even if nothing needed fixing:
+CHOICE_TEXT: [the reader's choice, corrected if needed]
+
+Then write the next chapter. It MUST follow these rules strictly:
 - Flow naturally from the preceding story path and the reader's choice
 - Stay strictly within the CONTENT RATING above
 - Refer to the protagonist by name; keep every established character perfectly consistent with the facts above

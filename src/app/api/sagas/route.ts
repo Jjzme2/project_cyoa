@@ -12,6 +12,7 @@ import {
   getLinkedEchoes,
   getMultiverseCameos,
   getLinkedCameos,
+  getGuestStarCameos,
   checkAndAwardAchievements,
   getUserSagaInWorld,
 } from '@/lib/firestore-helpers'
@@ -147,7 +148,7 @@ export async function POST(req: NextRequest) {
     // Multiverse pool: a fresh saga carries no chronicle of its own (the reader
     // just arrived), but the WORLD's declared multiverse is canon — so its
     // sibling worlds' legends may drift in as clearly-foreign echoes.
-    const [poolEchoes, linkEchoes, poolCameos, linkCameos] = await Promise.all([
+    const [poolEchoes, linkEchoes, poolCameos, linkCameos, guestStarCameos] = await Promise.all([
       world.multiverse?.id
         ? getMultiverseEchoes(world.multiverse.id, worldId, { maxRating: effectiveRating }).catch(() => [])
         : Promise.resolve([]),
@@ -160,9 +161,12 @@ export async function POST(req: NextRequest) {
       world.links?.length
         ? getLinkedCameos(world.links, { maxRating: effectiveRating }).catch(() => [])
         : Promise.resolve([]),
+      world.guestStarCharacterIds?.length
+        ? getGuestStarCameos(world.guestStarCharacterIds, { maxRating: effectiveRating }).catch(() => [])
+        : Promise.resolve([]),
     ])
     const echoes = mergeEchoes(poolEchoes, linkEchoes)
-    const cameos = mergeCameos(poolCameos, linkCameos)
+    const cameos = mergeCameos(poolCameos, linkCameos, guestStarCameos)
     // Assembled through the single audited seam: this context can only ever carry
     // THIS world's data plus the echoes/cameos its own multiverse membership opted into.
     const worldCtx = buildWorldContext(world, {
@@ -257,6 +261,7 @@ export async function POST(req: NextRequest) {
     revalidateTag(`story-${storyId}`, 'max')
     revalidateTag(`story-tree-${storyId}`, 'max')
     after(() => checkAndAwardAchievements(uid, 'story_created').catch(() => {}))
+    after(() => checkAndAwardAchievements(uid, 'saga_created').catch(() => {}))
     after(() =>
       analytics.track('saga.created', {
         uid,

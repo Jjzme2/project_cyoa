@@ -15,7 +15,7 @@ import { InterludeDirector } from './interlude-director';
 import { RelationshipGraph } from './relationship-graph';
 import { AgentAffect } from './agent-affect';
 import { BeliefModel } from './belief';
-import { resolveStoryNarrativeMode, gentleModeDirective, gentleGoapFilter, type NarrativeMode } from './narrative-mode';
+import { resolveStoryNarrativeMode, narrativeModeDirective, gentleGoapFilter, type NarrativeMode } from './narrative-mode';
 
 export interface NarrativeContext {
   /** Governs everything below it: the world's narrative shape (empty for dramatic). */
@@ -127,7 +127,7 @@ export class NarrativeBuilder {
    */
   public buildContext(nodePath: string, depth: number, currentState: WorldState, priorState?: EngineState, catchUpTicks: number = 0, readerStanding: number = 0, outsiderRegard: number = 0): NarrativeBuildResult {
     const context: NarrativeContext = {
-      modeDirective: this.mode === 'gentle' ? gentleModeDirective() : '',
+      modeDirective: narrativeModeDirective(this.mode),
       environmentalContext: '',
       activeEncounters: [],
       npcActions: [],
@@ -306,8 +306,11 @@ export class NarrativeBuilder {
     context.stakesDirective = DifficultyManager.directive(difficulty.level, this.mode);
 
     // 7c. Plot planner: advance the story's through-line one beat at a time.
-    // A gentle world draws only from the conflict-free arc pool.
-    const plot = PlotPlanner.advance(PlotPlanner.init(this.story.title, priorState?.plot, this.story.director, this.mode));
+    // A gentle world draws only from the conflict-free arc pool; a 'custom'
+    // story supplies its own AI-generated arc instead of a curated pool.
+    const plot = PlotPlanner.advance(
+      PlotPlanner.init(this.story.title, priorState?.plot, this.story.director, this.mode, this.story.customNarrativeShape),
+    );
     context.plotDirective = PlotPlanner.directive(plot);
 
     const turnCount = (priorState?.turnCount ?? 0) + 1;

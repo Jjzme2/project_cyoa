@@ -13,6 +13,7 @@ import { WorldGenesis } from '@/components/world/WorldGenesis'
 import { GenerateGenesisButton } from '@/components/world/GenerateGenesisButton'
 import { OutsiderRegard } from '@/components/world/OutsiderRegard'
 import { MultiverseSettings } from '@/components/world/MultiverseSettings'
+import { GuestStarSettings } from '@/components/world/GuestStarSettings'
 import { WorldPortal } from '@/components/world/WorldPortal'
 import { ShareImageButton } from '@/components/share/ShareImageButton'
 import { themeForTone, DEFAULT_WORLD_THEME } from '@/components/world/world-theme'
@@ -224,6 +225,12 @@ async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
           authorId={world.authorId}
           initialMultiverseName={world.multiverse?.name ?? ''}
           initialLinks={world.links ?? []}
+        />
+
+        <GuestStarSettings
+          worldId={world.id}
+          authorId={world.authorId}
+          initialCharacterIds={world.guestStarCharacterIds ?? []}
         />
 
         <WorldLore chronicle={chronicle} legends={legends} />

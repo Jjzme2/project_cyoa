@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Bell, BookOpen, Trophy, Check, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/components/Providers'
-import type { Notification } from '@/types'
+import { ACHIEVEMENT_DEFS, type Notification } from '@/types'
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
@@ -173,7 +173,10 @@ export function NotificationBell() {
                           </>
                         ) : (
                           <>
-                            Achievement unlocked: <span className="text-amber-300">{n.achievementId}</span>
+                            Achievement unlocked:{' '}
+                            <span className="text-amber-300">
+                              {ACHIEVEMENT_DEFS.find((d) => d.id === n.achievementId)?.name ?? n.achievementId}
+                            </span>
                           </>
                         )}
                       </p>

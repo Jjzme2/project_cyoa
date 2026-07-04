@@ -1,4 +1,5 @@
 import type { WorldPulse } from '@/types'
+import type { NarrativeMode } from './narrative-mode'
 
 /**
  * Build the reader-facing simulation snapshot from the engine's already-computed
@@ -11,7 +12,7 @@ import type { WorldPulse } from '@/types'
 export function buildWorldPulse(
   ctx: { factionStatus?: string; economySummary?: string; relationshipSummary?: string },
   state: { director?: { tension?: number } } | undefined,
-  mode: 'dramatic' | 'gentle' = 'dramatic',
+  mode: NarrativeMode = 'dramatic',
 ): WorldPulse {
   const trim = (s?: string) => {
     const t = (s ?? '').trim()

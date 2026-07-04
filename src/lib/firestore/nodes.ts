@@ -191,13 +191,42 @@ export async function getModerationQueue(limit = 50): Promise<ModerationQueueIte
  * @param nodeId The leaf node ID (e.g. parent node of the current slot).
  * @returns A promise resolving to an array of StoryPathSegment.
  */
+function toSegment(id: string, data: FirebaseFirestore.DocumentData): StoryPathSegment {
+  return {
+    id,
+    content: data.content ?? '',
+    choiceText: data.choiceText ?? null,
+    depth: data.depth ?? 0,
+  }
+}
+
 export async function getStoryPath(storyId: string, nodeId: string): Promise<StoryPathSegment[]> {
   'use cache'
   cacheLife('days')
   cacheTag(`path-${storyId}-${nodeId}`)
 
-  const segments: StoryPathSegment[] = []
-  let currentId: string | null = nodeId
+  const leafDoc = await nodeRef(storyId, nodeId).get()
+  if (!leafDoc.exists) return []
+  const leafData = leafDoc.data()
+  if (!leafData) return []
+
+  // Fast path: the leaf's denormalized ancestor chain lets us batch-fetch every
+  // ancestor in one parallel round-trip instead of a sequential walk.
+  if (leafData.pathIds) {
+    const ancestorIds: string[] = leafData.pathIds
+    const ancestorDocs = await Promise.all(ancestorIds.map((id) => nodeRef(storyId, id).get()))
+    const segments: StoryPathSegment[] = []
+    for (const doc of ancestorDocs) {
+      const data = doc.data()
+      if (doc.exists && data) segments.push(toSegment(doc.id, data))
+    }
+    segments.push(toSegment(leafDoc.id, leafData))
+    return segments
+  }
+
+  // Fallback for nodes created before `pathIds` existed: walk parentId one read at a time.
+  const segments: StoryPathSegment[] = [toSegment(leafDoc.id, leafData)]
+  let currentId: string | null = leafData.parentId ?? null
   const maxDepth = 40 // Safe-guard limit to prevent infinite loops and limit DB reads
   let count = 0
 
@@ -207,12 +236,7 @@ export async function getStoryPath(storyId: string, nodeId: string): Promise<Sto
     if (!doc.exists) break
     const data = doc.data()
     if (!data) break
-    segments.push({
-      id: doc.id,
-      content: data.content ?? '',
-      choiceText: data.choiceText ?? null,
-      depth: data.depth ?? 0,
-    })
+    segments.push(toSegment(doc.id, data))
     currentId = data.parentId ?? null
     count++
   }
@@ -230,7 +254,15 @@ export async function createStoryNode(
   const published = moderationFields?.published ?? true
   const moderation: NodeModeration =
     moderationFields?.moderation ?? { status: 'approved', reviewedBy: null, reviewedAt: null }
-  await ref.set({ ...data, published, moderation, createdAt: new Date().toISOString() })
+
+  let pathIds: string[] | undefined
+  if (data.parentId) {
+    const parentDoc = await nodeRef(data.storyId, data.parentId).get()
+    const parentData = parentDoc.data()
+    pathIds = [...(parentData?.pathIds ?? []), data.parentId]
+  }
+
+  await ref.set({ ...data, published, moderation, ...(pathIds ? { pathIds } : {}), createdAt: new Date().toISOString() })
 
   // A definitive ending is terminal — it gets no onward choice slots.
   if (data.isEnding) return ref.id

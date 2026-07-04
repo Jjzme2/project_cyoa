@@ -124,7 +124,7 @@ export async function generateStoryNode(
   includeImage: boolean,
   systemNarrativeEvents: string = '',
   endingDirective: string = '',
-): Promise<{ content: string; choices: string[]; model: string; newCharacters: StoryCharacter[]; location?: string; sceneAmbient?: AmbientEffect; ending?: { title: string; type: EndingType } }> {
+): Promise<{ content: string; choices: string[]; model: string; newCharacters: StoryCharacter[]; location?: string; sceneAmbient?: AmbientEffect; ending?: { title: string; type: EndingType }; correctedChoiceText?: string }> {
   const prompt = buildPrompt(world, storyPath, choiceText, includeImage, systemNarrativeEvents, endingDirective)
 
   try {
@@ -191,4 +191,72 @@ Respond with ONLY valid JSON in the same shape (no markdown):
   } catch {
     return skeleton // fail open — the procedural skeleton alone is still a usable world bible
   }
+}
+
+/**
+ * A wholly custom, author-described narrative through-line (credit-gated) —
+ * the same 4-beat setup/rising/turning-point/resolution shape as the curated
+ * preset pools (see `plot-planner.ts`), but generated on demand instead of
+ * picked from them. Persisted on the story as `customNarrativeShape` and fed
+ * back into `PlotPlanner` verbatim once `narrativeMode === 'custom'`.
+ */
+export async function generateCustomNarrativeShape(
+  description: string,
+  userId: string,
+): Promise<{ name: string; beats: string[] }> {
+  const aiPrompt = `You are designing a custom narrative through-line — a "shape" — for a Choose Your Own Adventure story, from the author's own description of the kind of story arc they want.
+
+A through-line has EXACTLY 4 beats, one per act: Setup, Rising action, Turning point, Resolution. Each beat is a single, concrete directorial instruction, written in the same terse, lower-case, mid-sentence imperative style as these real examples (do not reuse them, just match the register):
+- "plant a subtle seed of distrust between the protagonist and someone they rely on"
+- "let the compromises accumulate, each one a little easier to justify than the last"
+- "reveal a truth that recontextualizes what came before"
+- "spark the turn — a hard-won insight or unlikely ally"
+
+Respond with ONLY valid JSON (no markdown fences, no explanation):
+{"name": "a short evocative name for this shape (2-5 words)", "beats": ["setup beat", "rising action beat", "turning point beat", "resolution beat"]}
+
+${userInputBlock("Author's narrative shape idea", description)}`
+
+  const normalize = (data: Record<string, unknown>): { name: string; beats: string[] } => {
+    const beatsRaw = Array.isArray(data.beats) ? (data.beats as unknown[]).map(String) : []
+    const beats = beatsRaw.filter((b) => b.trim()).slice(0, 4).map((b) => b.trim().slice(0, 200))
+    while (beats.length < 4) beats.push('let the through-line continue')
+    return { name: pickStr(data.name, 'A Custom Shape', 60), beats }
+  }
+
+  const { text } = await runTextWaterfall({ prompt: aiPrompt, userId, maxOutputTokens: 400, feature: 'narrative-shape' })
+  return normalize(tryParseJSON(text))
+}
+
+const CLASSIFIABLE_MODES = ['dramatic', 'gentle', 'dark', 'absurd', 'melancholic', 'mystery', 'slice_of_life'] as const
+export type ClassifiableNarrativeMode = (typeof CLASSIFIABLE_MODES)[number]
+
+/**
+ * AI-assisted narrative-mode detection: suggests which curated mood best fits
+ * an author's story premise, so they don't have to already know the mode
+ * names to get a good match. A suggestion only — the author can always
+ * override it in the mood picker.
+ */
+export async function classifyNarrativeMode(
+  description: string,
+  userId: string,
+): Promise<ClassifiableNarrativeMode> {
+  const aiPrompt = `You are classifying the narrative MOOD of a Choose Your Own Adventure story from its premise, so the story engine can pace and direct chapters in the right register.
+
+Pick EXACTLY ONE of these moods:
+- dramatic: the traditional arc — conflict, real stakes, reckonings
+- gentle: no conflict at all — wonder, friendship, shared joy, no villains or danger
+- dark: heavier than dramatic — dread, moral cost, no guaranteed happy ending
+- absurd: surreal and comedic — illogical escalation played with total deadpan sincerity
+- melancholic: quiet sorrow and bittersweet longing — memory, distance, things unsaid or lost
+- mystery: a puzzle to solve — concrete clues, red herrings, a truth being chased down
+- slice_of_life: ordinary and low-stakes — everyday routines, small frictions, human-scale moments
+
+Respond with ONLY valid JSON (no markdown fences, no explanation): {"mode": "one of the exact mode names above"}
+
+${userInputBlock('Story premise', description)}`
+
+  const { text } = await runTextWaterfall({ prompt: aiPrompt, userId, maxOutputTokens: 60, feature: 'narrative-shape-classify' })
+  const mode = String(tryParseJSON(text).mode ?? '').trim()
+  return (CLASSIFIABLE_MODES as readonly string[]).includes(mode) ? (mode as ClassifiableNarrativeMode) : 'dramatic'
 }

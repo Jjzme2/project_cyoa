@@ -148,10 +148,17 @@ export interface Story {
   endingConditions?: EndingCondition[]
   /**
    * This story's narrative shape, CLAMPED by its world: a dramatic world may
-   * host a gentle story; a gentle world's stories are always gentle. Absent =
-   * inherit the world's shape.
+   * host a gentle/dark/absurd/melancholic/mystery/slice_of_life/custom story;
+   * a gentle world's stories are always gentle. Absent = inherit the world's
+   * shape.
    */
-  narrativeMode?: 'gentle' | 'dramatic'
+  narrativeMode?: 'gentle' | 'dramatic' | 'dark' | 'absurd' | 'melancholic' | 'mystery' | 'slice_of_life' | 'custom'
+  /**
+   * An author's AI-generated custom through-line (credit-gated), used only
+   * when `narrativeMode === 'custom'` — a wholly bespoke 4-beat arc instead of
+   * picking from the curated preset pools.
+   */
+  customNarrativeShape?: { name: string; beats: string[] }
 }
 
 export interface StoryNode {
@@ -162,6 +169,15 @@ export interface StoryNode {
   parentId: string | null
   choiceText: string | null
   slots: ChoiceSlot[]
+  /**
+   * Denormalized ancestor chain, root-first, NOT including this node itself —
+   * computed once at creation from the parent's own `pathIds`. Lets a full
+   * story path be reconstructed with one read + one parallel batch-get instead
+   * of walking `parentId` one sequential read at a time. Absent on nodes
+   * created before this field existed; `getStoryPath` falls back to the walk
+   * for those.
+   */
+  pathIds?: string[]
   authorId: string | null
   aiGenerated: boolean
   aiModel: string | null
@@ -177,6 +193,10 @@ export interface StoryNode {
   /** How many readers have branched a personal saga from this chapter (a 4th,
    * non-community branch type). Surfaced in the reader. */
   sagaBranches?: number
+  /** Denormalized sum of all sharded reaction-type counters on this node (see
+   * `reactionShards` subcollection) — cheap to read for reputation stats
+   * without scanning every shard of every authored node. */
+  totalReactions?: number
   /** A compact, reader-facing snapshot of the living simulation at this chapter
    * (tension, factions, economy, cast mood) — computed server-side from the
    * engine so the reader can SEE the world move. */

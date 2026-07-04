@@ -21,8 +21,7 @@ export type GenerationKind = 'assist' | 'cover' | 'chapter' | 'saga' | 'portrait
 /** Why a generation produced no usable content. */
 export type GenerationFailureReason =
   | 'model_error' // the model/provider threw or timed out
-  | 'prompt_rejected' // the model's own safety pass rejected the prompt
-  | 'voided' // the autonomous editor voided an illegitimate contribution
+  | 'prompt_rejected' // the model's own validation pass rejected or voided the prompt
   | 'refused' // moderation refused the generated content
   | 'image_failed' // text succeeded but the image generation returned nothing
   | 'empty' // the model returned nothing usable

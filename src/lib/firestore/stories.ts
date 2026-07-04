@@ -171,8 +171,11 @@ export async function getAuthoredPathStats(uid: string): Promise<AuthoredPathSta
   for (const d of snap.docs) {
     const data = d.data()
     totalReads += (data.traversals as number) ?? 0
-    const reactions = (data.reactions as Record<string, number>) ?? {}
-    totalLoves += Object.values(reactions).reduce((sum, n) => sum + (n ?? 0), 0)
+    // Legacy per-node `reactions` maps predate sharded counters — kept as a frozen
+    // baseline that `totalReactions` (the sharded aggregate) accrues on top of.
+    const legacyReactions = (data.reactions as Record<string, number>) ?? {}
+    totalLoves += Object.values(legacyReactions).reduce((sum, n) => sum + (n ?? 0), 0)
+    totalLoves += (data.totalReactions as number) ?? 0
   }
   return { pathsWritten: snap.size, totalReads, totalLoves }
 }
@@ -218,11 +221,12 @@ export async function incrementSagaBranches(storyId: string, nodeId: string): Pr
   await nodeRef(storyId, nodeId).update({ sagaBranches: FieldValue.increment(1) })
 }
 
-export async function getStoriesByAuthor(authorId: string): Promise<Story[]> {
+export async function getStoriesByAuthor(authorId: string, limit = 100): Promise<Story[]> {
   const snap = await adminDb
     .collection('stories')
     .where('authorId', '==', authorId)
     .orderBy('createdAt', 'desc')
+    .limit(limit)
     .get()
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Story))
 }

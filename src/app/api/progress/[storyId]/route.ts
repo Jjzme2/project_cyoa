@@ -45,6 +45,12 @@ export async function POST(
   const { currentNodeId, nodeHistory } = parsed.data
 
   await saveReadingProgress(uid, storyId, currentNodeId, nodeHistory)
-  checkAndAwardAchievements(uid, 'story_read').catch(() => {})
+  checkAndAwardAchievements(uid, 'story_read', { storyId }).catch(() => {})
+  // The very first time ANY reader's history goes from the root to a second
+  // chapter is their first choice ever — idempotent across every story, so
+  // this only ever actually earns once no matter how many stories arrive here.
+  if (nodeHistory.length === 1) {
+    checkAndAwardAchievements(uid, 'first_choice').catch(() => {})
+  }
   return NextResponse.json({ ok: true })
 }

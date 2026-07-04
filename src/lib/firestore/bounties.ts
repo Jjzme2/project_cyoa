@@ -3,8 +3,59 @@ import type { SlotBounty } from '@/types'
 import { CreditManager } from '../credit-manager'
 import { slotRef } from './refs'
 import { getChoiceSlot } from './slots'
+import { checkAndAwardAchievements } from './achievements'
+import { getStory } from './stories'
 
 // ─── Branch bounties (escrow on empty slots) ───────────────────────────────────────────────
+
+export interface OpenBountyListing {
+  storyId: string
+  nodeId: string
+  slotId: string
+  storyTitle: string
+  reward: number
+  promptHint?: string
+  posterName: string
+  createdAt: string
+}
+
+/**
+ * The global bounty board: every currently-open bounty across every story,
+ * newest first. A collection-group query across `slots` subcollections —
+ * needs the `slots` (bounty.status, bounty.createdAt) composite index (see
+ * firestore.indexes.json); until that index is deployed, Firestore throws
+ * FAILED_PRECONDITION, so callers should treat a thrown error here as "board
+ * not ready yet" rather than a hard failure.
+ */
+export async function listOpenBounties(limit = 30): Promise<OpenBountyListing[]> {
+  const snap = await adminDb
+    .collectionGroup('slots')
+    .where('bounty.status', '==', 'open')
+    .orderBy('bounty.createdAt', 'desc')
+    .limit(limit)
+    .get()
+
+  const raw = snap.docs.map((d) => {
+    // Path shape: stories/{storyId}/nodes/{nodeId}/slots/{slotId}
+    const parts = d.ref.path.split('/')
+    const bounty = d.data().bounty as SlotBounty
+    return {
+      storyId: parts[1],
+      nodeId: parts[3],
+      slotId: d.id,
+      reward: bounty.reward,
+      promptHint: bounty.promptHint,
+      posterName: bounty.posterName,
+      createdAt: bounty.createdAt,
+    }
+  })
+
+  const storyIds = Array.from(new Set(raw.map((r) => r.storyId)))
+  const stories = await Promise.all(storyIds.map((id) => getStory(id).catch(() => null)))
+  const titleById = new Map(storyIds.map((id, i) => [id, stories[i]?.title ?? 'Unknown story']))
+
+  return raw.map((r) => ({ ...r, storyTitle: titleById.get(r.storyId) ?? 'Unknown story' }))
+}
 
 export async function postBounty(
   storyId: string,
@@ -94,6 +145,7 @@ export async function settleBountyOnFill(
   published: boolean,
 ): Promise<void> {
   const ref = slotRef(storyId, nodeId, slotId)
+  let paidFiller = false
 
   await adminDb.runTransaction(async (txn) => {
     const doc = await txn.get(ref)
@@ -111,10 +163,13 @@ export async function settleBountyOnFill(
         'bounty.pendingNodeId': null,
       })
       CreditManager.grantCreditsInTxn(txn, fillerId, b.reward)
+      paidFiller = true
     } else {
       // Flagged — hold the reward until an admin approves the route.
       txn.update(ref, { 'bounty.pendingClaimBy': fillerId, 'bounty.pendingNodeId': childNodeId })
     }
   })
+
+  if (paidFiller) checkAndAwardAchievements(fillerId, 'bounty_filled').catch(() => {})
 }
 

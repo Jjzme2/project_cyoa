@@ -8,6 +8,7 @@ import { appearanceSummary, isCrossWorld } from '@/lib/characters'
 import { CharacterPortrait } from '@/components/character/CharacterPortrait'
 import { GeneratePortraitButton } from '@/components/character/GeneratePortraitButton'
 import { ShareImageButton } from '@/components/share/ShareImageButton'
+import { CharacterVoteButton } from '@/components/character/CharacterVoteButton'
 import { APP_CONFIG } from '@/lib/config'
 import { jsonLdSafe } from '@/lib/json-ld'
 
@@ -75,6 +76,7 @@ async function CharacterDetail({ params }: Props) {
       )}
 
       <div className="flex items-center gap-3 flex-wrap">
+        <CharacterVoteButton characterId={c.id} initialCount={c.voteCount ?? 0} />
         <ShareImageButton
           cardUrl={`/api/share-card/character/${c.id}`}
           filename={`chronicle-character-${c.id}`}

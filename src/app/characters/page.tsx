@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import Link from 'next/link'
-import { Users, Globe } from 'lucide-react'
+import { Users, Globe, Heart } from 'lucide-react'
 import { listCharacters } from '@/lib/firestore-helpers'
 import { appearanceSummary, isCrossWorld } from '@/lib/characters'
 import { CharacterPortrait } from '@/components/character/CharacterPortrait'
@@ -12,8 +12,14 @@ export const metadata: Metadata = {
   alternates: { canonical: '/characters' },
 }
 
-async function CharactersContent() {
-  const characters = await listCharacters(60)
+interface Props {
+  searchParams: Promise<{ sort?: string }>
+}
+
+async function CharactersContent({ searchParams }: Props) {
+  const { sort: sortParam } = await searchParams
+  const sort = sortParam === 'loved' ? 'loved' : 'recent'
+  const characters = await listCharacters(60, sort)
 
   return (
     <main className="max-w-5xl mx-auto px-4 sm:px-6 py-12 space-y-8">
@@ -27,6 +33,24 @@ async function CharactersContent() {
           Heroes and canon figures who appear across Chronicle&apos;s stories. The more a character is written, the
           further they travel — some cross from one world into another.
         </p>
+        <div className="flex items-center gap-2 pt-1">
+          <Link
+            href="/characters"
+            className={`text-xs font-sans px-3 py-1.5 rounded-md border transition-colors ${
+              sort === 'recent' ? 'border-amber-500/40 bg-amber-500/10 text-amber-300' : 'border-white/10 text-muted-foreground/60 hover:text-foreground/80'
+            }`}
+          >
+            Recent
+          </Link>
+          <Link
+            href="/characters?sort=loved"
+            className={`inline-flex items-center gap-1 text-xs font-sans px-3 py-1.5 rounded-md border transition-colors ${
+              sort === 'loved' ? 'border-rose-500/40 bg-rose-500/10 text-rose-300' : 'border-white/10 text-muted-foreground/60 hover:text-foreground/80'
+            }`}
+          >
+            <Heart className="h-3 w-3" /> Most loved
+          </Link>
+        </div>
       </header>
 
       {characters.length === 0 ? (
@@ -50,6 +74,11 @@ async function CharactersContent() {
                   <div className="text-[11px] text-muted-foreground/45 mt-1 flex items-center gap-1.5">
                     {isCrossWorld(c) && <Globe className="h-3 w-3 text-teal-400/70" />}
                     {appearanceSummary(c)}
+                    {!!c.voteCount && (
+                      <span className="inline-flex items-center gap-0.5 text-rose-400/60">
+                        <Heart className="h-3 w-3 fill-current" /> {c.voteCount}
+                      </span>
+                    )}
                   </div>
                 </div>
               </Link>
@@ -75,10 +104,10 @@ function CharactersSkeleton() {
   )
 }
 
-export default function CharactersPage() {
+export default function CharactersPage({ searchParams }: Props) {
   return (
     <Suspense fallback={<CharactersSkeleton />}>
-      <CharactersContent />
+      <CharactersContent searchParams={searchParams} />
     </Suspense>
   )
 }

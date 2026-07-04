@@ -465,3 +465,32 @@ export async function getRoomStoryId(roomId: string): Promise<string | null> {
   const snap = await roomRef(roomId).get()
   return snap.exists ? ((snap.data() as Room).storyId ?? null) : null
 }
+
+export interface ActiveRoomListing {
+  id: string
+  storyId: string
+  storyTitle: string
+  status: RoomStatus
+  memberCount: number
+}
+
+/**
+ * The rooms lobby: active (non-ended) rooms, most-recently-active first. A
+ * plain `orderBy('lastActivity')` avoids needing a composite index — 'ended'
+ * rooms are filtered out in memory rather than via an inequality WHERE, which
+ * would need one. Bounded scan, same trade-off as the character/admin lists.
+ */
+export async function listActiveRooms(limit = 30): Promise<ActiveRoomListing[]> {
+  const snap = await adminDb.collection('rooms').orderBy('lastActivity', 'desc').limit(limit * 2).get()
+  return snap.docs
+    .map((d) => ({ id: d.id, ...(d.data() as Omit<Room, 'id'>) }))
+    .filter((r) => r.status !== 'ended')
+    .slice(0, limit)
+    .map((r) => ({
+      id: r.id,
+      storyId: r.storyId,
+      storyTitle: r.storyTitle,
+      status: r.status,
+      memberCount: Object.keys(r.members ?? {}).length,
+    }))
+}

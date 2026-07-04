@@ -3,17 +3,35 @@ import type { World } from '@/types'
 /**
  * The narrative SHAPE of a world's stories.
  *
- * The engine's default arc machinery is conflict-driven (threats, betrayals,
- * stakes) — right for most worlds, quietly wrong for a world whose author built
- * a place where nothing bad happens. In a `gentle` world the climax is a moment
- * of wonder, connection, or achievement rather than a confrontation, and
- * "tension" is anticipation rather than danger.
- *
  * `dramatic` — the traditional arc: conflict, stakes, reckonings (default).
  * `gentle`   — conflict-free: arcs of wonder, friendship, and shared joy; no
  *              villains, threats, or manufactured danger, ever.
+ * `dark`     — heavier than dramatic: dread, moral cost, and consequences that
+ *              don't get undone; no guaranteed happy ending.
+ * `absurd`   — surreal and comedic: illogical escalation played with total
+ *              deadpan sincerity; the world is silly, everyone in it is not.
+ * `melancholic` — quiet sorrow and bittersweet longing: memory, distance, and
+ *              things left unsaid or already lost; no danger required.
+ * `mystery`  — a puzzle to solve: concrete clues, red herrings, and a truth
+ *              the protagonist is chasing down.
+ * `slice_of_life` — ordinary and low-stakes: everyday routines, small
+ *              frictions, and human-scale moments; nothing ever looms.
+ * `custom`   — an author's own AI-generated through-line (credit-gated),
+ *              stored on the story itself (`Story.customNarrativeShape`).
+ *
+ * Only `gentle` is ever auto-derived from a world's own text (see
+ * `resolveNarrativeMode`) — every other mode is always an explicit choice
+ * (author-picked, or AI-classified from the story's own description).
  */
-export type NarrativeMode = 'dramatic' | 'gentle'
+export type NarrativeMode =
+  | 'dramatic'
+  | 'gentle'
+  | 'dark'
+  | 'absurd'
+  | 'melancholic'
+  | 'mystery'
+  | 'slice_of_life'
+  | 'custom'
 
 /** Tones that lean gentle on their own (still need corroboration to flip). */
 const GENTLE_TONES = new Set(['Whimsical Fairy Tale'])
@@ -111,4 +129,68 @@ export function gentleModeDirective(): string {
     'Climaxes are moments of joy, connection, discovery, or achievement. ' +
     'End chapters on warm anticipation or a delightful choice, never peril.'
   )
+}
+
+/** The overriding instruction block for a DARK world — leads the system events. */
+export function darkModeDirective(): string {
+  return (
+    'This is a DARK world: dread, moral cost, and consequences that do not get undone. ' +
+    'Do not soften outcomes or guarantee a happy ending — victories are costly, compromises are real, ' +
+    'and something is usually lost even when the protagonist "wins". ' +
+    'Let unease build quietly between chapters, not just in overt threats. ' +
+    'End chapters on a note of dread, grim resolve, or a choice with no clean option.'
+  )
+}
+
+/** The overriding instruction block for an ABSURD world — leads the system events. */
+export function absurdModeDirective(): string {
+  return (
+    'This is an ABSURD world: surreal and illogical, played with total deadpan sincerity. ' +
+    'Everyone in the story treats the nonsense as completely normal — the comedy comes from that sincerity, ' +
+    'never from characters winking at how silly it is. Let escalation compound: one absurdity invites the next. ' +
+    'End chapters on a fresh, straight-faced absurdity or a delightfully illogical choice.'
+  )
+}
+
+/** The overriding instruction block for a MELANCHOLIC world — leads the system events. */
+export function melancholicModeDirective(): string {
+  return (
+    'This is a MELANCHOLIC world: quiet sorrow, wistfulness, and bittersweet longing. ' +
+    'Nothing needs to be dangerous or morally costly — the ache comes from memory, distance, and things left ' +
+    'unsaid or already lost. Let silences and small unspoken feelings carry weight. ' +
+    'End chapters on a wistful, tender, or quietly aching note, rarely a clean resolution.'
+  )
+}
+
+/** The overriding instruction block for a MYSTERY world — leads the system events. */
+export function mysteryModeDirective(): string {
+  return (
+    'This is a MYSTERY world: something does not add up, and finding out is the point. ' +
+    'Seed concrete clues and inconsistencies the protagonist can actually follow — not just vague unease. ' +
+    'Let red herrings mislead without cheating the reader; every clue should make sense in hindsight. ' +
+    'End chapters on a fresh clue, an unanswered question, or a suspicion sharpening.'
+  )
+}
+
+/** The overriding instruction block for a SLICE-OF-LIFE world — leads the system events. */
+export function sliceOfLifeModeDirective(): string {
+  return (
+    'This is a SLICE-OF-LIFE world: ordinary, human-scale, and low-stakes. ' +
+    'Nothing looms — momentum comes from small routines, minor frictions, everyday texture, and quiet human ' +
+    'moments. Let stakes stay genuinely small; even the biggest moment here is an ordinary one done well. ' +
+    'End chapters on a small, grounded, true-to-life beat, never a cliffhanger or peril.'
+  )
+}
+
+/** The mode-governing instruction block for `mode`, or '' for dramatic (no override needed). */
+export function narrativeModeDirective(mode: NarrativeMode): string {
+  switch (mode) {
+    case 'gentle': return gentleModeDirective()
+    case 'dark': return darkModeDirective()
+    case 'absurd': return absurdModeDirective()
+    case 'melancholic': return melancholicModeDirective()
+    case 'mystery': return mysteryModeDirective()
+    case 'slice_of_life': return sliceOfLifeModeDirective()
+    default: return ''
+  }
 }

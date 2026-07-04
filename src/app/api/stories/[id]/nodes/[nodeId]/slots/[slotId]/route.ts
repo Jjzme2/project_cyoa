@@ -30,11 +30,12 @@ import {
   getLinkedEchoes,
   getMultiverseCameos,
   getLinkedCameos,
+  getGuestStarCameos,
 } from '@/lib/firestore-helpers'
 import { mergeEchoes, mergeCameos } from '@/lib/multiverse'
 import { CreditManager } from '@/lib/credit-manager'
 import { creditFailureResponse } from '@/lib/credit-response'
-import { generateStoryNode, generateStoryImage, reviewContribution, judgeContent, buildWorldContext, PromptRejectedError } from '@/lib/ai'
+import { generateStoryNode, generateStoryImage, judgeContent, buildWorldContext, PromptRejectedError } from '@/lib/ai'
 import { trackGenerationCompleted, trackGenerationFailed } from '@/lib/generation-telemetry'
 import type { ModerationResult } from '@/lib/moderation'
 import { validatePromptLocal } from '@/lib/validate'
@@ -177,7 +178,7 @@ export async function POST(
     // Multiverse pool: only if THIS world opted into a multiverse do we draw a
     // few legends from its sibling worlds — surfaced as clearly-foreign echoes.
     // An unconnected world is never queried, so nothing crosses in.
-    const [poolEchoes, linkEchoes, poolCameos, linkCameos] = await Promise.all([
+    const [poolEchoes, linkEchoes, poolCameos, linkCameos, guestStarCameos] = await Promise.all([
       world.multiverse?.id
         ? getMultiverseEchoes(world.multiverse.id, story.worldId, { maxRating: effectiveRating }).catch(() => [])
         : Promise.resolve([]),
@@ -192,9 +193,13 @@ export async function POST(
       world.links?.length
         ? getLinkedCameos(world.links, { maxRating: effectiveRating }).catch(() => [])
         : Promise.resolve([]),
+      // Hand-picked guest stars (Fold 2d) — independent of any connection.
+      world.guestStarCharacterIds?.length
+        ? getGuestStarCameos(world.guestStarCharacterIds, { maxRating: effectiveRating }).catch(() => [])
+        : Promise.resolve([]),
     ])
     const echoes = mergeEchoes(poolEchoes, linkEchoes)
-    const cameos = mergeCameos(poolCameos, linkCameos)
+    const cameos = mergeCameos(poolCameos, linkCameos, guestStarCameos)
     // Assembled through the single audited seam (buildWorldContext): the chronicle
     // is read with story.worldId and passed in here, so only THIS world's legends
     // can reach the prompt — never another world's (save for declared echoes above).
@@ -212,21 +217,6 @@ export async function POST(
       echoes,
       cameos,
     })
-
-    // Autonomous Editor: void genuinely illegitimate / world-breaking entries
-    // (no chapter is generated for them), and silently fix typos & grammar while
-    // preserving the author's voice. The (possibly corrected) text is what gets
-    // generated from and stored as the choice label.
-    const review = await reviewContribution(promptText, worldCtx, uid)
-    if (review.verdict === 'void') {
-      await Promise.all([
-        releaseChoiceSlot(storyId, nodeId, slotId),
-        CreditManager.refund(uid, tier, credits, source),
-      ])
-      trackGenerationFailed({ kind: 'chapter', credits, source, uid, reason: 'voided', context: { storyId } })
-      return NextResponse.json({ error: review.reason, voided: true }, { status: 422 })
-    }
-    const editedPrompt = review.text
 
     // The narrative engine runs for EVERY story now. Its always-on subsystems —
     // the AI Director (pacing/tension beats), procedural environment & encounters,
@@ -284,15 +274,22 @@ export async function POST(
       ? `a definitive ${forceEnding.type} ending has been reached. Conclude the story NOW with a final chapter that lands this ${forceEnding.type} ending titled "${forceEnding.title}".`
       : endingDirective(parentNode.depth + 1, updatedEngineState, storyMode)
 
-    const { content, choices, model, newCharacters, location, sceneAmbient, ending } = await generateStoryNode(
-      worldCtx,
-      storyPath,
-      editedPrompt,
-      uid,
-      includeImage,
-      systemNarrativeEvents,
-      endDirective,
-    )
+    // Validation (does this choice even make sense?), typo/grammar correction,
+    // and chapter generation all happen in this ONE call — the model emits a
+    // REJECTED line to void an illegitimate choice, or a corrected CHOICE_TEXT
+    // line before writing (see buildPrompt/parseAIResponse). This replaces what
+    // used to be a separate "Editor" round-trip before generation ever started.
+    const { content, choices, model, newCharacters, location, sceneAmbient, ending, correctedChoiceText } =
+      await generateStoryNode(
+        worldCtx,
+        storyPath,
+        promptText.trim(),
+        uid,
+        includeImage,
+        systemNarrativeEvents,
+        endDirective,
+      )
+    const editedPrompt = correctedChoiceText ?? promptText.trim()
 
     // Moderate the generated prose. The rules-based check is the reliable floor;
     // the AI Content Judge can only escalate it (flag/refuse), never loosen it —
@@ -323,6 +320,7 @@ export async function POST(
     // simulation: the Content Judge infers how named characters' regard shifted
     // from what actually happened (no manual memory editing). Applied to the
     // child node's engine state so the next chapter reflects it.
+    let deepBondFormed = false
     if (updatedEngineState && judgment?.relationshipShifts?.length) {
       const known = new Map((story.characters ?? []).map((c) => [c.name.toLowerCase(), c.name]))
       for (const shift of judgment.relationshipShifts) {
@@ -330,7 +328,9 @@ export async function POST(
         if (!name || !shift.delta) continue
         if (updatedEngineState.relationships) {
           const cur = updatedEngineState.relationships.affinity[name] ?? 0
-          updatedEngineState.relationships.affinity[name] = Math.max(-1, Math.min(1, Math.round((cur + shift.delta) * 100) / 100))
+          const next = Math.max(-1, Math.min(1, Math.round((cur + shift.delta) * 100) / 100))
+          updatedEngineState.relationships.affinity[name] = next
+          if (next >= 0.8) deepBondFormed = true
         }
         const mems: AgentMemory[] = updatedEngineState.agentMemories[name] ?? []
         mems.push({
@@ -421,6 +421,7 @@ export async function POST(
     after(async () => {
       const ops: Promise<unknown>[] = [checkAndAwardAchievements(uid, 'contribution')]
       if (includeImage && imageUrl) ops.push(checkAndAwardAchievements(uid, 'illustration'))
+      if (deepBondFormed) ops.push(checkAndAwardAchievements(uid, 'npc_bond'))
       // Record any new canon characters the AI introduced this chapter.
       if (newCharacters && newCharacters.length > 0) {
         ops.push(addStoryCharacters(storyId, newCharacters))
@@ -436,7 +437,11 @@ export async function POST(
           if (aff.length > 0) observed = aff.reduce((s, v) => s + v, 0) / aff.length
         }
         if (observed !== null) {
-          ops.push(updateWorldStanding(uid, story.worldId, observed, displayName ?? undefined))
+          ops.push(
+            updateWorldStanding(uid, story.worldId, observed, displayName ?? undefined).then((standing) =>
+              checkAndAwardAchievements(uid, 'world_standing', { standing }),
+            ),
+          )
           // The same deed also shifts the world's COLLECTIVE regard for outsiders
           // (the reader is one) — slowly, so the whole people's opinion is the sum
           // of many sagas, not any single one.

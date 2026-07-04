@@ -93,6 +93,9 @@ vi.mock('@/lib/rate-limit', () => ({
   refundRateLimit: vi.fn(),
   getRemainingUses: vi.fn(),
 }))
+// Bounty settlement fires an (unawaited, best-effort) achievement check — keep
+// these tests focused on escrow correctness, not achievement reward amounts.
+vi.mock('@/lib/firestore/achievements', () => ({ checkAndAwardAchievements: vi.fn().mockResolvedValue([]) }))
 
 import { postBounty, cancelBounty, settleBountyOnFill } from '@/lib/firestore/bounties'
 import { claimStripeEvent } from '@/lib/stripe-events'

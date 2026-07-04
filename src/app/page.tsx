@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { LibraryClient, type WorldChrome } from '@/components/library/LibraryClient'
 import { ContinueReadingSection } from '@/components/library/ContinueReadingSection'
-import { getStories, getPublicWorlds } from '@/lib/firestore-helpers'
+import { InteractiveTeaser, type TeaserChoice } from '@/components/home/InteractiveTeaser'
+import { getStories, getPublicWorlds, getStoryNode } from '@/lib/firestore-helpers'
 
 async function LibraryContent() {
   'use cache'
@@ -80,48 +81,72 @@ async function HeroActions() {
   cacheTag('stories')
 
   let featuredId: string | null = null
+  let featuredTitle = ''
+  let teaser: { excerpt: string; choices: TeaserChoice[] } | null = null
   try {
     const stories = await getStories(30)
     if (stories.length > 0) {
-      const featured = stories.reduce(
+      // Prefer an Everyone-rated pick so the interactive excerpt below can
+      // actually be fetched by a signed-out first-time visitor; fall back to
+      // the overall most-viewed story if none qualify.
+      const pool = stories.filter((s) => (s.rating ?? 'Everyone') === 'Everyone')
+      const candidates = pool.length > 0 ? pool : stories
+      const featured = candidates.reduce(
         (top, s) => ((s.views ?? 0) > (top.views ?? 0) ? s : top),
-        stories[0],
+        candidates[0],
       )
       featuredId = featured.id
+      featuredTitle = featured.title
+
+      if (featured.rootNodeId) {
+        const root = await getStoryNode(featured.id, featured.rootNodeId).catch(() => null)
+        const choices: TeaserChoice[] = (root?.slots ?? [])
+          .filter((s) => s.filled && s.childNodeId && s.promptText)
+          .slice(0, 3)
+          .map((s) => ({ id: s.id, promptText: s.promptText as string, childNodeId: s.childNodeId as string }))
+        if (root?.content && choices.length >= 2) {
+          teaser = { excerpt: root.content.slice(0, 260).trim(), choices }
+        }
+      }
     }
   } catch {
     featuredId = null
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      {featuredId && (
-        <Link href={`/stories/${featuredId}?welcome=1`}>
-          <Button className="gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300">
-            <BookOpen className="h-4 w-4" />
-            Jump right in
+    <div className="space-y-4">
+      {teaser && featuredId && (
+        <InteractiveTeaser storyId={featuredId} storyTitle={featuredTitle} excerpt={teaser.excerpt} choices={teaser.choices} />
+      )}
+      <div className="flex flex-wrap items-center gap-3">
+        {featuredId && !teaser && (
+          <Link href={`/stories/${featuredId}?welcome=1`}>
+            <Button className="gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300">
+              <BookOpen className="h-4 w-4" />
+              Jump right in
+            </Button>
+          </Link>
+        )}
+        <Link href="/stories/new?assist=1">
+          <Button
+            variant="ghost"
+            className={
+              featuredId
+                ? 'gap-2 border border-white/10 text-muted-foreground/75 hover:text-foreground'
+                : 'gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300'
+            }
+          >
+            <Plus className="h-4 w-4" />
+            Start writing in 60 seconds
           </Button>
         </Link>
-      )}
-      <Link href="/stories/new?assist=1">
-        <Button
-          variant="ghost"
-          className={
-            featuredId
-              ? 'gap-2 border border-white/10 text-muted-foreground/75 hover:text-foreground'
-              : 'gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300'
-          }
-        >
-          <Plus className="h-4 w-4" />
-          Start writing in 60 seconds
-        </Button>
-      </Link>
-      <Link href="/worlds/new">
-        <Button variant="ghost" className="gap-2 text-muted-foreground/60 hover:text-foreground">
-          <Sparkles className="h-4 w-4" />
-          Create a world
-        </Button>
-      </Link>
+        <Link href="/worlds/new">
+          <Button variant="ghost" className="gap-2 text-muted-foreground/60 hover:text-foreground">
+            <Sparkles className="h-4 w-4" />
+            Create a world
+          </Button>
+        </Link>
+      </div>
     </div>
   )
 }
