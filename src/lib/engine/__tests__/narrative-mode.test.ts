@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveNarrativeMode, gentleModeDirective } from '@/lib/engine/narrative-mode'
+import { resolveNarrativeMode, resolveStoryNarrativeMode, gentleModeDirective } from '@/lib/engine/narrative-mode'
 import { PlotPlanner } from '@/lib/engine/plot-planner'
 import { DramaManager } from '@/lib/engine/drama-manager'
 import { DifficultyManager } from '@/lib/engine/difficulty'
@@ -47,6 +47,23 @@ describe('resolveNarrativeMode', () => {
     const d = gentleModeDirective()
     expect(d).toMatch(/no villains/i)
     expect(d).toMatch(/Do not manufacture conflict/i)
+  })
+})
+
+describe('resolveStoryNarrativeMode (the world clamp)', () => {
+  const gentleWorld = { ...base, rules: 'No bad happens here' }
+
+  it('a dramatic world may host a gentle story', () => {
+    expect(resolveStoryNarrativeMode(base, { narrativeMode: 'gentle' })).toBe('gentle')
+  })
+
+  it('a gentle world is law — a story can never be overridden dramatic', () => {
+    expect(resolveStoryNarrativeMode(gentleWorld, { narrativeMode: 'dramatic' })).toBe('gentle')
+  })
+
+  it('absent story mode inherits the world', () => {
+    expect(resolveStoryNarrativeMode(base, {})).toBe('dramatic')
+    expect(resolveStoryNarrativeMode(gentleWorld, undefined)).toBe('gentle')
   })
 })
 

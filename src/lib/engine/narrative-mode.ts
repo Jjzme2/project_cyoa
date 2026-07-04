@@ -63,6 +63,21 @@ export function resolveNarrativeMode(
 }
 
 /**
+ * Resolve the EFFECTIVE mode for one story: a gentle world is law (its stories
+ * can never be overridden dramatic — same clamp philosophy as content ratings),
+ * while a dramatic world may host an individual gentle story via the story's
+ * own `narrativeMode`.
+ */
+export function resolveStoryNarrativeMode(
+  world: Parameters<typeof resolveNarrativeMode>[0],
+  story?: { narrativeMode?: NarrativeMode },
+): NarrativeMode {
+  const worldMode = resolveNarrativeMode(world)
+  if (worldMode === 'gentle') return 'gentle'
+  return story?.narrativeMode ?? worldMode
+}
+
+/**
  * The overriding instruction block for a gentle world — leads the system-driven
  * narrative events so it governs everything after it (encounters, pacing,
  * quests). Explicit about what tension means here, so the model doesn't

@@ -15,7 +15,7 @@ import { InterludeDirector } from './interlude-director';
 import { RelationshipGraph } from './relationship-graph';
 import { AgentAffect } from './agent-affect';
 import { BeliefModel } from './belief';
-import { resolveNarrativeMode, gentleModeDirective, type NarrativeMode } from './narrative-mode';
+import { resolveStoryNarrativeMode, gentleModeDirective, type NarrativeMode } from './narrative-mode';
 
 export interface NarrativeContext {
   /** Governs everything below it: the world's narrative shape (empty for dramatic). */
@@ -79,9 +79,10 @@ export class NarrativeBuilder {
   constructor(story: Story, world: World, priorState?: EngineState) {
     this.story = story;
     this.world = world;
-    // The world's narrative shape (author-set or derived from its own context)
-    // governs which arc pool, pacing language, and encounter flavour run below.
-    this.mode = resolveNarrativeMode(world);
+    // The story's EFFECTIVE narrative shape (its own choice, clamped by the
+    // world — a gentle world is law) governs which arc pool, pacing language,
+    // and encounter flavour run below.
+    this.mode = resolveStoryNarrativeMode(world, story);
 
     const baseSeed = world.seed ?? SeededRNG.hashString(story.title);
     const storySeed = SeededRNG.deriveSeed(baseSeed, story.id);

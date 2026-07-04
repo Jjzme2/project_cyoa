@@ -43,7 +43,7 @@ The working order. Within each bucket, top-to-bottom is the suggested sequence;
     path → first story created.
   - *Deeper v2 (multi-day, later):* personalized starting shelf, a guided
     first-saga, homepage redesign around the flow.
-- [ ] **S2. Per-story narrative shape, clamped by the world.** A dramatic world
+- [x] **S2. Per-story narrative shape, clamped by the world.** A dramatic world
   may host a gentle story; a gentle world can never be overridden dramatic
   (same clamp philosophy as content ratings). Story-creator picker + clamp.
 - [ ] **S3. Season scheduler.** Auto-activate/rotate seasons so live-ops doesn't
