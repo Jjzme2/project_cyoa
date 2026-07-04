@@ -177,8 +177,11 @@ abuse guard below was also already covered by the Tier-3 throttle work.)
   (worlds → stories → reads → purchases) and DAU/retention, beyond raw counts.
 - [ ] **Per-user activity drill-down** — from `/admin/users`, open a user's
   tracked events, authored stories, and credit history.
-- [ ] **Admin audit trail** — the `insights` channel already logs `admin.*`
-  actions; surface a filtered audit view (who granted credits / changed roles).
+- [x] **Admin audit trail** — `/admin/insights` got an "Admin actions only"
+  toggle (count badge, `Shield` icon) that filters to `admin.*` events
+  (credits adjusted, role changed) client-side from the same feed; no new
+  index needed since the insights channel is already a low-volume signal
+  feed, not a firehose.
 - [x] **Richer per-page SEO** — `CreativeWork` + `BreadcrumbList` JSON-LD on
   `/stories/[id]` (linked to its world via `isPartOf`) and `/worlds/[id]`;
   story pages also picked up a missing `alternates.canonical`.
