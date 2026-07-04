@@ -187,8 +187,9 @@ abuse guard below was also already covered by the Tier-3 throttle work.)
   story pages also picked up a missing `alternates.canonical`.
 - [ ] **Logo-based brand assets** — once the logo is hosted, generate a proper
   multi-size favicon/PWA icon set and a logo-bearing OG image.
-- [ ] **Analytics export** — CSV/JSON export of the analytics window for
-  offline analysis.
+- [x] **Analytics export** — `GET /api/admin/analytics/export` (CSV or JSON,
+  admin-only) + CSV/JSON download buttons on `/admin/analytics`, mirroring
+  the existing feedback-export pattern.
 - [x] **Abuse guard on `POST /api/track`** — already throttled (`throttle('track:${uid}', 120, 60)`
   in `src/app/api/track/route.ts`), same pass that covered `/api/feedback`.
 
