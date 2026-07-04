@@ -5,6 +5,9 @@ import {
   gentleModeDirective,
   darkModeDirective,
   absurdModeDirective,
+  melancholicModeDirective,
+  mysteryModeDirective,
+  sliceOfLifeModeDirective,
   narrativeModeDirective,
   gentleGoapFilter,
 } from '@/lib/engine/narrative-mode'
@@ -101,6 +104,30 @@ describe('dark and absurd mode directives', () => {
     expect(narrativeModeDirective('gentle')).toBe(gentleModeDirective())
     expect(narrativeModeDirective('dark')).toBe(darkModeDirective())
     expect(narrativeModeDirective('absurd')).toBe(absurdModeDirective())
+    expect(narrativeModeDirective('melancholic')).toBe(melancholicModeDirective())
+    expect(narrativeModeDirective('mystery')).toBe(mysteryModeDirective())
+    expect(narrativeModeDirective('slice_of_life')).toBe(sliceOfLifeModeDirective())
+  })
+})
+
+describe('melancholic, mystery, and slice-of-life mode directives', () => {
+  it('the melancholic directive asks for quiet ache, not villains', () => {
+    const d = melancholicModeDirective()
+    expect(d).toMatch(/bittersweet/i)
+    expect(d).toMatch(/memory/i)
+    expect(d).not.toMatch(/villain/i)
+  })
+
+  it('the mystery directive demands concrete, followable clues', () => {
+    const d = mysteryModeDirective()
+    expect(d).toMatch(/clues/i)
+    expect(d).toMatch(/red herrings/i)
+  })
+
+  it('the slice-of-life directive keeps stakes genuinely small', () => {
+    const d = sliceOfLifeModeDirective()
+    expect(d).toMatch(/low-stakes/i)
+    expect(d).toMatch(/never a cliffhanger/i)
   })
 })
 
@@ -200,5 +227,40 @@ describe('dark & absurd pacing, stakes, and interludes', () => {
     })
     expect(absurdOut.fired).toBe(true)
     expect(absurdOut.directive).toMatch(/bizarre/i)
+  })
+})
+
+describe('melancholic, mystery, and slice-of-life pacing, stakes, and interludes', () => {
+  it('drama directives read melancholic as feeling, mystery as clue-chasing, slice-of-life as ordinary rhythm', () => {
+    const dm = new DramaManager()
+    expect(dm.directive('escalate', 'melancholic')).toMatch(/memory|feeling/i)
+    expect(dm.directive('escalate', 'mystery')).toMatch(/clue/i)
+    expect(dm.directive('escalate', 'slice_of_life')).toMatch(/ordinary/i)
+  })
+
+  it('difficulty directives read each mode along its own axis', () => {
+    expect(DifficultyManager.directive(0.9, 'melancholic')).toMatch(/ache runs deep/i)
+    expect(DifficultyManager.directive(0.9, 'mystery')).toMatch(/truth is close/i)
+    expect(DifficultyManager.directive(0.9, 'slice_of_life')).toMatch(/quiet significance/i)
+  })
+
+  it('interludes pick the mode-appropriate table', () => {
+    const melancholicOut = InterludeDirector.decide({
+      nodePath: 'a', turnCount: 10, lastInterlude: 0, plotBeatIndex: 2, betrayalThisTurn: false, mode: 'melancholic',
+    })
+    expect(melancholicOut.fired).toBe(true)
+    expect(melancholicOut.directive).toMatch(/wistful/i)
+
+    const mysteryOut = InterludeDirector.decide({
+      nodePath: 'a', turnCount: 10, lastInterlude: 0, plotBeatIndex: 2, betrayalThisTurn: false, mode: 'mystery',
+    })
+    expect(mysteryOut.fired).toBe(true)
+    expect(mysteryOut.directive).toMatch(/INSIGHT/i)
+
+    const sliceOut = InterludeDirector.decide({
+      nodePath: 'a', turnCount: 10, lastInterlude: 0, plotBeatIndex: 2, betrayalThisTurn: false, mode: 'slice_of_life',
+    })
+    expect(sliceOut.fired).toBe(true)
+    expect(sliceOut.directive).toMatch(/daydream/i)
   })
 })

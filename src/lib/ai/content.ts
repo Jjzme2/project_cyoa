@@ -227,3 +227,36 @@ ${userInputBlock("Author's narrative shape idea", description)}`
   const { text } = await runTextWaterfall({ prompt: aiPrompt, userId, maxOutputTokens: 400, feature: 'narrative-shape' })
   return normalize(tryParseJSON(text))
 }
+
+const CLASSIFIABLE_MODES = ['dramatic', 'gentle', 'dark', 'absurd', 'melancholic', 'mystery', 'slice_of_life'] as const
+export type ClassifiableNarrativeMode = (typeof CLASSIFIABLE_MODES)[number]
+
+/**
+ * AI-assisted narrative-mode detection: suggests which curated mood best fits
+ * an author's story premise, so they don't have to already know the mode
+ * names to get a good match. A suggestion only — the author can always
+ * override it in the mood picker.
+ */
+export async function classifyNarrativeMode(
+  description: string,
+  userId: string,
+): Promise<ClassifiableNarrativeMode> {
+  const aiPrompt = `You are classifying the narrative MOOD of a Choose Your Own Adventure story from its premise, so the story engine can pace and direct chapters in the right register.
+
+Pick EXACTLY ONE of these moods:
+- dramatic: the traditional arc — conflict, real stakes, reckonings
+- gentle: no conflict at all — wonder, friendship, shared joy, no villains or danger
+- dark: heavier than dramatic — dread, moral cost, no guaranteed happy ending
+- absurd: surreal and comedic — illogical escalation played with total deadpan sincerity
+- melancholic: quiet sorrow and bittersweet longing — memory, distance, things unsaid or lost
+- mystery: a puzzle to solve — concrete clues, red herrings, a truth being chased down
+- slice_of_life: ordinary and low-stakes — everyday routines, small frictions, human-scale moments
+
+Respond with ONLY valid JSON (no markdown fences, no explanation): {"mode": "one of the exact mode names above"}
+
+${userInputBlock('Story premise', description)}`
+
+  const { text } = await runTextWaterfall({ prompt: aiPrompt, userId, maxOutputTokens: 60, feature: 'narrative-shape-classify' })
+  const mode = String(tryParseJSON(text).mode ?? '').trim()
+  return (CLASSIFIABLE_MODES as readonly string[]).includes(mode) ? (mode as ClassifiableNarrativeMode) : 'dramatic'
+}

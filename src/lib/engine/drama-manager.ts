@@ -1,3 +1,5 @@
+import type { NarrativeMode } from './narrative-mode'
+
 /**
  * Drama Manager / AI Director.
  *
@@ -57,7 +59,7 @@ export class DramaManager {
    * delightful new development, a "respite" a savoring pause. DARK leans the
    * same curve toward dread and cost; ABSURD toward compounding nonsense.
    */
-  directive(beat: Beat, mode: 'dramatic' | 'gentle' | 'dark' | 'absurd' | 'custom' = 'dramatic'): string {
+  directive(beat: Beat, mode: NarrativeMode = 'dramatic'): string {
     if (mode === 'gentle') {
       switch (beat) {
         case 'escalate':
@@ -86,6 +88,36 @@ export class DramaManager {
           return 'The nonsense has peaked — allow a deadpan pause where everyone acts as if nothing strange happened at all.'
         default:
           return 'Keep compounding the absurdity, one straight-faced escalation at a time.'
+      }
+    }
+    if (mode === 'melancholic') {
+      switch (beat) {
+        case 'escalate':
+          return "The quiet has sat long enough — let something stir: a memory surfacing, an old feeling resurfacing, a reminder of what's distant or lost."
+        case 'respite':
+          return "The feeling has crested — allow a soft, still pause: a quiet moment to simply sit with what's been felt."
+        default:
+          return 'Let the wistful undercurrent deepen a little further, unhurried.'
+      }
+    }
+    if (mode === 'mystery') {
+      switch (beat) {
+        case 'escalate':
+          return 'The trail has gone cold — introduce a fresh clue, inconsistency, or complication that reopens the question.'
+        case 'respite':
+          return "The pursuit has been intense — allow a brief lull to piece together what's been gathered so far."
+        default:
+          return 'Let the clues accumulate steadily, each one sharpening the question without answering it yet.'
+      }
+    }
+    if (mode === 'slice_of_life') {
+      switch (beat) {
+        case 'escalate':
+          return 'The day has been too quiet — stir in a small, ordinary complication: an errand, a visitor, a minor mishap.'
+        case 'respite':
+          return 'Things have been busy — allow a small, unhurried pause: a cup of tea, a quiet moment, nothing more.'
+        default:
+          return 'Keep the ordinary rhythm going, small moments accumulating without ever needing to matter much.'
       }
     }
     switch (beat) {

@@ -24,7 +24,7 @@ const CreateStorySchema = z.object({
   coverGradient: z.string().optional(),
   resources: z.custom<ResourceDefinition[]>().optional(),
   endingConditions: z.custom<EndingCondition[]>().optional(),
-  narrativeMode: z.enum(['gentle', 'dramatic', 'dark', 'absurd', 'custom']).optional(),
+  narrativeMode: z.enum(['gentle', 'dramatic', 'dark', 'absurd', 'melancholic', 'mystery', 'slice_of_life', 'custom']).optional(),
   customNarrativeShape: z
     .object({ name: z.string().trim().min(1).max(60), beats: z.array(z.string().trim().min(1).max(200)).length(4) })
     .optional(),

@@ -1,3 +1,5 @@
+import type { NarrativeMode } from './narrative-mode';
+
 /**
  * Dynamic difficulty. Stakes escalate with story depth (classic rising action)
  * and adapt to how the player has been faring, read from the Director's tension:
@@ -29,7 +31,7 @@ export const DifficultyManager = {
    * dangerous it is — significance instead of peril. DARK reads it as moral/
    * physical cost; ABSURD as how far the nonsense has escalated.
    */
-  directive(level: number, mode: 'dramatic' | 'gentle' | 'dark' | 'absurd' | 'custom' = 'dramatic'): string {
+  directive(level: number, mode: NarrativeMode = 'dramatic'): string {
     if (mode === 'gentle') {
       if (level >= 0.66) return 'This moment matters deeply — let its emotional weight be felt: something long-awaited, dearly hoped-for, or quietly profound.';
       if (level >= 0.33) return 'The moment carries real meaning — let choices touch hearts and friendships in ways that matter.';
@@ -44,6 +46,21 @@ export const DifficultyManager = {
       if (level >= 0.66) return 'The absurdity has reached its peak — let the illogic be total and gloriously over-the-top.';
       if (level >= 0.33) return 'The nonsense is escalating nicely — let obstacles be silly but strangely committed to their own internal logic.';
       return 'Keep the strangeness low-key for now — a faint wrongness, played completely straight.';
+    }
+    if (mode === 'melancholic') {
+      if (level >= 0.66) return 'The ache runs deep — let this moment carry real grief, longing, or the full weight of what is gone.';
+      if (level >= 0.33) return 'There is real wistfulness here — let feelings sit, unresolved, a little tender.';
+      return 'Keep it soft and quiet for now — small, unremarked-upon feelings.';
+    }
+    if (mode === 'mystery') {
+      if (level >= 0.66) return 'The truth is close now — let the clues converge and the stakes of knowing (or not) feel urgent.';
+      if (level >= 0.33) return 'The trail is warming up — let clues connect in ways that raise real questions.';
+      return 'Keep the mystery simmering quietly — small oddities, nothing urgent yet.';
+    }
+    if (mode === 'slice_of_life') {
+      if (level >= 0.66) return 'This ordinary moment matters more than it looks — let it land with real, quiet significance.';
+      if (level >= 0.33) return 'Let this moment carry a little more weight than usual, still small, still true.';
+      return 'Keep this moment light and unremarkable — just life, ticking along.';
     }
     if (level >= 0.66) return 'The stakes are dire — make threats and obstacles genuinely dangerous and costly.';
     if (level >= 0.33) return 'The stakes are real — challenges should carry meaningful risk.';

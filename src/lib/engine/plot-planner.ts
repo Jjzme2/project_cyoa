@@ -1,4 +1,5 @@
 import { SeededRNG } from './seed-rng';
+import type { NarrativeMode } from './narrative-mode';
 
 /**
  * HTN-style plot planner. Where the quest system runs side-arcs and the Director
@@ -214,16 +215,163 @@ const ABSURD_ARCS: PlotArc[] = [
   },
 ];
 
-const ALL_ARCS = [...ARCS, ...GENTLE_ARCS, ...DARK_ARCS, ...ABSURD_ARCS];
+/**
+ * MELANCHOLIC through-lines: quiet sorrow and bittersweet longing — memory,
+ * distance, and things left unsaid or already lost. No danger required.
+ */
+const MELANCHOLIC_ARCS: PlotArc[] = [
+  {
+    id: 'the_one_that_got_away',
+    name: 'The One That Got Away',
+    beats: [
+      'surface a small, wistful memory of someone or something once close, now distant',
+      'let the ache of that distance surface in quiet, unguarded moments',
+      'bring the protagonist face to face with what was lost, or who it was lost to',
+      'let them carry the bittersweet weight of it forward, gently, unresolved',
+    ],
+  },
+  {
+    id: 'fading_light',
+    name: 'Fading Light',
+    beats: [
+      'introduce something precious quietly nearing its end — a season, a friendship, a place',
+      'let small, tender moments accumulate, each one a little more precious for being numbered',
+      'reach the quiet goodbye, said or unsaid',
+      'settle into what remains — memory, gratitude, a changed quiet',
+    ],
+  },
+  {
+    id: 'the_letter_never_sent',
+    name: 'The Letter Never Sent',
+    beats: [
+      'reveal something left unsaid that still weighs on the protagonist',
+      'let opportunities to finally say it come and slip away, gently, again',
+      'force the moment where it must be said, or be lost for good',
+      'live with the saying, or the silence, and what it costs either way',
+    ],
+  },
+  {
+    id: 'the_quiet_house',
+    name: 'The Quiet House',
+    beats: [
+      'return the protagonist to a place thick with memory, changed by time',
+      'let old memories surface unbidden among the small, ordinary details',
+      'find the one object, room, or moment that holds everything',
+      'leave the place changed by having remembered it fully',
+    ],
+  },
+];
+
+/**
+ * MYSTERY through-lines: a puzzle to solve — concrete clues, red herrings,
+ * and a truth the protagonist is chasing down.
+ */
+const MYSTERY_ARCS: PlotArc[] = [
+  {
+    id: 'the_loose_thread',
+    name: 'The Loose Thread',
+    beats: [
+      'plant an inconsistency too small for most to notice, but not the protagonist',
+      'let following it unravel more questions than it answers',
+      'pull the thread to its end and expose the truth it was hiding',
+      'reckon with what the truth changes now that it is known',
+    ],
+  },
+  {
+    id: 'the_locked_room',
+    name: 'The Locked Room',
+    beats: [
+      'present an impossible situation with no apparent explanation',
+      'gather clues that only seem to deepen the impossibility',
+      'find the detail that makes the impossible make sense',
+      'confront whoever — or whatever — the solution implicates',
+    ],
+  },
+  {
+    id: 'the_unreliable_witness',
+    name: 'The Unreliable Witness',
+    beats: [
+      'introduce an account of events that does not quite add up',
+      'gather a second, conflicting account that muddies the truth further',
+      'find the detail that reveals who was lying, and why',
+      'deal with the fallout of knowing who to trust now',
+    ],
+  },
+  {
+    id: 'the_paper_trail',
+    name: 'The Paper Trail',
+    beats: [
+      "uncover a single overlooked document, ledger, or record that shouldn't exist",
+      'trace it backward through hands that all deny knowing anything',
+      'arrive at the person or truth it was always pointing to',
+      'decide what to do with a truth someone worked hard to bury',
+    ],
+  },
+];
+
+/**
+ * SLICE-OF-LIFE through-lines: ordinary and low-stakes — small routines,
+ * minor frictions, and human-scale moments. Nothing ever looms.
+ */
+const SLICE_OF_LIFE_ARCS: PlotArc[] = [
+  {
+    id: 'an_ordinary_week',
+    name: 'An Ordinary Week',
+    beats: [
+      'settle into the small routines and minor frictions of an ordinary stretch of days',
+      'let one small errand or plan wind through everyday complications',
+      'reach a small, human moment of the week — a meal, a chat, a mundane triumph',
+      'close the week a little different for it, nothing dramatic, just true',
+    ],
+  },
+  {
+    id: 'the_new_routine',
+    name: 'The New Routine',
+    beats: [
+      'drop the protagonist into an unfamiliar but ordinary rhythm — a new job, home, or habit',
+      'let small awkwardnesses and discoveries shape how they settle in',
+      'find the moment it starts to feel less new and more like theirs',
+      'let the routine become simply life, quietly and without ceremony',
+    ],
+  },
+  {
+    id: 'small_repairs',
+    name: 'Small Repairs',
+    beats: [
+      "notice something minor that's been quietly neglected — a relationship, a space, a habit",
+      'make small, unglamorous efforts to tend to it',
+      'hit a small, human snag that almost derails the effort',
+      'let the mended thing sit a little better than before, unremarkably',
+    ],
+  },
+  {
+    id: 'the_visit',
+    name: 'The Visit',
+    beats: [
+      "bring someone (family, an old friend) into the protagonist's ordinary orbit for a while",
+      'fill the visit with small talk, old habits, and minor friction',
+      'reach the one honest, unguarded conversation the visit was really about',
+      'let the goodbye be ordinary too, and all the more meaningful for it',
+    ],
+  },
+];
+
+const ALL_ARCS = [...ARCS, ...GENTLE_ARCS, ...DARK_ARCS, ...ABSURD_ARCS, ...MELANCHOLIC_ARCS, ...MYSTERY_ARCS, ...SLICE_OF_LIFE_ARCS];
 const GENTLE_IDS = new Set(GENTLE_ARCS.map((a) => a.id));
 const DARK_IDS = new Set(DARK_ARCS.map((a) => a.id));
 const ABSURD_IDS = new Set(ABSURD_ARCS.map((a) => a.id));
+const MELANCHOLIC_IDS = new Set(MELANCHOLIC_ARCS.map((a) => a.id));
+const MYSTERY_IDS = new Set(MYSTERY_ARCS.map((a) => a.id));
+const SLICE_OF_LIFE_IDS = new Set(SLICE_OF_LIFE_ARCS.map((a) => a.id));
 
 /** The arc's own family pool, for chaining into a fresh movement of the same kind. */
 function familyOf(arcId: string): PlotArc[] {
   if (GENTLE_IDS.has(arcId)) return GENTLE_ARCS;
   if (DARK_IDS.has(arcId)) return DARK_ARCS;
   if (ABSURD_IDS.has(arcId)) return ABSURD_ARCS;
+  if (MELANCHOLIC_IDS.has(arcId)) return MELANCHOLIC_ARCS;
+  if (MYSTERY_IDS.has(arcId)) return MYSTERY_ARCS;
+  if (SLICE_OF_LIFE_IDS.has(arcId)) return SLICE_OF_LIFE_ARCS;
   return ARCS;
 }
 
@@ -234,21 +382,24 @@ export const PlotPlanner = {
     storyTitle: string,
     prior?: PlotState,
     persona?: { darkness?: number },
-    mode: 'dramatic' | 'gentle' | 'dark' | 'absurd' | 'custom' = 'dramatic',
+    mode: NarrativeMode = 'dramatic',
     customArc?: { name: string; beats: string[] },
   ): PlotState {
     if (prior) return prior;
     if (mode === 'custom' && customArc && customArc.beats.length > 0) {
       return { arcId: 'custom', beatIndex: 0, turnsOnBeat: 0, arcsCompleted: 0, customArc };
     }
-    // A gentle/dark/absurd world draws only from its own curated pool; a
-    // dramatic one keeps the traditional pool, leaned by the director's
-    // darkness (dark steers away from the heroic alliance arc; warm steers
-    // toward it).
+    // A gentle/dark/absurd/melancholic/mystery/slice-of-life world draws only
+    // from its own curated pool; a dramatic one keeps the traditional pool,
+    // leaned by the director's darkness (dark steers away from the heroic
+    // alliance arc; warm steers toward it).
     let pool: PlotArc[];
     if (mode === 'gentle') pool = GENTLE_ARCS;
     else if (mode === 'dark') pool = DARK_ARCS;
     else if (mode === 'absurd') pool = ABSURD_ARCS;
+    else if (mode === 'melancholic') pool = MELANCHOLIC_ARCS;
+    else if (mode === 'mystery') pool = MYSTERY_ARCS;
+    else if (mode === 'slice_of_life') pool = SLICE_OF_LIFE_ARCS;
     else {
       const dark = persona?.darkness ?? 0;
       pool = ARCS;

@@ -71,10 +71,13 @@ export default function NewStoryPage() {
 
   const [economyEffects, setEconomyEffects] = useState<EconomyEffectRow[]>([])
   const [endingConditions, setEndingConditions] = useState<EndingCondition[]>([])
-  const [storyNarrativeMode, setStoryNarrativeMode] = useState<'inherit' | 'gentle' | 'dark' | 'absurd' | 'custom'>('inherit')
+  const [storyNarrativeMode, setStoryNarrativeMode] = useState<
+    'inherit' | 'gentle' | 'dark' | 'absurd' | 'melancholic' | 'mystery' | 'slice_of_life' | 'custom'
+  >('inherit')
   const [customShapeDescription, setCustomShapeDescription] = useState('')
   const [customShape, setCustomShape] = useState<{ name: string; beats: string[] } | null>(null)
   const [generatingShape, setGeneratingShape] = useState(false)
+  const [detectingMood, setDetectingMood] = useState(false)
   const [resources, setResources] = useState<StoryResourceDraft[]>([])
 
   const draft = useDraft<{
@@ -197,6 +200,28 @@ export default function NewStoryPage() {
   const selectedWorld = worlds.find((w) => w.id === worldId)
   // The selected world's configurable style options (empty for most worlds).
   const styleOptions = selectedWorld?.storySettings?.styleOptions ?? []
+
+  async function detectMood() {
+    if (!user || !description.trim()) return
+    setDetectingMood(true)
+    try {
+      const token = await user.getIdToken()
+      const res = await fetch('/api/stories/narrative-shape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ mode: 'classify', description: description.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Could not detect a mood')
+      const detected = data.mode as string
+      setStoryNarrativeMode(detected === 'dramatic' ? 'inherit' : (detected as typeof storyNarrativeMode))
+      toast.success(`Detected: ${detected === 'dramatic' ? 'the traditional arc' : detected.replace('_', ' ')}`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not detect a mood')
+    } finally {
+      setDetectingMood(false)
+    }
+  }
 
   async function generateShape() {
     if (!user || !customShapeDescription.trim()) return
@@ -499,7 +524,20 @@ export default function NewStoryPage() {
           world is law: all its stories are gentle, no override possible). */}
       {selectedWorld && resolveNarrativeMode(selectedWorld) !== 'gentle' && (
         <div className="space-y-2">
-          <Label htmlFor="story-mood">Story mood</Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="story-mood">Story mood</Label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={detectMood}
+              disabled={detectingMood || !description.trim()}
+              className="h-6 gap-1 px-2 text-[11px] text-amber-400/70 hover:text-amber-300"
+            >
+              {detectingMood ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+              Detect from description
+            </Button>
+          </div>
           <select
             id="story-mood"
             value={storyNarrativeMode}
@@ -510,12 +548,18 @@ export default function NewStoryPage() {
             <option value="gentle" className="bg-background">🌿 Gentle — wonder, friendship, and joy; no conflict</option>
             <option value="dark" className="bg-background">🌑 Dark — dread and cost; nothing is undone</option>
             <option value="absurd" className="bg-background">🎭 Absurd — surreal, deadpan, escalating nonsense</option>
+            <option value="melancholic" className="bg-background">🍂 Melancholic — quiet sorrow and bittersweet longing</option>
+            <option value="mystery" className="bg-background">🔍 Mystery — clues, red herrings, a truth to chase</option>
+            <option value="slice_of_life" className="bg-background">🍵 Slice of life — ordinary, low-stakes, human-scale</option>
             <option value="custom" className="bg-background">✨ Custom (AI-generated, 1 credit)</option>
           </select>
           <p className="text-[11px] text-muted-foreground/45">
             {storyNarrativeMode === 'gentle' && 'A gentle story has climaxes of connection and discovery — never threats or villains.'}
             {storyNarrativeMode === 'dark' && 'A dark story never guarantees a happy ending — victories are costly and nothing gets undone.'}
             {storyNarrativeMode === 'absurd' && 'An absurd story is surreal and illogical, played with total deadpan sincerity.'}
+            {storyNarrativeMode === 'melancholic' && 'A melancholic story lingers on memory, distance, and things left unsaid — no danger required.'}
+            {storyNarrativeMode === 'mystery' && 'A mystery story is a puzzle to solve — concrete clues, red herrings, and a truth worth chasing.'}
+            {storyNarrativeMode === 'slice_of_life' && 'A slice-of-life story stays small and human — everyday routines and moments, nothing looming.'}
             {storyNarrativeMode === 'custom' && 'Describe your own through-line and the AI will generate its own 4-beat arc, spending 1 credit.'}
             {storyNarrativeMode === 'inherit' && 'The traditional arc: conflict, stakes, and reckonings.'}
           </p>

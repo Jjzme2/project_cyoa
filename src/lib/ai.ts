@@ -14,6 +14,8 @@ export {
   generateStoryNode,
   elaborateWorldBible,
   generateCustomNarrativeShape,
+  classifyNarrativeMode,
+  type ClassifiableNarrativeMode,
 } from './ai/content'
 export { reviewContribution, judgeContent, type ContributionReview, type ContentJudgment } from './ai/review'
 export {
