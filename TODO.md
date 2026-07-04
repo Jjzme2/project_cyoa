@@ -235,7 +235,10 @@ presets and makes ambient dynamic rather than a single static per-story pick.
   `AchievementUnlockToast` (framer-motion: spring-popped icon + a brief
   radiating burst) rendered via `toast.custom()` in `BookViewer`, replacing
   the plain text toast on a newly-earned ending achievement.
-- [ ] **Cover reveal flourish animation.**
+- [x] **Cover reveal flourish animation** — `BookCoverPreview`'s cover face and
+  `CoverDesigner`'s thumbnail both fade + scale in (framer-motion, keyed by
+  `coverImageUrl`) whenever a fresh AI cover is generated, regenerated, or
+  removed.
 - [ ] **World portal ambiance animation** (subtle breathing/parallax on the
   banner).
 - [ ] **Choice/chapter micro-interaction animations.**
