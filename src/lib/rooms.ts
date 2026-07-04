@@ -13,6 +13,8 @@ import type { Room, RoomMember, RoomStatus, ChoiceSlot } from '@/types'
  */
 
 export const ROUND_SECONDS = 30
+/** How long the room waits on the "mark as read" gate before moving on regardless. */
+export const READING_SECONDS = 60
 export const MAX_MEMBERS = 20
 /** A member is considered present if they've sent a heartbeat within this window. */
 export const STALE_MS = 90_000
@@ -27,14 +29,38 @@ function openSlots(slots: ChoiceSlot[] | undefined): ChoiceSlot[] {
 }
 
 /**
- * The room status implied by a node: vote when there are written paths, pause
- * to write at a frontier with open slots, otherwise the tale has ended.
+ * The room's REAL status implied by a node once the reading gate clears: vote
+ * when there are written paths, pause to write at a frontier with open slots,
+ * otherwise the tale has ended.
  */
 async function statusForNode(storyId: string, nodeId: string): Promise<RoomStatus> {
   const node = await getStoryNode(storyId, nodeId)
   if (navigableSlots(node?.slots).length > 0) return 'voting'
   if (openSlots(node?.slots).length > 0) return 'writing'
   return 'ended'
+}
+
+/**
+ * Called whenever the room arrives at a NEW chapter (creation, a resolved
+ * vote, or a fresh in-room write). Ending nodes skip the gate entirely —
+ * there's nothing to advance to. Otherwise the room pauses on 'reading' so
+ * everyone can catch up before voting/writing starts; `pendingStatus` records
+ * what to become once the gate resolves (see {@link resolveReading}).
+ */
+async function enterNode(ref: FirebaseFirestore.DocumentReference, storyId: string, nodeId: string): Promise<void> {
+  const next = await statusForNode(storyId, nodeId)
+  const now = new Date()
+  if (next === 'ended') {
+    await ref.update({ status: 'ended', pendingStatus: FieldValue.delete(), lastActivity: now.toISOString() })
+    return
+  }
+  await ref.update({
+    status: 'reading',
+    pendingStatus: next,
+    ready: {},
+    roundEndsAt: new Date(now.getTime() + READING_SECONDS * 1000).toISOString(),
+    lastActivity: now.toISOString(),
+  })
 }
 
 /**
@@ -49,6 +75,7 @@ function pruneStaleMembers(data: Room, update: Record<string, unknown>): void {
     if (new Date(m.lastSeen).getTime() < cutoff) {
       update[`members.${uid}`] = FieldValue.delete()
       update[`votes.${uid}`] = FieldValue.delete()
+      update[`ready.${uid}`] = FieldValue.delete()
       delete data.members[uid]
       if (uid === host) host = ''
     }
@@ -85,20 +112,24 @@ export async function createRoom(
   if (!story.rootNodeId) return { error: 'This story has no opening chapter yet.' }
 
   const now = new Date()
-  // Vote if there are written paths, pause to write at a frontier, else ended.
-  const status = await statusForNode(storyId, story.rootNodeId)
+  // Vote if there are written paths, pause to write at a frontier, else ended —
+  // gated behind the 'reading' phase unless the opening chapter is already the end.
+  const next = await statusForNode(storyId, story.rootNodeId)
+  const status: RoomStatus = next === 'ended' ? 'ended' : 'reading'
 
   const room: Omit<Room, 'id'> = {
     storyId,
     storyTitle: story.title,
     hostId: host.uid,
     status,
+    ...(status === 'reading' ? { pendingStatus: next } : {}),
     currentNodeId: story.rootNodeId,
     round: 1,
-    roundEndsAt: new Date(now.getTime() + ROUND_SECONDS * 1000).toISOString(),
+    roundEndsAt: new Date(now.getTime() + (status === 'reading' ? READING_SECONDS : ROUND_SECONDS) * 1000).toISOString(),
     roundSeconds: ROUND_SECONDS,
     members: { [host.uid]: member(host) },
     votes: {},
+    ready: {},
     createdAt: now.toISOString(),
     lastActivity: now.toISOString(),
   }
@@ -152,6 +183,7 @@ export async function leaveRoom(roomId: string, uid: string): Promise<void> {
     const update: Record<string, unknown> = {
       [`members.${uid}`]: FieldValue.delete(),
       [`votes.${uid}`]: FieldValue.delete(),
+      [`ready.${uid}`]: FieldValue.delete(),
       lastActivity: new Date().toISOString(),
     }
     if (remaining.length === 0) {
@@ -243,20 +275,74 @@ export async function resolveRound(
       currentNodeId: newNodeId,
       round: round + 1,
       votes: {},
-      roundEndsAt: new Date(Date.now() + r.roundSeconds * 1000).toISOString(),
       lastActivity: new Date().toISOString(),
     })
     advanced = true
   })
 
-  // Re-derive status at the destination: it may be another vote, a frontier to
-  // write, or an ending.
+  // Arriving at a new chapter: gate on 'reading' (or 'ended' if this is the close).
   if (advanced) {
-    const status = await statusForNode(room.storyId, newNodeId)
-    if (status !== 'voting') {
-      await ref.update({ status, lastActivity: new Date().toISOString() })
-    }
+    await enterNode(ref, room.storyId, newNodeId)
   }
+  return {}
+}
+
+/**
+ * Resolve the reading gate on the current chapter once everyone's marked it
+ * read, or (like {@link resolveRound}) the timer runs out — idempotent and
+ * safe for any client to call. `force` lets the host skip the wait early.
+ */
+export async function resolveReading(
+  roomId: string,
+  round: number,
+  opts: { force?: boolean; byUid?: string } = {},
+): Promise<{ error?: string }> {
+  const ref = roomRef(roomId)
+  const snap = await ref.get()
+  if (!snap.exists) return { error: 'Room not found.' }
+  const room = snap.data() as Room
+
+  if (room.status !== 'reading') return {}
+  if (room.round !== round) return {} // already resolved by someone else
+  if (opts.force && room.hostId !== opts.byUid) return { error: 'Only the host can skip the wait.' }
+
+  const memberIds = Object.keys(room.members)
+  const allReady = memberIds.length > 0 && memberIds.every((uid) => room.ready?.[uid])
+  const timeUp = Date.now() >= new Date(room.roundEndsAt).getTime()
+  if (!opts.force && !allReady && !timeUp) return {} // still waiting
+
+  const nextStatus: RoomStatus = room.pendingStatus ?? 'ended'
+  await adminDb.runTransaction(async (txn) => {
+    const doc = await txn.get(ref)
+    const r = doc.data() as Room
+    if (r.status !== 'reading' || r.round !== round) return
+    txn.update(ref, {
+      status: nextStatus,
+      pendingStatus: FieldValue.delete(),
+      ready: {},
+      votes: {},
+      roundEndsAt: new Date(Date.now() + r.roundSeconds * 1000).toISOString(),
+      lastActivity: new Date().toISOString(),
+    })
+  })
+  return {}
+}
+
+/** Acknowledge the current chapter as read. Idempotent; ignored once the gate's already resolved. */
+export async function markReady(roomId: string, uid: string, round: number): Promise<{ error?: string }> {
+  const ref = roomRef(roomId)
+  const snap = await ref.get()
+  if (!snap.exists) return { error: 'Room not found.' }
+  const room = snap.data() as Room
+  if (!room.members[uid]) return { error: 'Join the room first.' }
+  if (room.status !== 'reading' || room.round !== round) return {} // stale — client will resync
+
+  await adminDb.runTransaction(async (txn) => {
+    const doc = await txn.get(ref)
+    const r = doc.data() as Room
+    if (r.status !== 'reading' || r.round !== round) return
+    txn.update(ref, { [`ready.${uid}`]: true, lastActivity: new Date().toISOString() })
+  })
   return {}
 }
 
@@ -280,15 +366,13 @@ export async function advanceRoom(
   const isChild = navigableSlots(node?.slots).some((s) => s.childNodeId === toNodeId)
   if (!isChild) return { error: 'That path isn’t reachable from here yet.' }
 
-  const status = await statusForNode(room.storyId, toNodeId)
   await ref.update({
     currentNodeId: toNodeId,
     round: room.round + 1,
     votes: {},
-    status,
-    roundEndsAt: new Date(Date.now() + room.roundSeconds * 1000).toISOString(),
     lastActivity: new Date().toISOString(),
   })
+  await enterNode(ref, room.storyId, toNodeId)
   return {}
 }
 
@@ -315,6 +399,7 @@ export async function kickMember(
     txn.update(ref, {
       [`members.${targetUid}`]: FieldValue.delete(),
       [`votes.${targetUid}`]: FieldValue.delete(),
+      [`ready.${targetUid}`]: FieldValue.delete(),
       lastActivity: new Date().toISOString(),
     })
   })
