@@ -4,9 +4,15 @@ import { parseJson } from '@/lib/api-validation'
 import { getAuthContext } from '@/lib/auth'
 import { getStory } from '@/lib/firestore-helpers'
 import { canView } from '@/lib/ratings'
-import { createRoom } from '@/lib/rooms'
+import { createRoom, listActiveRooms } from '@/lib/rooms'
 
 const CreateRoomSchema = z.object({ storyId: z.string().min(1, 'storyId required') })
+
+/** The rooms lobby: active reading rooms anyone can discover and join. */
+export async function GET() {
+  const rooms = await listActiveRooms(30)
+  return NextResponse.json({ rooms })
+}
 
 /** Create a co-op reading room for a story (the creator becomes host). */
 export async function POST(req: NextRequest) {

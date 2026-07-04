@@ -33,6 +33,14 @@
       ]
     },
     {
+      "collectionGroup": "slots",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "bounty.status", "order": "ASCENDING" },
+        { "fieldPath": "bounty.createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "nodes",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
