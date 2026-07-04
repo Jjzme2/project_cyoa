@@ -24,6 +24,8 @@ export interface Feedback {
   voters: string[]
   /** Optional admin note attached to a status change. */
   adminNote?: string
+  /** Admin priority tier: 0 (do first) … 3 (someday). Unset = untriaged. */
+  tier?: 0 | 1 | 2 | 3
   createdAt: string
   updatedAt: string
 }

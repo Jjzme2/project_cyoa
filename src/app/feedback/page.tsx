@@ -20,6 +20,7 @@ interface BoardItem {
   votedByMe: boolean
   isMine: boolean
   adminNote?: string
+  tier?: number
   createdAt: string
 }
 
@@ -126,6 +127,22 @@ export default function FeedbackPage() {
       setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, status } : i)))
     } catch {
       toast.error('Could not update status')
+    }
+  }
+
+  async function setTier(item: BoardItem, tier: number | null) {
+    if (!user) return
+    try {
+      const token = await user.getIdToken()
+      const res = await fetch(`/api/feedback/${item.id}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status: item.status, ...(tier !== null ? { tier } : {}) }),
+      })
+      if (!res.ok) throw new Error('tier failed')
+      setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, tier: tier ?? i.tier } : i)))
+    } catch {
+      toast.error('Could not set tier')
     }
   }
 
@@ -260,6 +277,11 @@ export default function FeedbackPage() {
                       {TM.label}
                     </span>
                     <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border font-sans ${SM.cls}`}>{SM.label}</span>
+                    {typeof item.tier === 'number' && (
+                      <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border font-sans text-amber-300 bg-amber-500/10 border-amber-500/25" title="Admin priority tier (T0 = do first)">
+                        T{item.tier}
+                      </span>
+                    )}
                   </div>
                   <h3 className="font-semibold text-foreground/90">{item.title}</h3>
                   <p className="text-sm text-muted-foreground/65 whitespace-pre-wrap">{item.body}</p>
@@ -280,6 +302,19 @@ export default function FeedbackPage() {
                           <option key={s} value={s} className="bg-stone-900">
                             {STATUS_META[s].label}
                           </option>
+                        ))}
+                      </select>
+                    )}
+                    {isAdmin && (
+                      <select
+                        value={typeof item.tier === 'number' ? String(item.tier) : ''}
+                        onChange={(e) => setTier(item, e.target.value === '' ? null : Number(e.target.value))}
+                        title="Priority tier for the coding-agent export"
+                        className="text-[11px] bg-transparent border border-white/10 rounded px-1.5 py-0.5 text-muted-foreground/70"
+                      >
+                        <option value="" className="bg-stone-900">tier…</option>
+                        {[0, 1, 2, 3].map((t) => (
+                          <option key={t} value={t} className="bg-stone-900">T{t}</option>
                         ))}
                       </select>
                     )}

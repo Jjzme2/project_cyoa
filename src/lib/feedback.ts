@@ -25,6 +25,19 @@ export function applyVote(
 }
 
 /**
+ * Order feedback for the coding-agent export: by admin tier first (T0 → T3,
+ * untriaged last), then community votes, then recency. Pure.
+ */
+export function sortForExport(items: Feedback[]): Feedback[] {
+  return [...items].sort(
+    (a, b) =>
+      (a.tier ?? 99) - (b.tier ?? 99) ||
+      b.votes - a.votes ||
+      Date.parse(b.createdAt) - Date.parse(a.createdAt),
+  )
+}
+
+/**
  * Order feedback for display: open items first (open > planned > in_progress),
  * then by votes, then by recency. Done/declined sink to the bottom. Pure.
  */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isFeedbackType, isFeedbackStatus, applyVote, sortFeedback } from '@/lib/feedback'
+import { isFeedbackType, isFeedbackStatus, applyVote, sortFeedback, sortForExport } from '@/lib/feedback'
 import type { Feedback } from '@/types'
 
 describe('isFeedbackType / isFeedbackStatus', () => {
@@ -53,5 +53,15 @@ describe('sortFeedback', () => {
     const older = fb({ id: 'older', votes: 2, createdAt: '2026-01-01T00:00:00.000Z' })
     const newer = fb({ id: 'newer', votes: 2, createdAt: '2026-02-01T00:00:00.000Z' })
     expect(sortFeedback([older, newer]).map((f) => f.id)).toEqual(['newer', 'older'])
+  })
+})
+
+describe('sortForExport (tier-ranked for the coding agent)', () => {
+  it('orders by tier first (T0 → T3, untriaged last), then votes', () => {
+    const t2 = fb({ id: 't2', tier: 2, votes: 99 })
+    const t0 = fb({ id: 't0', tier: 0, votes: 1 })
+    const none = fb({ id: 'none', votes: 500 })
+    const t0hot = fb({ id: 't0hot', tier: 0, votes: 50 })
+    expect(sortForExport([t2, t0, none, t0hot]).map((f) => f.id)).toEqual(['t0hot', 't0', 't2', 'none'])
   })
 })
