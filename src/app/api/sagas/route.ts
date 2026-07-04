@@ -257,6 +257,7 @@ export async function POST(req: NextRequest) {
     revalidateTag(`story-${storyId}`, 'max')
     revalidateTag(`story-tree-${storyId}`, 'max')
     after(() => checkAndAwardAchievements(uid, 'story_created').catch(() => {}))
+    after(() => checkAndAwardAchievements(uid, 'saga_created').catch(() => {}))
     after(() =>
       analytics.track('saga.created', {
         uid,

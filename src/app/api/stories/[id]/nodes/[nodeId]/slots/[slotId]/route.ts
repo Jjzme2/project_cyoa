@@ -323,6 +323,7 @@ export async function POST(
     // simulation: the Content Judge infers how named characters' regard shifted
     // from what actually happened (no manual memory editing). Applied to the
     // child node's engine state so the next chapter reflects it.
+    let deepBondFormed = false
     if (updatedEngineState && judgment?.relationshipShifts?.length) {
       const known = new Map((story.characters ?? []).map((c) => [c.name.toLowerCase(), c.name]))
       for (const shift of judgment.relationshipShifts) {
@@ -330,7 +331,9 @@ export async function POST(
         if (!name || !shift.delta) continue
         if (updatedEngineState.relationships) {
           const cur = updatedEngineState.relationships.affinity[name] ?? 0
-          updatedEngineState.relationships.affinity[name] = Math.max(-1, Math.min(1, Math.round((cur + shift.delta) * 100) / 100))
+          const next = Math.max(-1, Math.min(1, Math.round((cur + shift.delta) * 100) / 100))
+          updatedEngineState.relationships.affinity[name] = next
+          if (next >= 0.8) deepBondFormed = true
         }
         const mems: AgentMemory[] = updatedEngineState.agentMemories[name] ?? []
         mems.push({
@@ -421,6 +424,7 @@ export async function POST(
     after(async () => {
       const ops: Promise<unknown>[] = [checkAndAwardAchievements(uid, 'contribution')]
       if (includeImage && imageUrl) ops.push(checkAndAwardAchievements(uid, 'illustration'))
+      if (deepBondFormed) ops.push(checkAndAwardAchievements(uid, 'npc_bond'))
       // Record any new canon characters the AI introduced this chapter.
       if (newCharacters && newCharacters.length > 0) {
         ops.push(addStoryCharacters(storyId, newCharacters))
@@ -436,7 +440,11 @@ export async function POST(
           if (aff.length > 0) observed = aff.reduce((s, v) => s + v, 0) / aff.length
         }
         if (observed !== null) {
-          ops.push(updateWorldStanding(uid, story.worldId, observed, displayName ?? undefined))
+          ops.push(
+            updateWorldStanding(uid, story.worldId, observed, displayName ?? undefined).then((standing) =>
+              checkAndAwardAchievements(uid, 'world_standing', { standing }),
+            ),
+          )
           // The same deed also shifts the world's COLLECTIVE regard for outsiders
           // (the reader is one) — slowly, so the whole people's opinion is the sum
           // of many sagas, not any single one.

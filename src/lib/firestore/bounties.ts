@@ -3,6 +3,7 @@ import type { SlotBounty } from '@/types'
 import { CreditManager } from '../credit-manager'
 import { slotRef } from './refs'
 import { getChoiceSlot } from './slots'
+import { checkAndAwardAchievements } from './achievements'
 
 // ─── Branch bounties (escrow on empty slots) ───────────────────────────────────────────────
 
@@ -94,6 +95,7 @@ export async function settleBountyOnFill(
   published: boolean,
 ): Promise<void> {
   const ref = slotRef(storyId, nodeId, slotId)
+  let paidFiller = false
 
   await adminDb.runTransaction(async (txn) => {
     const doc = await txn.get(ref)
@@ -111,10 +113,13 @@ export async function settleBountyOnFill(
         'bounty.pendingNodeId': null,
       })
       CreditManager.grantCreditsInTxn(txn, fillerId, b.reward)
+      paidFiller = true
     } else {
       // Flagged — hold the reward until an admin approves the route.
       txn.update(ref, { 'bounty.pendingClaimBy': fillerId, 'bounty.pendingNodeId': childNodeId })
     }
   })
+
+  if (paidFiller) checkAndAwardAchievements(fillerId, 'bounty_filled').catch(() => {})
 }
 

@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { parseJson } from '@/lib/api-validation'
 import { getAuthContext } from '@/lib/auth'
 import { apiHandler } from '@/lib/api-handler'
-import { postBounty, cancelBounty, getStory } from '@/lib/firestore-helpers'
+import { postBounty, cancelBounty, getStory, checkAndAwardAchievements } from '@/lib/firestore-helpers'
 
 const BountySchema = z.object({
   reward: z.coerce.number(),
@@ -39,6 +39,7 @@ export const POST = apiHandler(async (
   )
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 })
 
+  checkAndAwardAchievements(auth.uid, 'bounty_posted').catch(() => {})
   revalidateTag(`node-${storyId}-${nodeId}`, 'max')
   return NextResponse.json({ ok: true })
 })

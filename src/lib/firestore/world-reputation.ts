@@ -54,16 +54,17 @@ export async function updateWorldStanding(
   worldId: string,
   observed: number,
   name?: string,
-): Promise<void> {
+): Promise<number> {
   const ref = worldRepRef(userId, worldId)
   const now = new Date().toISOString()
-  await adminDb.runTransaction(async (txn) => {
+  return adminDb.runTransaction(async (txn) => {
     const doc = await txn.get(ref)
     const data = doc.exists ? doc.data() ?? {} : {}
     const prior = decayStanding((data.standing as number) ?? 0, data.updatedAt as string)
     const next = Math.max(-1, Math.min(1, Math.round((prior + (observed - prior) * 0.3) * 100) / 100))
     const history = [...(((data.history as { standing: number; at: string }[]) ?? [])), { standing: next, at: now }].slice(-12)
     txn.set(ref, { userId, worldId, name: name ?? data.name ?? 'A wanderer', standing: next, updatedAt: now, history }, { merge: true })
+    return next
   })
 }
 

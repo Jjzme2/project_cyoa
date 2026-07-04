@@ -11,8 +11,13 @@ interface EnrichedAchievement {
   name: string
   description: string
   icon: string
+  reward?: number
   earned: boolean
   earnedAt?: string
+}
+
+function tooltip(a: EnrichedAchievement): string {
+  return a.reward ? `${a.name}: ${a.description} (+${a.reward} credits)` : `${a.name}: ${a.description}`
 }
 
 export function AchievementDisplay() {
@@ -74,13 +79,16 @@ export function AchievementDisplay() {
                 {earned.map((a) => (
                   <div
                     key={a.id}
-                    title={`${a.name}: ${a.description}`}
+                    title={tooltip(a)}
                     className="relative flex flex-col items-center gap-1.5 p-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.06] text-center group cursor-default"
                   >
                     <span className="text-2xl leading-none">{a.icon}</span>
                     <span className="text-[9px] font-sans font-semibold text-amber-300/80 leading-tight">
                       {a.name}
                     </span>
+                    {!!a.reward && (
+                      <span className="text-[8px] font-mono text-amber-400/50">+{a.reward}</span>
+                    )}
                     <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <ShareImageButton
                         cardUrl={`/api/share-card/achievement/${a.id}`}
@@ -106,7 +114,7 @@ export function AchievementDisplay() {
                 {locked.map((a) => (
                   <div
                     key={a.id}
-                    title={a.description}
+                    title={tooltip(a)}
                     className="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-white/[0.05] bg-white/[0.02] text-center opacity-35 cursor-default"
                   >
                     <span className="text-2xl leading-none grayscale">{a.icon}</span>

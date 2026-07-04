@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { parseJson } from '@/lib/api-validation'
-import { incrementTraversal } from '@/lib/firestore-helpers'
+import { incrementTraversal, getChoiceSlot, checkAndAwardAchievements } from '@/lib/firestore-helpers'
 
 const TraverseSchema = z.object({ childNodeId: z.string().min(1, 'childNodeId required') })
+
+/** A written path this popular earns its author the "Path Pioneer" achievement. */
+const PATH_PIONEER_THRESHOLD = 25
 
 /**
  * Records that a reader took this path (powers "% went here" and path reads).
@@ -20,6 +23,10 @@ export async function POST(
 
   try {
     await incrementTraversal(storyId, nodeId, slotId, parsed.data.childNodeId)
+    const slot = await getChoiceSlot(storyId, nodeId, slotId)
+    if (slot?.submittedBy && slot.traversals === PATH_PIONEER_THRESHOLD) {
+      checkAndAwardAchievements(slot.submittedBy, 'path_traversal_milestone').catch(() => {})
+    }
   } catch {
     // best-effort; popularity counters should never break reading
   }

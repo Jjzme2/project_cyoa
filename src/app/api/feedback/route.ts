@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { parseJson } from '@/lib/api-validation'
 import { getAuthContext } from '@/lib/auth'
 import { apiHandler } from '@/lib/api-handler'
-import { createFeedback, listFeedback } from '@/lib/firestore-helpers'
+import { createFeedback, listFeedback, checkAndAwardAchievements } from '@/lib/firestore-helpers'
 import { sortFeedback } from '@/lib/feedback'
 import { throttle } from '@/lib/rate-limit'
 import { insights } from '@/lib/telemetry'
@@ -47,6 +47,7 @@ export const POST = apiHandler(async (req: NextRequest) => {
 
   const id = await createFeedback({ type, title, body }, auth.uid, auth.name ?? 'Anonymous')
   await insights.track('feedback.created', { uid: auth.uid, props: { feedbackId: id, type } })
+  checkAndAwardAchievements(auth.uid, 'feedback_submitted').catch(() => {})
 
   return NextResponse.json({ id }, { status: 201 })
 })
