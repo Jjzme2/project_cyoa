@@ -1,5 +1,13 @@
 import { ENDING_TYPES, type EndingType, type StoryCharacter } from '@/types'
 
+/**
+ * Nudges every AI naming surface (emergent characters, protagonists) away from
+ * the small set of names LLMs default to when given free rein, so different
+ * stories don't all end up drawing from the same handful of names.
+ */
+export const NAME_DIVERSITY_NOTE =
+  "avoid generic, overused fantasy names (e.g. Kael, Kaelen, Aiden, Aria, Lyra, Elara, Zephyr, Thorne, Raven, Seraphina) — pick something distinctive that fits this world's culture and tone, varied in length, origin, and sound from any names already established here"
+
 export class PromptRejectedError extends Error {
   constructor(public readonly reason: string) {
     super(reason)

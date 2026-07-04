@@ -4,6 +4,7 @@ import { formatCast } from './context-budget'
 import { worldStyleBlock } from './world-style'
 import { formatStoryPath } from './story-memory'
 import { resolveNarrativeMode, gentleModeDirective, type NarrativeMode } from '@/lib/engine/narrative-mode'
+import { NAME_DIVERSITY_NOTE } from './shared'
 
 /**
  * The context's EFFECTIVE narrative shape: an explicitly resolved story-level
@@ -273,7 +274,7 @@ CHOICE_1: [choice text]
 CHOICE_2: [choice text]
 CHOICE_3: [choice text]
 ${endingBlock(endingDirective)}
-Then, ONLY if this chapter introduces a brand-new named character not already listed above, add one line per new character (omit entirely if none):
+Then, ONLY if this chapter introduces a brand-new named character not already listed above, add one line per new character (omit entirely if none). When naming them, ${NAME_DIVERSITY_NOTE}:
 NEW_CHARACTER: [name] — [one-line description]
 
 Finally, name where this chapter takes place on its own line — prefer a Region from WORLD CANON above when the scene is there; otherwise a short place name (4 words max):
@@ -336,7 +337,7 @@ CHOICE_1: [choice text]
 CHOICE_2: [choice text]
 CHOICE_3: [choice text]
 
-Then, ONLY if this opening introduces a brand-new named character, add one line per new character (omit entirely if none):
+Then, ONLY if this opening introduces a brand-new named character, add one line per new character (omit entirely if none). When naming them, ${NAME_DIVERSITY_NOTE}:
 NEW_CHARACTER: [name] — [one-line description]
 
 Finally, name where this opening takes place on its own line — prefer a Region from WORLD CANON above when applicable; otherwise a short place name (4 words max):

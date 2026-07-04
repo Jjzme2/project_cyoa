@@ -1,5 +1,5 @@
 import type { ContentRating, EndingType, StoryCharacter, StoryPathSegment, WorldBible } from '@/types'
-import { VALID_TONES, VALID_TAGS, parseAIResponse, tryParseJSON, pickStr } from './shared'
+import { VALID_TONES, VALID_TAGS, NAME_DIVERSITY_NOTE, parseAIResponse, tryParseJSON, pickStr } from './shared'
 import { runTextWaterfall, isBillingOrRateLimitError } from './waterfall'
 import { buildPrompt, buildSagaOpeningPrompt, userInputBlock, type WorldContext } from './prompts'
 
@@ -67,6 +67,8 @@ Respond with ONLY valid JSON (no markdown fences, no explanation) in this exact 
   "protagonistDesc": "one-line protagonist description, or empty string",
   "tags": ["tag1", "tag2"]
 }
+
+If you give the protagonist a name, ${NAME_DIVERSITY_NOTE}.
 
 tags must only include values from: Fantasy, Horror, Sci-Fi, Mystery, Romance, Adventure, Comedy, Thriller, Historical, Cosmic Horror, Fairy Tale, Noir, Post-Apocalyptic, Steampunk, Western. Pick 1-3.
 

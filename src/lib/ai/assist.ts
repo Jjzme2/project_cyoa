@@ -1,5 +1,5 @@
 import type { ContentRating } from '@/types'
-import { VALID_TONES, VALID_TAGS, tryParseJSON } from './shared'
+import { VALID_TONES, VALID_TAGS, NAME_DIVERSITY_NOTE, tryParseJSON } from './shared'
 import { runTextWaterfall } from './waterfall'
 import { userInputBlock } from './prompts'
 
@@ -47,7 +47,7 @@ const STORY_FIELD_SPECS: Record<string, string> = {
   title: '"title": the story title',
   description: '"description": a 1-2 sentence tagline (under 240 characters)',
   opening: '"opening": the opening chapter, 130-160 words, immersive, ending at a moment of decision or tension',
-  protagonistName: '"protagonistName": the protagonist\'s name, or an empty string if the story has no fixed protagonist',
+  protagonistName: `"protagonistName": the protagonist's name, or an empty string if the story has no fixed protagonist — if named, ${NAME_DIVERSITY_NOTE}`,
   protagonistDesc: '"protagonistDesc": a one-line protagonist description, or an empty string if none',
   choice1: '"choice1": first path option, under 10 words',
   choice2: '"choice2": second path option, under 10 words',
