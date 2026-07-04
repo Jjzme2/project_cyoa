@@ -247,6 +247,20 @@ export function describeDirector(d: DirectorPersona | null | undefined): string[
 }
 
 /**
+ * A random archetype with slight per-axis jitter (±0.15) — a coherent
+ * starting point for authors who'd rather not think about sliders yet.
+ */
+export function surpriseDirector(): DirectorPersona {
+  const archetype = DIRECTOR_ARCHETYPES[Math.floor(Math.random() * DIRECTOR_ARCHETYPES.length)]
+  const persona: DirectorPersona = { ...emptyDirector(), ...archetype.persona }
+  for (const axis of DIRECTOR_AXES) {
+    const jittered = axisValue(persona, axis.key) + (Math.random() - 0.5) * 0.3
+    persona[axis.key] = Math.max(-1, Math.min(1, jittered))
+  }
+  return persona
+}
+
+/**
  * Translate a persona into cover-art direction (palette, composition, mood) —
  * same axes as `describeDirector`, but phrased for an illustrator instead of
  * a prose stylist, so generated cover art matches the story's intended tone.

@@ -6,6 +6,8 @@ import {
   describeDirectorForCoverArt,
   sanitizeDirector,
   personaMatches,
+  surpriseDirector,
+  DIRECTOR_AXES,
 } from '@/lib/director'
 
 describe('emptyDirector / isDirectorMeaningful', () => {
@@ -34,6 +36,20 @@ describe('describeDirector', () => {
     const notes = describeDirector({ ...emptyDirector(), darkness: 1, vision: 'dread' })
     expect(notes.length).toBe(2)
     expect(notes[notes.length - 1]).toContain('dread')
+  })
+})
+
+describe('surpriseDirector', () => {
+  it('lands on a meaningful, in-range persona every time', () => {
+    for (let i = 0; i < 20; i++) {
+      const d = surpriseDirector()
+      expect(isDirectorMeaningful(d)).toBe(true)
+      for (const axis of DIRECTOR_AXES) {
+        const v = d[axis.key] ?? 0
+        expect(v).toBeGreaterThanOrEqual(-1)
+        expect(v).toBeLessThanOrEqual(1)
+      }
+    }
   })
 })
 

@@ -166,8 +166,9 @@ abuse guard below was also already covered by the Tier-3 throttle work.)
 - [ ] **Author-reusable director presets** — let authors save a tuned director
   as a named preset and reuse it across stories; optionally share community
   presets alongside the built-in archetypes.
-- [ ] **"Surprise me" director** — a randomize button that lands on a coherent
-  archetype with slight jitter, for authors who want a starting point.
+- [x] **"Surprise me" director** — `surpriseDirector()` picks a random
+  archetype and jitters each axis ±0.15; a "Shuffle" button next to the
+  archetype presets in `DirectorControls`.
 - [x] **Director-aware cover art** — `describeDirectorForCoverArt()` translates
   the persona's axes/vision into art-direction notes (palette, composition,
   mood) folded into the cover-image prompt; wired from both `/stories/new`
