@@ -246,6 +246,44 @@ export function describeDirector(d: DirectorPersona | null | undefined): string[
   return notes
 }
 
+/**
+ * A random archetype with slight per-axis jitter (±0.15) — a coherent
+ * starting point for authors who'd rather not think about sliders yet.
+ */
+export function surpriseDirector(): DirectorPersona {
+  const archetype = DIRECTOR_ARCHETYPES[Math.floor(Math.random() * DIRECTOR_ARCHETYPES.length)]
+  const persona: DirectorPersona = { ...emptyDirector(), ...archetype.persona }
+  for (const axis of DIRECTOR_AXES) {
+    const jittered = axisValue(persona, axis.key) + (Math.random() - 0.5) * 0.3
+    persona[axis.key] = Math.max(-1, Math.min(1, jittered))
+  }
+  return persona
+}
+
+/**
+ * Translate a persona into cover-art direction (palette, composition, mood) —
+ * same axes as `describeDirector`, but phrased for an illustrator instead of
+ * a prose stylist, so generated cover art matches the story's intended tone.
+ */
+export function describeDirectorForCoverArt(d: DirectorPersona | null | undefined): string[] {
+  if (!d) return []
+  const notes: string[] = []
+  const lean = (key: DirectorAxisKey, positive: string, negative: string) => {
+    const v = axisValue(d, key)
+    if (v > DIRECTOR_THRESHOLD) notes.push(positive)
+    else if (v < -DIRECTOR_THRESHOLD) notes.push(negative)
+  }
+  lean('darkness', 'an ominous, shadow-heavy palette', 'a warm, tender palette with soft, inviting light')
+  lean('intensity', 'a bold, high-contrast composition', 'a restrained composition with quiet emotional weight')
+  lean('focus', 'epic, sweeping scale', 'intimate, close framing on a single figure')
+  lean('pace', 'dynamic, mid-action energy', 'still, contemplative stillness')
+  lean('levity', 'a playful, whimsical tone', 'a solemn, grave tone')
+  lean('experimental', 'surreal, unconventional imagery', 'classic, traditional genre imagery')
+  lean('prose', 'richly ornate, painterly detail', 'a clean, spare visual style')
+  if (d.vision && d.vision.trim()) notes.push(`honoring the director's stated vision: "${d.vision.trim()}"`)
+  return notes
+}
+
 const clampAxis = (v: unknown): number => Math.max(-1, Math.min(1, Number(v) || 0))
 
 /**

@@ -616,6 +616,9 @@ export default function NewStoryPage() {
               tags,
               worldName: world?.name ?? '',
               worldDescription: world?.description ?? '',
+              director: isDirectorMeaningful(director)
+                ? { ...director, vision: (director.vision ?? '').trim() }
+                : undefined,
             }),
           })
           if (!res.ok) return null

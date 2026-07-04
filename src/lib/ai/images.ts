@@ -64,12 +64,14 @@ export async function generateCoverImage(
   worldName: string,
   worldDescription: string,
   blobKey: string,
+  directorNotes: string[] = [],
 ): Promise<{ url: string | null; error?: string }> {
   const apiKey = process.env.OPENROUTER_API_KEY
   if (!apiKey) return { url: null, error: 'No OpenRouter API key configured on server.' }
 
   const tagLine = tags.length > 0 ? `Genres: ${tags.join(', ')}. ` : ''
-  const prompt = `Epic book cover illustration for a choose-your-own-adventure story. Title: "${title}". ${description ? `Premise: "${description}". ` : ''}${tagLine}${worldName ? `World: "${worldName}" — ${worldDescription.slice(0, 150)}. ` : ''}Dramatic composition, detailed fantasy art, painterly style, cinematic lighting. Portrait orientation, no text, no letters, no words anywhere in the image. Professional book cover art.`
+  const directorLine = directorNotes.length > 0 ? `Art direction: ${directorNotes.join(', ')}. ` : ''
+  const prompt = `Epic book cover illustration for a choose-your-own-adventure story. Title: "${title}". ${description ? `Premise: "${description}". ` : ''}${tagLine}${worldName ? `World: "${worldName}" — ${worldDescription.slice(0, 150)}. ` : ''}${directorLine}Dramatic composition, detailed fantasy art, painterly style, cinematic lighting. Portrait orientation, no text, no letters, no words anywhere in the image. Professional book cover art.`
 
   return generateAndUpload(prompt, apiKey, `cover-images/${blobKey}.webp`)
 }

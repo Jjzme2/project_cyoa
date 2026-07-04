@@ -136,24 +136,43 @@ validation, lint-debt cleanup)._
     target — the remainder is irreducible form/reader orchestration. Further
     splitting needs deep render extraction (risky prop-drilling) — left as a
     focused follow-up rather than forcing it._
-- [ ] Co-op reading rooms **PR 2** (frontier write-pause, host kick, ended
-  summary, stale-room cleanup).
+- [x] **Co-op reading rooms PR 2** — frontier write-pause (write the next
+  chapter in-room via the existing contribution endpoint; room advances for
+  everyone once published), host kick, ended summary (chapters traversed +
+  reader count), stale-member cleanup (>90s heartbeat prune, host
+  reassignment). Since followed by guest (read-only) accounts, a Living World
+  panel + join interstitial + reading-phase "Ready" gate, and softened benign
+  write-race errors.
 - [ ] Global leaderboards (denormalized aggregate counters).
 - [ ] Global bounty board (collection-group query + index).
+- [ ] **Reader Pal** — a visual companion (no AI) that shows up across the app
+  (reader, profile, library), tracks its own stats, and levels up as the
+  reader/writer plays; progression ties into the existing achievement system
+  (Tier 2 #9 in `docs/EXECUTION-PLAN.md`; richer triggers need 9b first).
+- [ ] **Custom AI-generated narrative shapes** — an author spends credits to
+  have the AI generate a wholly custom narrative shape for their world (its
+  own arc pool, pacing/stakes flavor, climax types), instead of picking from a
+  fixed dramatic/gentle/preset list. Distinct from EXECUTION-PLAN.md M6 (more
+  *preset* shapes chosen by the team + AI auto-classification) — this is
+  per-world, author-initiated, and AI-generated on demand.
 
 ## 💡 Ideas & suggestions (surfaced while building)
 
 Candidates that emerged from this session's work — not yet committed, ordered
 roughly by value. (Reader analytics, admin hub live counts, Users search, and
-telemetry retention already graduated into P0/P1 above.)
+telemetry retention already graduated into P0/P1 above; the `/api/track`
+abuse guard below was also already covered by the Tier-3 throttle work.)
 
 - [ ] **Author-reusable director presets** — let authors save a tuned director
   as a named preset and reuse it across stories; optionally share community
   presets alongside the built-in archetypes.
-- [ ] **"Surprise me" director** — a randomize button that lands on a coherent
-  archetype with slight jitter, for authors who want a starting point.
-- [ ] **Director-aware cover art** — feed the director's vision/axes into the
-  cover-image generation prompt so the art matches the intended tone.
+- [x] **"Surprise me" director** — `surpriseDirector()` picks a random
+  archetype and jitters each axis ±0.15; a "Shuffle" button next to the
+  archetype presets in `DirectorControls`.
+- [x] **Director-aware cover art** — `describeDirectorForCoverArt()` translates
+  the persona's axes/vision into art-direction notes (palette, composition,
+  mood) folded into the cover-image prompt; wired from both `/stories/new`
+  and `/saga/new`.
 - [ ] **Funnel & retention in admin analytics** — a conversion view
   (worlds → stories → reads → purchases) and DAU/retention, beyond raw counts.
 - [ ] **Per-user activity drill-down** — from `/admin/users`, open a user's
@@ -166,8 +185,8 @@ telemetry retention already graduated into P0/P1 above.)
   multi-size favicon/PWA icon set and a logo-bearing OG image.
 - [ ] **Analytics export** — CSV/JSON export of the analytics window for
   offline analysis.
-- [ ] **Abuse guard on `POST /api/track`** — rate-limit client-emitted events so
-  the telemetry collections can't be spammed.
+- [x] **Abuse guard on `POST /api/track`** — already throttled (`throttle('track:${uid}', 120, 60)`
+  in `src/app/api/track/route.ts`), same pass that covered `/api/feedback`.
 
 ## 🔒 Blocked on ops / deploy
 

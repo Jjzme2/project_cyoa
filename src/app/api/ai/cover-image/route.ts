@@ -6,6 +6,7 @@ import { CreditManager } from '@/lib/credit-manager'
 import { creditFailureResponse } from '@/lib/credit-response'
 import { generateCoverImage } from '@/lib/ai'
 import { trackGenerationCompleted, trackGenerationFailed } from '@/lib/generation-telemetry'
+import { sanitizeDirector, describeDirectorForCoverArt } from '@/lib/director'
 
 const CoverImageSchema = z.object({
   title: z.string().trim().min(1, 'title required'),
@@ -13,6 +14,7 @@ const CoverImageSchema = z.object({
   tags: z.array(z.string()).optional(),
   worldName: z.string().optional(),
   worldDescription: z.string().optional(),
+  director: z.unknown().optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -34,7 +36,8 @@ export async function POST(req: NextRequest) {
 
   const parsed = await parseJson(req, CoverImageSchema)
   if (!parsed.ok) return parsed.response
-  const { title, description, tags, worldName, worldDescription } = parsed.data
+  const { title, description, tags, worldName, worldDescription, director } = parsed.data
+  const directorNotes = describeDirectorForCoverArt(sanitizeDirector(director))
 
   const credit = await CreditManager.consume(uid, tier, 3)
   if (!credit.success) {
@@ -49,6 +52,7 @@ export async function POST(req: NextRequest) {
     worldName ?? '',
     worldDescription ?? '',
     blobKey,
+    directorNotes,
   )
 
   if (!result.url) {

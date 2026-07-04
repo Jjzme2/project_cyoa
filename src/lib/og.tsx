@@ -25,6 +25,9 @@ export function clamp(text: string, max: number): string {
   return t.length <= max ? t : t.slice(0, max - 1).trimEnd() + '…'
 }
 
+/** Cheap to render but requested on every crawler fetch/relink; let the CDN absorb repeats. */
+const ogHeaders = { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600' }
+
 export function renderOgImage({ eyebrow, title, subtitle }: OgImageOptions): ImageResponse {
   return new ImageResponse(
     (
@@ -91,6 +94,6 @@ export function renderOgImage({ eyebrow, title, subtitle }: OgImageOptions): Ima
         </div>
       </div>
     ),
-    { ...ogSize },
+    { ...ogSize, headers: ogHeaders },
   )
 }

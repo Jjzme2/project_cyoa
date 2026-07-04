@@ -63,6 +63,15 @@ GitHub trackers:
 ### Seed content
 - `scripts/seed.ts` (`npm run seed`) — hand-authored starter worlds/stories flagged `seeded` with a "Seeded — not community-built" badge.
 
+### Co-op live reading rooms — [#5](https://github.com/Jjzme2/project_cyoa/issues/5)
+Group reads a story together and votes on each choice; everyone advances in sync. Realtime via Firestore `onSnapshot` (reads) + Admin-SDK API (writes); read-only client rules.
+- **PR 1 (core):** create/join/vote/resolve/heartbeat/leave, live voting + countdown + presence, "Read together" entry.
+- **PR 2 (polish):** frontier write-pause (write the next chapter in-room; room advances for everyone once published), host kick, ended summary (chapters traversed + reader count), stale-member cleanup.
+- Since followed by: guest (read-only) accounts via Firebase Anonymous Auth, a room reader that no longer evicts on unmount (deliberate "Leave room" control instead), the reader-facing Living World panel, a join interstitial explaining what joining does, a reading-phase "Ready" gate before advancing, and softened benign write-race error messaging.
+
+### Saga draft persistence
+The story creator's `useDraft` (`chronicle:draft:story`) restore/discard banner is now also wired into the Personal Saga creator (`/saga/new`) — entry points, premise, director, cover/reading theme — so an interrupted saga is no longer lost on reload.
+
 ---
 
 ## 🛠️ Outstanding (ops / verify) — see [#4](https://github.com/Jjzme2/project_cyoa/issues/4)
@@ -73,15 +82,12 @@ GitHub trackers:
 - [ ] Run `npm run seed` with admin creds.
 - [ ] **Smoke-test bounty credit flows** (never runtime-tested): post→fill→pay, cancel→refund, flagged→approve→pay / reject→reopen, can't-claim-own.
 - [ ] Smoke-test age gating, rating containment, character continuity, reader polish.
+- [ ] Deploy `firestore.rules` for co-op rooms (`firebase deploy --only firestore:rules`).
+- [ ] **2-browser smoke test** for co-op rooms: create/join by link, vote, countdown resolve + sync advance, age-ineligible join, frontier write-pause, host kick, room end.
 
 ---
 
 ## 🔮 Planned
-
-### Co-op live reading rooms — [#5](https://github.com/Jjzme2/project_cyoa/issues/5)
-Group reads a story together and votes on each choice; everyone advances in sync; pause-to-write at frontiers. Realtime via Firestore `onSnapshot` (reads) + Admin-SDK API (writes); read-only client rules.
-- **PR 1 (core) — built**, pending: deploy `firestore.rules` (`firebase deploy --only firestore:rules`) and **2-browser smoke test** (create/join by link, vote, countdown resolve + sync advance, age-ineligible join). Create/join/vote/resolve/heartbeat/leave, live voting + countdown + presence, "Read together" entry.
-- **PR 2 (polish) — planned:** frontier write-pause, host kick, ended summary, stale-room cleanup.
 
 ### Global leaderboards
 Most-loved / most-traveled paths and top writers. Needs denormalized aggregate counters (beyond the per-node traversal/reaction counts already in place).
@@ -89,8 +95,8 @@ Most-loved / most-traveled paths and top writers. Needs denormalized aggregate c
 ### Global bounty board
 Discovery surface for open bounties across stories (currently bounties only appear inline on slots). Needs a collection-group query + index.
 
-### Saga draft persistence
-The story creator autosaves/restores a draft via `useDraft` (`chronicle:draft:story`); the Personal Saga creator (`/saga/new`) has no equivalent, so an interrupted saga is lost on reload. Wire the same draft restore/discard banner into the saga form (entry points, premise, director, cover/reading theme). Parked from the Director-UI work.
+### Rooms lobby
+In-app discovery for co-op reading rooms — currently only reachable via a direct invite link, no listing page.
 
 ### Open product decision
 - Anonymous vs. named authorship policy (named authorship builds community).

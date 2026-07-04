@@ -1,6 +1,6 @@
 'use client'
 
-import { Clapperboard, RotateCcw, Wand2 } from 'lucide-react'
+import { Clapperboard, RotateCcw, Shuffle, Wand2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -12,6 +12,7 @@ import {
   emptyDirector,
   isDirectorMeaningful,
   personaMatches,
+  surpriseDirector,
   type DirectorArchetype,
 } from '@/lib/director'
 
@@ -63,9 +64,19 @@ export function DirectorControls({
 
             {/* Archetype presets — one click to a recognizable sensibility */}
             <div className="space-y-2">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground/40 font-sans">
-                Start from a style
-              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/40 font-sans">
+                  Start from a style
+                </p>
+                <button
+                  type="button"
+                  onClick={() => onChange(surpriseDirector())}
+                  title="Land on a random, coherent style to start from"
+                  className="flex items-center gap-1 text-[11px] font-sans text-muted-foreground/50 hover:text-amber-200/80 transition-colors"
+                >
+                  <Shuffle className="h-3 w-3" /> Surprise me
+                </button>
+              </div>
               <div className="flex flex-wrap gap-1.5">
                 {DIRECTOR_ARCHETYPES.map((a) => {
                   const active = personaMatches(value, a.persona)
