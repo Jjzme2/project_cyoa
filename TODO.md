@@ -179,8 +179,9 @@ abuse guard below was also already covered by the Tier-3 throttle work.)
   tracked events, authored stories, and credit history.
 - [ ] **Admin audit trail** — the `insights` channel already logs `admin.*`
   actions; surface a filtered audit view (who granted credits / changed roles).
-- [ ] **Richer per-page SEO** — `CreativeWork`/`Article` + breadcrumb JSON-LD
-  for story and world pages (the root only has WebSite/Organization today).
+- [x] **Richer per-page SEO** — `CreativeWork` + `BreadcrumbList` JSON-LD on
+  `/stories/[id]` (linked to its world via `isPartOf`) and `/worlds/[id]`;
+  story pages also picked up a missing `alternates.canonical`.
 - [ ] **Logo-based brand assets** — once the logo is hosted, generate a proper
   multi-size favicon/PWA icon set and a logo-bearing OG image.
 - [ ] **Analytics export** — CSV/JSON export of the analytics window for

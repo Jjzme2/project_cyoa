@@ -21,6 +21,7 @@ import { CharacterPortrait } from '@/components/character/CharacterPortrait'
 import { isCrossWorld } from '@/lib/characters'
 import { resolveNarrativeMode } from '@/lib/engine/narrative-mode'
 import { APP_CONFIG } from '@/lib/config'
+import { jsonLdSafe } from '@/lib/json-ld'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -73,8 +74,33 @@ async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
   // Legacy worlds (no saved theme) get a coherent look derived from their tone.
   const theme = world.theme ?? themeForTone(world.tone, DEFAULT_WORLD_THEME)
 
+  const worldUrl = `${APP_CONFIG.site.url}/worlds/${world.id}`
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'CreativeWork',
+        '@id': `${worldUrl}#world`,
+        name: world.name,
+        url: worldUrl,
+        ...(world.description ? { description: world.description } : {}),
+        ...(world.tags && world.tags.length > 0 ? { genre: world.tags } : {}),
+        author: { '@type': 'Person', name: world.authorName },
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: APP_CONFIG.site.url },
+          { '@type': 'ListItem', position: 2, name: 'Worlds', item: `${APP_CONFIG.site.url}/worlds` },
+          { '@type': 'ListItem', position: 3, name: world.name, item: worldUrl },
+        ],
+      },
+    ],
+  }
+
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdSafe(jsonLd) }} />
       <section className="space-y-6">
         <Link
           href="/worlds"

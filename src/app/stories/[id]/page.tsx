@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { getStory, getStoryNode, getStoryTree, incrementStoryViews, getWorld } from '@/lib/firestore-helpers'
 import { ratingRank } from '@/lib/ratings'
 import { APP_CONFIG } from '@/lib/config'
+import { jsonLdSafe } from '@/lib/json-ld'
 import type { StoryTreeNode } from '@/types'
 
 function countEndings(nodes: StoryTreeNode[]): number {
@@ -41,6 +42,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title,
     description,
+    alternates: { canonical: `/stories/${id}` },
     openGraph: { title, description, type: 'article', siteName: APP_CONFIG.site.name },
     twitter: { card: 'summary_large_image', title, description },
   }
@@ -67,8 +69,35 @@ async function StoryContent({ params }: { params: Promise<{ id: string }> }) {
 
   after(() => incrementStoryViews(id).catch(() => {}))
 
+  const storyUrl = `${APP_CONFIG.site.url}/stories/${story.id}`
+  const worldUrl = story.worldId ? `${APP_CONFIG.site.url}/worlds/${story.worldId}` : undefined
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'CreativeWork',
+        '@id': `${storyUrl}#story`,
+        name: story.title,
+        url: storyUrl,
+        ...(story.description ? { description: story.description } : {}),
+        ...(story.tags && story.tags.length > 0 ? { genre: story.tags } : {}),
+        author: { '@type': 'Person', name: story.authorName },
+        ...(worldUrl ? { isPartOf: { '@type': 'CreativeWork', '@id': `${worldUrl}#world`, name: story.worldName } } : {}),
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: APP_CONFIG.site.url },
+          ...(worldUrl ? [{ '@type': 'ListItem', position: 2, name: story.worldName, item: worldUrl }] : []),
+          { '@type': 'ListItem', position: worldUrl ? 3 : 2, name: story.title, item: storyUrl },
+        ],
+      },
+    ],
+  }
+
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdSafe(jsonLd) }} />
       <div className="space-y-1 max-w-2xl">
         <p className="text-[11px] text-amber-400/45 uppercase tracking-widest font-sans">
           {story.worldName}
