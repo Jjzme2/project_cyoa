@@ -20,6 +20,7 @@ const SeasonSchema = z
       .regex(/^#[0-9a-fA-F]{6}$/, 'accent must be a #rrggbb hex')
       .optional(),
     published: z.boolean().default(false),
+    recurrence: z.enum(['none', 'monthly', 'yearly']).optional(),
     multiverseId: z.string().trim().min(1).nullable().optional(),
     multiverseName: z.string().trim().min(1).nullable().optional(),
   })

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { seasonPhase, isSeasonLive, featuredSeason, countdownLabel } from '@/lib/seasons'
+import { seasonPhase, isSeasonLive, featuredSeason, countdownLabel, rollSeasonWindow } from '@/lib/seasons'
 
 const base = { startsAt: '2026-06-01T00:00:00.000Z', endsAt: '2026-06-30T00:00:00.000Z', published: true }
 const mid = new Date('2026-06-15T00:00:00.000Z')
@@ -59,5 +59,30 @@ describe('countdownLabel', () => {
   it('reads Ended / Draft outside the live window', () => {
     expect(countdownLabel(base, new Date('2026-07-02T00:00:00.000Z'))).toBe('Ended')
     expect(countdownLabel({ ...base, published: false }, mid)).toBe('Draft')
+  })
+})
+
+describe('rollSeasonWindow (the self-sustaining heartbeat)', () => {
+  const ended = { startsAt: '2026-06-01T00:00:00.000Z', endsAt: '2026-06-08T00:00:00.000Z' }
+
+  it('returns null for one-shot or still-running seasons', () => {
+    expect(rollSeasonWindow({ ...ended, recurrence: 'none' }, new Date('2026-07-01T00:00:00.000Z'))).toBeNull()
+    expect(rollSeasonWindow({ ...ended, recurrence: undefined }, new Date('2026-07-01T00:00:00.000Z'))).toBeNull()
+    expect(rollSeasonWindow({ ...ended, recurrence: 'monthly' }, new Date('2026-06-05T00:00:00.000Z'))).toBeNull()
+  })
+
+  it('rolls a monthly season one period forward', () => {
+    const next = rollSeasonWindow({ ...ended, recurrence: 'monthly' }, new Date('2026-06-20T00:00:00.000Z'))
+    expect(next).toEqual({ startsAt: '2026-07-01T00:00:00.000Z', endsAt: '2026-07-08T00:00:00.000Z' })
+  })
+
+  it('catches up across several missed periods', () => {
+    const next = rollSeasonWindow({ ...ended, recurrence: 'monthly' }, new Date('2026-09-15T00:00:00.000Z'))
+    expect(next).toEqual({ startsAt: '2026-10-01T00:00:00.000Z', endsAt: '2026-10-08T00:00:00.000Z' })
+  })
+
+  it('rolls a yearly season to next year', () => {
+    const next = rollSeasonWindow({ ...ended, recurrence: 'yearly' }, new Date('2026-08-01T00:00:00.000Z'))
+    expect(next).toEqual({ startsAt: '2027-06-01T00:00:00.000Z', endsAt: '2027-06-08T00:00:00.000Z' })
   })
 })

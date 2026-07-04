@@ -20,6 +20,7 @@ interface FormState {
   endsAt: string // datetime-local value
   accent: string
   published: boolean
+  recurrence: 'none' | 'monthly' | 'yearly'
 }
 
 const EMPTY: FormState = {
@@ -31,6 +32,7 @@ const EMPTY: FormState = {
   endsAt: '',
   accent: '#f5d896',
   published: false,
+  recurrence: 'none',
 }
 
 function isoToLocalInput(iso: string): string {
@@ -115,6 +117,7 @@ export default function AdminSeasonsPage() {
           endsAt,
           accent: form.accent,
           published: form.published,
+          recurrence: form.recurrence,
         }),
       })
       if (!res.ok) throw new Error((await res.json()).error ?? 'Save failed')
@@ -139,6 +142,7 @@ export default function AdminSeasonsPage() {
       endsAt: isoToLocalInput(s.endsAt),
       accent: s.accent ?? '#f5d896',
       published: s.published,
+      recurrence: s.recurrence ?? 'none',
     })
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [])
@@ -219,6 +223,18 @@ export default function AdminSeasonsPage() {
           <label className="space-y-1.5">
             <span className="text-xs text-muted-foreground/60">Ends</span>
             <Input type="datetime-local" value={form.endsAt} onChange={(e) => setForm({ ...form, endsAt: e.target.value })} />
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs text-muted-foreground/60">Repeats</span>
+            <select
+              value={form.recurrence}
+              onChange={(e) => setForm({ ...form, recurrence: e.target.value as FormState['recurrence'] })}
+              className="w-full h-9 px-2 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none"
+            >
+              <option value="none">Never — one-shot</option>
+              <option value="monthly">Monthly — rolls forward automatically</option>
+              <option value="yearly">Yearly — rolls forward automatically</option>
+            </select>
           </label>
           <label className="space-y-1.5">
             <span className="text-xs text-muted-foreground/60">Accent</span>

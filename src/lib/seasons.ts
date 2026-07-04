@@ -45,6 +45,41 @@ export function featuredSeason<T extends Pick<Season, 'startsAt' | 'endsAt' | 'p
 }
 
 /**
+ * Roll a recurring season's window forward past `now`: advance start/end by the
+ * recurrence period (calendar-aware months, or years) until the end lies in the
+ * future. Returns null for one-shot seasons or ones still running — nothing to
+ * roll. Pure, so the rotation cron's logic is fully testable.
+ */
+export function rollSeasonWindow(
+  season: Pick<Season, 'startsAt' | 'endsAt' | 'recurrence'>,
+  now: Date,
+): { startsAt: string; endsAt: string } | null {
+  const rec = season.recurrence
+  if (rec !== 'monthly' && rec !== 'yearly') return null
+  const start = new Date(season.startsAt)
+  const end = new Date(season.endsAt)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null
+  if (end.getTime() > now.getTime()) return null // still running / upcoming
+
+  const advance = (d: Date) => {
+    const n = new Date(d)
+    if (rec === 'monthly') n.setUTCMonth(n.getUTCMonth() + 1)
+    else n.setUTCFullYear(n.getUTCFullYear() + 1)
+    return n
+  }
+  let s = start
+  let e = end
+  // Advance in lockstep until the window's end is in the future (bounded so a
+  // pathological ancient date can't spin forever).
+  for (let i = 0; i < 600 && e.getTime() <= now.getTime(); i++) {
+    s = advance(s)
+    e = advance(e)
+  }
+  if (e.getTime() <= now.getTime()) return null
+  return { startsAt: s.toISOString(), endsAt: e.toISOString() }
+}
+
+/**
  * Human countdown like "3d 4h left" / "starts in 2h" / "ended". Coarse by
  * design (days/hours/minutes) — it drives a banner, not a clock.
  */

@@ -46,7 +46,7 @@ The working order. Within each bucket, top-to-bottom is the suggested sequence;
 - [x] **S2. Per-story narrative shape, clamped by the world.** A dramatic world
   may host a gentle story; a gentle world can never be overridden dramatic
   (same clamp philosophy as content ratings). Story-creator picker + clamp.
-- [ ] **S3. Season scheduler.** Auto-activate/rotate seasons so live-ops doesn't
+- [x] **S3. Season scheduler.** Auto-activate/rotate seasons so live-ops doesn't
   depend on an operator remembering (extends `/admin/seasons`).
 - [x] **S4. GOAP filtering in gentle worlds.** The cast sim shouldn't even PLAN
   betray/attack/intimidate actions in a gentle world (today only the prose

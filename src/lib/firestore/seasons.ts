@@ -1,5 +1,5 @@
 import { adminDb } from '../firebase-admin'
-import { isSeasonLive } from '../seasons'
+import { isSeasonLive, rollSeasonWindow } from '../seasons'
 import type { Season } from '@/types'
 
 // ─── Seasons (live events) ───────────────────────────────────────────────────
@@ -29,6 +29,7 @@ export async function getLiveSeasons(now: Date = new Date()): Promise<Season[]> 
 }
 
 export interface SeasonInput {
+  recurrence?: 'none' | 'monthly' | 'yearly'
   name: string
   tagline: string
   description: string
@@ -54,4 +55,23 @@ export async function upsertSeason(input: SeasonInput, createdBy: string, id?: s
 
 export async function deleteSeason(id: string): Promise<void> {
   await seasonsCollection().doc(id).delete()
+}
+
+/**
+ * Roll every ended, recurring, published season's window forward (see
+ * rollSeasonWindow) — the self-sustaining live-ops heartbeat, run by the daily
+ * rotation cron. Returns the ids that rolled.
+ */
+export async function rotateExpiredSeasons(now: Date = new Date()): Promise<string[]> {
+  const all = await listSeasons()
+  const rolled: string[] = []
+  for (const s of all) {
+    if (!s.published) continue
+    const next = rollSeasonWindow(s, now)
+    if (next) {
+      await seasonsCollection().doc(s.id).update({ ...next, updatedAt: new Date().toISOString() })
+      rolled.push(s.id)
+    }
+  }
+  return rolled
 }
