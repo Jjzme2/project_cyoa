@@ -168,6 +168,15 @@ export interface StoryNode {
   parentId: string | null
   choiceText: string | null
   slots: ChoiceSlot[]
+  /**
+   * Denormalized ancestor chain, root-first, NOT including this node itself —
+   * computed once at creation from the parent's own `pathIds`. Lets a full
+   * story path be reconstructed with one read + one parallel batch-get instead
+   * of walking `parentId` one sequential read at a time. Absent on nodes
+   * created before this field existed; `getStoryPath` falls back to the walk
+   * for those.
+   */
+  pathIds?: string[]
   authorId: string | null
   aiGenerated: boolean
   aiModel: string | null
