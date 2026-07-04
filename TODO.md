@@ -239,8 +239,11 @@ presets and makes ambient dynamic rather than a single static per-story pick.
   `CoverDesigner`'s thumbnail both fade + scale in (framer-motion, keyed by
   `coverImageUrl`) whenever a fresh AI cover is generated, regenerated, or
   removed.
-- [ ] **World portal ambiance animation** (subtle breathing/parallax on the
-  banner).
+- [x] **World portal ambiance animation** — the banner variant's
+  pattern/atmosphere layer slowly breathes (scale) and the emblem drifts at
+  its own pace (parallax), via a new `WorldPortalBreath.tsx` client wrapper;
+  the dense `card` variant (world listings) is untouched and stays
+  server-safe.
 - [ ] **Choice/chapter micro-interaction animations.**
 
 ## 🔒 Blocked on ops / deploy
