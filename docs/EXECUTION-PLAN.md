@@ -68,8 +68,10 @@ The working order. Within each bucket, top-to-bottom is the suggested sequence;
   author reads, sharded reaction counters.
 - [ ] **M4. Characters Fold 2d.** Community curation/voting to surface the best
   characters; hand-picked "guest star" cameos beyond connection-based ones.
-- [ ] **M5. Co-op rooms PR2.** Frontier write-pause, host kick, ended summary,
-  stale-room cleanup.
+- [x] **M5. Co-op rooms PR2.** Frontier write-pause, host kick, ended summary,
+  stale-room cleanup. Landed, plus guest read-only accounts, Living World
+  panel + join interstitial + reading "Ready" gate, and softened benign
+  write-race errors.
 - [ ] **M6. New narrative shapes + AI-assisted detection** (melancholic /
   mystery / slice-of-life; classify-at-creation) — build as authors ask.
 
@@ -187,9 +189,16 @@ read caching, prompt-injection delimiters on user text.
 - [ ] **12. Collapse the 3 sequential per-chapter LLM calls.**
 - [ ] **13. Denormalize node ancestry (pathIds)** + bound/paginate author reads +
   sharded reaction counters.
-- [ ] **14. Cache the share-card / OG routes.**
-- [ ] **15. Handler/integration tests** for slot-fill and the Stripe webhook money
+- [ ] **14. Cache the share-card / OG routes.** _Partial: the `/api/share-card/*`
+  routes already send `Cache-Control: public, s-maxage=300,
+  stale-while-revalidate` via the shared `share-card.tsx` helper. The Next.js
+  `opengraph-image.tsx` special routes (stories/worlds/characters/root) still
+  have no explicit cache header — that half remains open._
+- [x] **15. Handler/integration tests** for slot-fill and the Stripe webhook money
   paths (reuse the proven `credit-manager.test.ts` firebase-admin mock).
+  _Done via S6 (`money-paths.test.ts`): exercises `postBounty`/`cancelBounty`/
+  `settleBountyOnFill` and `claimStripeEvent` idempotency against an
+  in-memory Firestore fake._
 - [x] **16. Rate-limit non-credit write endpoints** — fail-open throttle on
   `/api/feedback` and `/api/track`. _Remaining: meter world genesis, rate-limit
   `/api/ai/assist` questions mode, allowlist `/api/track` event names._

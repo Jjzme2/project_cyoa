@@ -136,8 +136,13 @@ validation, lint-debt cleanup)._
     target — the remainder is irreducible form/reader orchestration. Further
     splitting needs deep render extraction (risky prop-drilling) — left as a
     focused follow-up rather than forcing it._
-- [ ] Co-op reading rooms **PR 2** (frontier write-pause, host kick, ended
-  summary, stale-room cleanup).
+- [x] **Co-op reading rooms PR 2** — frontier write-pause (write the next
+  chapter in-room via the existing contribution endpoint; room advances for
+  everyone once published), host kick, ended summary (chapters traversed +
+  reader count), stale-member cleanup (>90s heartbeat prune, host
+  reassignment). Since followed by guest (read-only) accounts, a Living World
+  panel + join interstitial + reading-phase "Ready" gate, and softened benign
+  write-race errors.
 - [ ] Global leaderboards (denormalized aggregate counters).
 - [ ] Global bounty board (collection-group query + index).
 
@@ -145,7 +150,8 @@ validation, lint-debt cleanup)._
 
 Candidates that emerged from this session's work — not yet committed, ordered
 roughly by value. (Reader analytics, admin hub live counts, Users search, and
-telemetry retention already graduated into P0/P1 above.)
+telemetry retention already graduated into P0/P1 above; the `/api/track`
+abuse guard below was also already covered by the Tier-3 throttle work.)
 
 - [ ] **Author-reusable director presets** — let authors save a tuned director
   as a named preset and reuse it across stories; optionally share community
@@ -166,8 +172,8 @@ telemetry retention already graduated into P0/P1 above.)
   multi-size favicon/PWA icon set and a logo-bearing OG image.
 - [ ] **Analytics export** — CSV/JSON export of the analytics window for
   offline analysis.
-- [ ] **Abuse guard on `POST /api/track`** — rate-limit client-emitted events so
-  the telemetry collections can't be spammed.
+- [x] **Abuse guard on `POST /api/track`** — already throttled (`throttle('track:${uid}', 120, 60)`
+  in `src/app/api/track/route.ts`), same pass that covered `/api/feedback`.
 
 ## 🔒 Blocked on ops / deploy
 
