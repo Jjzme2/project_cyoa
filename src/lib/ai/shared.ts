@@ -1,9 +1,5 @@
 import { ENDING_TYPES, type EndingType, type StoryCharacter } from '@/types'
 
-export const PRIMARY_MODEL = 'google/gemini-2.5-pro'
-export const OPENROUTER_MODEL = 'google/gemma-4-31b-it:free'
-export const IMAGE_MODEL = 'google/gemini-2.5-flash-image-preview'
-
 export class PromptRejectedError extends Error {
   constructor(public readonly reason: string) {
     super(reason)
