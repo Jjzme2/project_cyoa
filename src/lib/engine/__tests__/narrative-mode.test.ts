@@ -1,8 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { resolveNarrativeMode, resolveStoryNarrativeMode, gentleModeDirective, gentleGoapFilter } from '@/lib/engine/narrative-mode'
+import {
+  resolveNarrativeMode,
+  resolveStoryNarrativeMode,
+  gentleModeDirective,
+  darkModeDirective,
+  absurdModeDirective,
+  narrativeModeDirective,
+  gentleGoapFilter,
+} from '@/lib/engine/narrative-mode'
 import { PlotPlanner } from '@/lib/engine/plot-planner'
 import { DramaManager } from '@/lib/engine/drama-manager'
 import { DifficultyManager } from '@/lib/engine/difficulty'
+import { InterludeDirector } from '@/lib/engine/interlude-director'
 
 const base = {
   tone: 'Epic Fantasy',
@@ -57,13 +66,41 @@ describe('resolveStoryNarrativeMode (the world clamp)', () => {
     expect(resolveStoryNarrativeMode(base, { narrativeMode: 'gentle' })).toBe('gentle')
   })
 
-  it('a gentle world is law — a story can never be overridden dramatic', () => {
+  it('a dramatic world may host a dark or absurd story too', () => {
+    expect(resolveStoryNarrativeMode(base, { narrativeMode: 'dark' })).toBe('dark')
+    expect(resolveStoryNarrativeMode(base, { narrativeMode: 'absurd' })).toBe('absurd')
+  })
+
+  it('a gentle world is law — a story can never be overridden dramatic, dark, or absurd', () => {
     expect(resolveStoryNarrativeMode(gentleWorld, { narrativeMode: 'dramatic' })).toBe('gentle')
+    expect(resolveStoryNarrativeMode(gentleWorld, { narrativeMode: 'dark' })).toBe('gentle')
+    expect(resolveStoryNarrativeMode(gentleWorld, { narrativeMode: 'absurd' })).toBe('gentle')
   })
 
   it('absent story mode inherits the world', () => {
     expect(resolveStoryNarrativeMode(base, {})).toBe('dramatic')
     expect(resolveStoryNarrativeMode(gentleWorld, undefined)).toBe('gentle')
+  })
+})
+
+describe('dark and absurd mode directives', () => {
+  it('the dark directive demands real, undone-able cost', () => {
+    const d = darkModeDirective()
+    expect(d).toMatch(/dread/i)
+    expect(d).toMatch(/do not soften/i)
+  })
+
+  it('the absurd directive demands deadpan sincerity', () => {
+    const d = absurdModeDirective()
+    expect(d).toMatch(/deadpan/i)
+    expect(d).toMatch(/surreal/i)
+  })
+
+  it('narrativeModeDirective dispatches to the right block, and is empty for dramatic', () => {
+    expect(narrativeModeDirective('dramatic')).toBe('')
+    expect(narrativeModeDirective('gentle')).toBe(gentleModeDirective())
+    expect(narrativeModeDirective('dark')).toBe(darkModeDirective())
+    expect(narrativeModeDirective('absurd')).toBe(absurdModeDirective())
   })
 })
 
@@ -134,5 +171,34 @@ describe('gentle pacing & stakes language', () => {
     expect(DifficultyManager.directive(0.9, 'gentle')).not.toMatch(/danger|threat/i)
     expect(DifficultyManager.directive(0.9, 'gentle')).toMatch(/matters deeply/i)
     expect(DifficultyManager.directive(0.9)).toMatch(/dangerous/i)
+  })
+})
+
+describe('dark & absurd pacing, stakes, and interludes', () => {
+  it('drama directives lean dark toward dread, absurd toward nonsense', () => {
+    const dm = new DramaManager()
+    expect(dm.directive('escalate', 'dark')).toMatch(/dread/i)
+    expect(dm.directive('respite', 'dark')).toMatch(/grim/i)
+    expect(dm.directive('escalate', 'absurd')).toMatch(/absurdity/i)
+    expect(dm.directive('respite', 'absurd')).toMatch(/deadpan/i)
+  })
+
+  it('difficulty directives read dark as cost and absurd as escalating illogic', () => {
+    expect(DifficultyManager.directive(0.9, 'dark')).toMatch(/irreversible|grim/i)
+    expect(DifficultyManager.directive(0.9, 'absurd')).toMatch(/illogic|over-the-top/i)
+  })
+
+  it('interludes pick the mode-appropriate table', () => {
+    const darkOut = InterludeDirector.decide({
+      nodePath: 'a', turnCount: 10, lastInterlude: 0, plotBeatIndex: 2, betrayalThisTurn: false, mode: 'dark',
+    })
+    expect(darkOut.fired).toBe(true)
+    expect(darkOut.directive).toMatch(/unsettling/i)
+
+    const absurdOut = InterludeDirector.decide({
+      nodePath: 'a', turnCount: 10, lastInterlude: 0, plotBeatIndex: 2, betrayalThisTurn: false, mode: 'absurd',
+    })
+    expect(absurdOut.fired).toBe(true)
+    expect(absurdOut.directive).toMatch(/bizarre/i)
   })
 })

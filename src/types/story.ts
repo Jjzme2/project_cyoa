@@ -148,10 +148,16 @@ export interface Story {
   endingConditions?: EndingCondition[]
   /**
    * This story's narrative shape, CLAMPED by its world: a dramatic world may
-   * host a gentle story; a gentle world's stories are always gentle. Absent =
-   * inherit the world's shape.
+   * host a gentle/dark/absurd/custom story; a gentle world's stories are
+   * always gentle. Absent = inherit the world's shape.
    */
-  narrativeMode?: 'gentle' | 'dramatic'
+  narrativeMode?: 'gentle' | 'dramatic' | 'dark' | 'absurd' | 'custom'
+  /**
+   * An author's AI-generated custom through-line (credit-gated), used only
+   * when `narrativeMode === 'custom'` — a wholly bespoke 4-beat arc instead of
+   * picking from the curated preset pools.
+   */
+  customNarrativeShape?: { name: string; beats: string[] }
 }
 
 export interface StoryNode {

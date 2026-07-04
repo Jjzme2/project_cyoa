@@ -1,4 +1,5 @@
 import type { EngineState } from '@/types'
+import type { NarrativeMode } from './narrative-mode'
 
 /** Never end before the story has had room to breathe. */
 export const ENDING_MIN_DEPTH = 4
@@ -19,7 +20,7 @@ const RESOLUTION_BEAT = 3
 export function endingDirective(
   depth: number,
   state: EngineState | undefined,
-  mode: 'dramatic' | 'gentle' = 'dramatic',
+  mode: NarrativeMode = 'dramatic',
 ): string {
   if (depth < ENDING_MIN_DEPTH) return ''
   const gentle = mode === 'gentle'

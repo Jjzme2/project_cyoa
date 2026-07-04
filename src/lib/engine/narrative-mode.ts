@@ -3,17 +3,20 @@ import type { World } from '@/types'
 /**
  * The narrative SHAPE of a world's stories.
  *
- * The engine's default arc machinery is conflict-driven (threats, betrayals,
- * stakes) — right for most worlds, quietly wrong for a world whose author built
- * a place where nothing bad happens. In a `gentle` world the climax is a moment
- * of wonder, connection, or achievement rather than a confrontation, and
- * "tension" is anticipation rather than danger.
- *
  * `dramatic` — the traditional arc: conflict, stakes, reckonings (default).
  * `gentle`   — conflict-free: arcs of wonder, friendship, and shared joy; no
  *              villains, threats, or manufactured danger, ever.
+ * `dark`     — heavier than dramatic: dread, moral cost, and consequences that
+ *              don't get undone; no guaranteed happy ending.
+ * `absurd`   — surreal and comedic: illogical escalation played with total
+ *              deadpan sincerity; the world is silly, everyone in it is not.
+ * `custom`   — an author's own AI-generated through-line (credit-gated),
+ *              stored on the story itself (`Story.customNarrativeShape`).
+ *
+ * Only `gentle` is ever auto-derived from a world's own text (see
+ * `resolveNarrativeMode`) — dark/absurd/custom are always an explicit choice.
  */
-export type NarrativeMode = 'dramatic' | 'gentle'
+export type NarrativeMode = 'dramatic' | 'gentle' | 'dark' | 'absurd' | 'custom'
 
 /** Tones that lean gentle on their own (still need corroboration to flip). */
 const GENTLE_TONES = new Set(['Whimsical Fairy Tale'])
@@ -111,4 +114,35 @@ export function gentleModeDirective(): string {
     'Climaxes are moments of joy, connection, discovery, or achievement. ' +
     'End chapters on warm anticipation or a delightful choice, never peril.'
   )
+}
+
+/** The overriding instruction block for a DARK world — leads the system events. */
+export function darkModeDirective(): string {
+  return (
+    'This is a DARK world: dread, moral cost, and consequences that do not get undone. ' +
+    'Do not soften outcomes or guarantee a happy ending — victories are costly, compromises are real, ' +
+    'and something is usually lost even when the protagonist "wins". ' +
+    'Let unease build quietly between chapters, not just in overt threats. ' +
+    'End chapters on a note of dread, grim resolve, or a choice with no clean option.'
+  )
+}
+
+/** The overriding instruction block for an ABSURD world — leads the system events. */
+export function absurdModeDirective(): string {
+  return (
+    'This is an ABSURD world: surreal and illogical, played with total deadpan sincerity. ' +
+    'Everyone in the story treats the nonsense as completely normal — the comedy comes from that sincerity, ' +
+    'never from characters winking at how silly it is. Let escalation compound: one absurdity invites the next. ' +
+    'End chapters on a fresh, straight-faced absurdity or a delightfully illogical choice.'
+  )
+}
+
+/** The mode-governing instruction block for `mode`, or '' for dramatic (no override needed). */
+export function narrativeModeDirective(mode: NarrativeMode): string {
+  switch (mode) {
+    case 'gentle': return gentleModeDirective()
+    case 'dark': return darkModeDirective()
+    case 'absurd': return absurdModeDirective()
+    default: return ''
+  }
 }

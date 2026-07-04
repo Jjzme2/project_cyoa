@@ -33,3 +33,54 @@ describe('PlotPlanner', () => {
     expect(PlotPlanner.init('whatever', prior)).toEqual(prior)
   })
 })
+
+describe('PlotPlanner — dark and absurd arcs', () => {
+  const DARK_IDS = ['creeping_corruption', 'debt_collector', 'last_good_thing', 'mask_slips']
+  const ABSURD_IDS = ['escalating_nonsense', 'bureaucracy_of_the_bizarre', 'wrong_hero', 'curse_of_mild_inconvenience']
+
+  it('a dark world only draws dark arcs, and chains within them', () => {
+    let state = PlotPlanner.init('The Long Rot', undefined, undefined, 'dark')
+    expect(DARK_IDS).toContain(state.arcId)
+    for (let i = 0; i < 30; i++) {
+      state = PlotPlanner.advance(state)
+      expect(DARK_IDS).toContain(state.arcId)
+    }
+    expect(state.arcsCompleted ?? 0).toBeGreaterThan(0)
+  })
+
+  it('an absurd world only draws absurd arcs, and chains within them', () => {
+    let state = PlotPlanner.init('The Silly Kingdom', undefined, undefined, 'absurd')
+    expect(ABSURD_IDS).toContain(state.arcId)
+    for (let i = 0; i < 30; i++) {
+      state = PlotPlanner.advance(state)
+      expect(ABSURD_IDS).toContain(state.arcId)
+    }
+    expect(state.arcsCompleted ?? 0).toBeGreaterThan(0)
+  })
+})
+
+describe('PlotPlanner — custom AI-generated arc', () => {
+  const customArc = { name: 'The Clockwork Heart', beats: ['wind it', 'test it', 'break it', 'mend it'] }
+
+  it('a custom mode with a provided arc seeds directly from it', () => {
+    const state = PlotPlanner.init('Any Title', undefined, undefined, 'custom', customArc)
+    expect(state.arcId).toBe('custom')
+    expect(state.customArc).toEqual(customArc)
+    expect(PlotPlanner.directive(state)).toContain('The Clockwork Heart')
+    expect(PlotPlanner.directive(state)).toContain('wind it')
+  })
+
+  it('replays the same custom arc as a fresh movement once its beats are exhausted', () => {
+    let state = PlotPlanner.init('Any Title', undefined, undefined, 'custom', customArc)
+    for (let i = 0; i < 8; i++) state = PlotPlanner.advance(state)
+    expect(state.beatIndex).toBe(0)
+    expect(state.arcsCompleted).toBe(1)
+    expect(state.customArc).toEqual(customArc)
+    expect(PlotPlanner.directive(state)).toContain('movement 2')
+  })
+
+  it('falls back to the curated dramatic pool if custom mode has no arc yet', () => {
+    const state = PlotPlanner.init('Any Title', undefined, undefined, 'custom', undefined)
+    expect(state.arcId).not.toBe('custom')
+  })
+})

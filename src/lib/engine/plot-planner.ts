@@ -15,6 +15,8 @@ export interface PlotState {
   turnsOnBeat: number;
   /** How many through-lines have already resolved — long stories chain arcs. */
   arcsCompleted?: number;
+  /** A per-story AI-generated custom arc (credit-gated), overriding the curated pools entirely. */
+  customArc?: { name: string; beats: string[] };
 }
 
 /** Narrative phase for a beat, so the prompt conveys where in the arc we are. */
@@ -118,8 +120,112 @@ const GENTLE_ARCS: PlotArc[] = [
   },
 ];
 
-const ALL_ARCS = [...ARCS, ...GENTLE_ARCS];
+/**
+ * DARK through-lines: heavier than the default dramatic pool — dread, moral
+ * cost, and consequences that don't get undone. No guaranteed happy ending.
+ */
+const DARK_ARCS: PlotArc[] = [
+  {
+    id: 'creeping_corruption',
+    name: 'Creeping Corruption',
+    beats: [
+      'let a small, easily-justified compromise take root, rotting something from within',
+      'let the compromises accumulate, each one a little easier to justify than the last',
+      'reveal exactly how deep the rot has gone — far further than anyone admitted',
+      'force a choice between costs, with no clean way out',
+    ],
+  },
+  {
+    id: 'debt_collector',
+    name: 'The Debt Collector',
+    beats: [
+      'surface an old debt or wrong that was never truly settled',
+      'let the price being demanded for it grow crueler than expected',
+      'strike a desperate bargain to satisfy it',
+      'pay the bargain’s true cost in full, and let it hurt',
+    ],
+  },
+  {
+    id: 'last_good_thing',
+    name: 'The Last Good Thing',
+    beats: [
+      'establish something precious, now threatened by encroaching ruin',
+      'let every attempt to protect it cost more than it should',
+      'lose it, or hollow it out, despite everything done to save it',
+      'carry the grief of it forward, changed',
+    ],
+  },
+  {
+    id: 'mask_slips',
+    name: 'The Mask Slips',
+    beats: [
+      'show the first hairline crack in someone deeply trusted',
+      'let the crack widen despite every reassurance that all is well',
+      'expose the true rot beneath the mask at the cruelest possible moment',
+      'reckon with having to live alongside who they really are',
+    ],
+  },
+];
+
+/**
+ * ABSURD through-lines: surreal, comedic escalation played with total deadpan
+ * sincerity — the world is silly, nobody in it treats it that way.
+ */
+const ABSURD_ARCS: PlotArc[] = [
+  {
+    id: 'escalating_nonsense',
+    name: 'Escalating Nonsense',
+    beats: [
+      'introduce a small oddity that everyone treats with total, straight-faced sincerity',
+      'let the oddity compound — each development sillier than the last, taken completely seriously',
+      'spiral the nonsense into full, glorious absurd chaos',
+      'resolve it with an utterly unbothered, deadpan shrug',
+    ],
+  },
+  {
+    id: 'bureaucracy_of_the_bizarre',
+    name: 'The Bureaucracy of the Bizarre',
+    beats: [
+      'introduce an inexplicable rule, form, or institution that intrudes on ordinary life',
+      'demand ever-more-ridiculous compliance with it, played entirely straight',
+      'reveal the rule’s absurd, self-defeating internal logic',
+      'win not by fighting the nonsense but by embracing it completely',
+    ],
+  },
+  {
+    id: 'wrong_hero',
+    name: 'The Wrong Hero',
+    beats: [
+      'have someone utterly unsuited mistaken for a legendary figure',
+      'let the misunderstanding snowball as everyone commits harder to the bit',
+      'nearly expose the truth at the worst, most public possible moment',
+      'lean into the role anyway, absurdly, and have it somehow work',
+    ],
+  },
+  {
+    id: 'curse_of_mild_inconvenience',
+    name: 'The Curse of Mild Inconvenience',
+    beats: [
+      'afflict the protagonist with a trivial, faintly ridiculous curse or mishap',
+      'let it compound in increasingly silly, entirely harmless ways',
+      'attempt an over-the-top ritual or "fix" for it',
+      'have the fix produce an even sillier side effect everyone simply accepts',
+    ],
+  },
+];
+
+const ALL_ARCS = [...ARCS, ...GENTLE_ARCS, ...DARK_ARCS, ...ABSURD_ARCS];
 const GENTLE_IDS = new Set(GENTLE_ARCS.map((a) => a.id));
+const DARK_IDS = new Set(DARK_ARCS.map((a) => a.id));
+const ABSURD_IDS = new Set(ABSURD_ARCS.map((a) => a.id));
+
+/** The arc's own family pool, for chaining into a fresh movement of the same kind. */
+function familyOf(arcId: string): PlotArc[] {
+  if (GENTLE_IDS.has(arcId)) return GENTLE_ARCS;
+  if (DARK_IDS.has(arcId)) return DARK_ARCS;
+  if (ABSURD_IDS.has(arcId)) return ABSURD_ARCS;
+  return ARCS;
+}
 
 const CHAPTERS_PER_BEAT = 2;
 
@@ -128,16 +234,22 @@ export const PlotPlanner = {
     storyTitle: string,
     prior?: PlotState,
     persona?: { darkness?: number },
-    mode: 'dramatic' | 'gentle' = 'dramatic',
+    mode: 'dramatic' | 'gentle' | 'dark' | 'absurd' | 'custom' = 'dramatic',
+    customArc?: { name: string; beats: string[] },
   ): PlotState {
     if (prior) return prior;
-    // A gentle world draws only from the conflict-free arcs; a dramatic one
-    // keeps the traditional pool, leaned by the director's darkness (dark steers
-    // away from the heroic alliance arc; warm steers toward it).
+    if (mode === 'custom' && customArc && customArc.beats.length > 0) {
+      return { arcId: 'custom', beatIndex: 0, turnsOnBeat: 0, arcsCompleted: 0, customArc };
+    }
+    // A gentle/dark/absurd world draws only from its own curated pool; a
+    // dramatic one keeps the traditional pool, leaned by the director's
+    // darkness (dark steers away from the heroic alliance arc; warm steers
+    // toward it).
     let pool: PlotArc[];
-    if (mode === 'gentle') {
-      pool = GENTLE_ARCS;
-    } else {
+    if (mode === 'gentle') pool = GENTLE_ARCS;
+    else if (mode === 'dark') pool = DARK_ARCS;
+    else if (mode === 'absurd') pool = ABSURD_ARCS;
+    else {
       const dark = persona?.darkness ?? 0;
       pool = ARCS;
       if (dark > 0.3) pool = ARCS.filter((a) => a.id !== 'forge_and_test');
@@ -148,9 +260,21 @@ export const PlotPlanner = {
   },
 
   advance(state: PlotState): PlotState {
-    const arc = ALL_ARCS.find((a) => a.id === state.arcId) ?? ARCS[0];
     const arcsCompleted = state.arcsCompleted ?? 0;
     const turnsOnBeat = state.turnsOnBeat + 1;
+
+    if (state.customArc) {
+      if (turnsOnBeat >= CHAPTERS_PER_BEAT) {
+        if (state.beatIndex < state.customArc.beats.length - 1) {
+          return { ...state, beatIndex: state.beatIndex + 1, turnsOnBeat: 0, arcsCompleted };
+        }
+        // A custom arc has no siblings to chain into — replay it as a fresh movement.
+        return { ...state, beatIndex: 0, turnsOnBeat: 0, arcsCompleted: arcsCompleted + 1 };
+      }
+      return { ...state, turnsOnBeat, arcsCompleted };
+    }
+
+    const arc = ALL_ARCS.find((a) => a.id === state.arcId) ?? ARCS[0];
 
     if (turnsOnBeat >= CHAPTERS_PER_BEAT) {
       if (state.beatIndex < arc.beats.length - 1) {
@@ -159,9 +283,9 @@ export const PlotPlanner = {
       // The arc has resolved. Rather than plateau on the final beat (which made
       // long stories stall), chain into a fresh through-line — a new movement —
       // deterministically chosen so it differs from the one that just ended.
-      // Chaining stays within the arc's own family: a gentle story never drifts
-      // into a betrayal arc (and vice versa).
-      const family = GENTLE_IDS.has(arc.id) ? GENTLE_ARCS : ARCS;
+      // Chaining stays within the arc's own family (gentle/dark/absurd/dramatic
+      // never drift into one another).
+      const family = familyOf(arc.id);
       const others = family.filter((a) => a.id !== arc.id);
       const next = others[(arcsCompleted + SeededRNG.hashString(arc.id)) % others.length];
       return { arcId: next.id, beatIndex: 0, turnsOnBeat: 0, arcsCompleted: arcsCompleted + 1 };
@@ -170,6 +294,13 @@ export const PlotPlanner = {
   },
 
   directive(state: PlotState): string {
+    if (state.customArc) {
+      const i = Math.min(state.beatIndex, state.customArc.beats.length - 1);
+      const beat = state.customArc.beats[i];
+      const phase = PHASES[Math.min(i, PHASES.length - 1)];
+      const movement = (state.arcsCompleted ?? 0) > 0 ? ` (movement ${(state.arcsCompleted ?? 0) + 1})` : '';
+      return `Story through-line${movement} — "${state.customArc.name}", ${phase}: ${beat}.`;
+    }
     const arc = ALL_ARCS.find((a) => a.id === state.arcId);
     if (!arc) return '';
     const i = Math.min(state.beatIndex, arc.beats.length - 1);

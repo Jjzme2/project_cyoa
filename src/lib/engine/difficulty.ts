@@ -26,13 +26,24 @@ export const DifficultyManager = {
 
   /**
    * In a GENTLE world the same curve measures how much the moment MEANS, not how
-   * dangerous it is — significance instead of peril.
+   * dangerous it is — significance instead of peril. DARK reads it as moral/
+   * physical cost; ABSURD as how far the nonsense has escalated.
    */
-  directive(level: number, mode: 'dramatic' | 'gentle' = 'dramatic'): string {
+  directive(level: number, mode: 'dramatic' | 'gentle' | 'dark' | 'absurd' | 'custom' = 'dramatic'): string {
     if (mode === 'gentle') {
       if (level >= 0.66) return 'This moment matters deeply — let its emotional weight be felt: something long-awaited, dearly hoped-for, or quietly profound.';
       if (level >= 0.33) return 'The moment carries real meaning — let choices touch hearts and friendships in ways that matter.';
       return 'Keep things light and easeful — small pleasures, low ceremony.';
+    }
+    if (mode === 'dark') {
+      if (level >= 0.66) return 'The cost is severe — let consequences be genuinely grim, irreversible, and morally costly.';
+      if (level >= 0.33) return 'The stakes carry real weight — choices should cost something that cannot be undone.';
+      return 'Even the small things carry a faint unease — nothing here is entirely safe.';
+    }
+    if (mode === 'absurd') {
+      if (level >= 0.66) return 'The absurdity has reached its peak — let the illogic be total and gloriously over-the-top.';
+      if (level >= 0.33) return 'The nonsense is escalating nicely — let obstacles be silly but strangely committed to their own internal logic.';
+      return 'Keep the strangeness low-key for now — a faint wrongness, played completely straight.';
     }
     if (level >= 0.66) return 'The stakes are dire — make threats and obstacles genuinely dangerous and costly.';
     if (level >= 0.33) return 'The stakes are real — challenges should carry meaningful risk.';

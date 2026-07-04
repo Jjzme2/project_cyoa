@@ -13,6 +13,7 @@ export {
   generateSagaOpening,
   generateStoryNode,
   elaborateWorldBible,
+  generateCustomNarrativeShape,
 } from './ai/content'
 export { reviewContribution, judgeContent, type ContributionReview, type ContentJudgment } from './ai/review'
 export {
