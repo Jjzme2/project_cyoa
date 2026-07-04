@@ -12,17 +12,17 @@ The working order. Within each bucket, top-to-bottom is the suggested sequence;
 
 ### ⚡ Quick wins (≤ ~1 hour each)
 
-- [ ] **Q1. Mode-aware wording polish.** The last dramatic-flavoured strings in
+- [x] **Q1. Mode-aware wording polish.** The last dramatic-flavoured strings in
   shared surfaces: the chapter prompt's choice guidance ("one bold, one
   cautious, one cunning" / "moment of decision or tension"), the ending-invite
   metaphors ("the storm has passed"), and the Living World panel's tension
   labels — gentle worlds should read "Anticipation", not "At a knife's edge".
-- [ ] **Q2. Gentle-world badge.** Surface `resolveNarrativeMode` on world cards
+- [x] **Q2. Gentle-world badge.** Surface `resolveNarrativeMode` on world cards
   and the world page (a small leaf/heart badge) so gentle worlds are visibly
   gentle — useful for parents and for setting expectations before writing.
-- [ ] **Q3. `/api/track` event-name allowlist.** Client can currently emit any
+- [x] **Q3. `/api/track` event-name allowlist.** Client can currently emit any
   event name into analytics; constrain to a known list.
-- [ ] **Q4. Meter the remaining AI surfaces.** Rate-limit `/api/ai/assist`
+- [x] **Q4. Meter the remaining AI surfaces.** Rate-limit `/api/ai/assist`
   questions mode; meter world-genesis generation.
 
 ### 🚶 Same-day items (roughly 2–5 hours each)

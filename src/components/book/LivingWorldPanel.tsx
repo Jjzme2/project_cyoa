@@ -16,8 +16,11 @@ export function LivingWorldPanel({ pulse }: { pulse?: WorldPulse }) {
   if (!hasPulse(pulse)) return null
 
   const pct = Math.round(pulse.tension * 100)
-  // Tension colour shifts calm → fevered.
-  const hue = Math.round(140 - pulse.tension * 140) // 140 (green) → 0 (red)
+  // Dramatic worlds shift calm → fevered (green → red); gentle worlds read the
+  // same curve as anticipation and warm from green → gold instead.
+  const hue = pulse.gentle
+    ? Math.round(140 - pulse.tension * 60) // 140 (green) → 80 (gold)
+    : Math.round(140 - pulse.tension * 140) // 140 (green) → 0 (red)
   const tensionColor = `oklch(0.62 0.17 ${hue})`
 
   const border = 'color-mix(in oklch, var(--page-text) 16%, transparent)'
@@ -31,7 +34,7 @@ export function LivingWorldPanel({ pulse }: { pulse?: WorldPulse }) {
       >
         <Activity className="h-3.5 w-3.5" style={{ color: tensionColor }} />
         <span className="uppercase tracking-widest text-[10px] opacity-60">Living world</span>
-        <span className="opacity-80" style={{ color: tensionColor }}>{tensionLabel(pulse.tension)}</span>
+        <span className="opacity-80" style={{ color: tensionColor }}>{tensionLabel(pulse.tension, pulse.gentle)}</span>
         <ChevronDown className={`h-3.5 w-3.5 ml-auto opacity-50 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
@@ -39,7 +42,7 @@ export function LivingWorldPanel({ pulse }: { pulse?: WorldPulse }) {
         <div className="px-3 pb-3 space-y-2.5">
           <div className="space-y-1">
             <div className="flex items-center justify-between text-[10px] uppercase tracking-wide opacity-55 font-sans">
-              <span>Tension</span>
+              <span>{pulse.gentle ? 'Anticipation' : 'Tension'}</span>
               <span>{pct}%</span>
             </div>
             <div className="h-1.5 rounded-full overflow-hidden" style={{ background: faint }}>

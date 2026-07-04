@@ -6,6 +6,7 @@ import { Search, X, Globe, BookOpen, Feather, SlidersHorizontal } from 'lucide-r
 import { CONTENT_RATING_META } from '@/types'
 import { SeededBadge } from '@/components/ContentBadges'
 import { truncateAtWord } from '@/lib/utils'
+import { resolveNarrativeMode } from '@/lib/engine/narrative-mode'
 import { WorldPortal } from '@/components/world/WorldPortal'
 import { themeForTone, DEFAULT_WORLD_THEME } from '@/components/world/world-theme'
 import type { World } from '@/types'
@@ -79,6 +80,14 @@ function WorldCard({ world }: { world: WorldWithCount }) {
             </Link>
           </h2>
           <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+            {resolveNarrativeMode(world) === 'gentle' && (
+              <span
+                className="text-[10px] font-sans font-semibold px-1.5 py-0.5 rounded-full border text-emerald-300 bg-emerald-500/10 border-emerald-500/25"
+                title="A gentle world — stories of wonder, friendship, and joy; nothing bad happens here"
+              >
+                🌿 Gentle
+              </span>
+            )}
             {world.rating && (
               <span
                 className={`text-[10px] font-sans font-semibold px-1.5 py-0.5 rounded-full border ${CONTENT_RATING_META[world.rating].className}`}

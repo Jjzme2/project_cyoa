@@ -13,6 +13,21 @@ const TrackSchema = z.object({
 })
 
 /**
+ * The only event names the CLIENT may emit — everything else is dropped
+ * silently, so the analytics collections can't be polluted with arbitrary
+ * names. Server-side emitters are unaffected (they don't go through here).
+ */
+const CLIENT_EVENT_ALLOWLIST = new Set([
+  'story.opened',
+  'chapter.reached',
+  'ending.reached',
+  'onboarding.jumped_in',
+  'onboarding.welcome_shown',
+  'onboarding.welcome_dismissed',
+  'onboarding.first_write_nudged',
+])
+
+/**
  * Client → server bridge for tracking. Authenticated callers POST
  * `{ channel, name, props }`; the event is attributed to their uid. Defaults to
  * the analytics channel. Tracking failures are swallowed server-side, so this
@@ -25,6 +40,12 @@ export async function POST(req: NextRequest) {
   const parsed = await parseJson(req, TrackSchema)
   if (!parsed.ok) return parsed.response
   const { channel, name, props } = parsed.data
+
+  // Unknown event names are dropped silently — tracking is best-effort, and a
+  // 200 keeps old/modified clients from retry-hammering.
+  if (!CLIENT_EVENT_ALLOWLIST.has(name)) {
+    return NextResponse.json({ ok: true, dropped: true })
+  }
 
   // Abuse guard: cap client-emitted events per minute. Excess is dropped
   // silently — tracking is best-effort, so this stays a 200 either way.
