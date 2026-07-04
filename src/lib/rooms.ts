@@ -51,12 +51,18 @@ async function enterNode(ref: FirebaseFirestore.DocumentReference, storyId: stri
   const next = await statusForNode(storyId, nodeId)
   const now = new Date()
   if (next === 'ended') {
-    await ref.update({ status: 'ended', pendingStatus: FieldValue.delete(), lastActivity: now.toISOString() })
+    await ref.update({
+      status: 'ended',
+      endedReason: 'story',
+      pendingStatus: FieldValue.delete(),
+      lastActivity: now.toISOString(),
+    })
     return
   }
   await ref.update({
     status: 'reading',
     pendingStatus: next,
+    endedReason: FieldValue.delete(),
     ready: {},
     roundEndsAt: new Date(now.getTime() + READING_SECONDS * 1000).toISOString(),
     lastActivity: now.toISOString(),
@@ -83,6 +89,7 @@ function pruneStaleMembers(data: Room, update: Record<string, unknown>): void {
   const remaining = Object.keys(data.members)
   if (remaining.length === 0) {
     update.status = 'ended'
+    update.endedReason = 'empty'
   } else if (!host) {
     update.hostId = remaining[0] // promote someone if the host went stale
   }
@@ -122,7 +129,7 @@ export async function createRoom(
     storyTitle: story.title,
     hostId: host.uid,
     status,
-    ...(status === 'reading' ? { pendingStatus: next } : {}),
+    ...(status === 'reading' ? { pendingStatus: next } : { endedReason: 'story' as const }),
     currentNodeId: story.rootNodeId,
     round: 1,
     roundEndsAt: new Date(now.getTime() + (status === 'reading' ? READING_SECONDS : ROUND_SECONDS) * 1000).toISOString(),
@@ -137,14 +144,19 @@ export async function createRoom(
   return { roomId: ref.id }
 }
 
+type Revive = { storyId: string; currentNodeId: string } | null
+
 export async function joinRoom(roomId: string, actor: Actor): Promise<{ error?: string }> {
   const ref = roomRef(roomId)
   let error: string | undefined
-  await adminDb.runTransaction(async (txn) => {
+
+  // Non-null only when a rejoin lands on a room that "ended" purely because
+  // everyone left (not a genuine story conclusion) — revived right after.
+  const revive = await adminDb.runTransaction<Revive>(async (txn) => {
     const doc = await txn.get(ref)
     if (!doc.exists) {
       error = 'Room not found.'
-      return
+      return null
     }
     const data = doc.data() as Room
     const now = new Date().toISOString()
@@ -153,21 +165,34 @@ export async function joinRoom(roomId: string, actor: Actor): Promise<{ error?: 
     if (data.members[actor.uid]) data.members[actor.uid].lastSeen = now
     const update: Record<string, unknown> = { lastActivity: now }
     pruneStaleMembers(data, update)
+
+    const wasEmptyEnded = data.status === 'ended' && data.endedReason === 'empty'
+    const revive: Revive = wasEmptyEnded ? { storyId: data.storyId, currentNodeId: data.currentNodeId } : null
+
     if (data.members[actor.uid]) {
       // Already a member — just refresh presence.
       update[`members.${actor.uid}.lastSeen`] = now
       delete update.status // rejoining keeps the room alive
+      delete update.endedReason
       txn.update(ref, update)
-      return
+      return revive
     }
     if (Object.keys(data.members).length >= MAX_MEMBERS) {
       error = 'This room is full.'
-      return
+      return null
     }
     update[`members.${actor.uid}`] = member(actor)
     delete update.status // a new member keeps the room alive
+    delete update.endedReason
     txn.update(ref, update)
+    return revive
   })
+
+  // A room that only "ended" because everyone left is revived to wherever the
+  // story actually is — a genuine story conclusion is never revived this way.
+  if (!error && revive) {
+    await enterNode(ref, revive.storyId, revive.currentNodeId)
+  }
   return { error }
 }
 

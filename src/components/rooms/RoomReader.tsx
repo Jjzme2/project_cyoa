@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { toast } from 'sonner'
-import { Loader2, Users, Share2, SkipForward, Check, Crown, BookOpen, BookOpenCheck, Feather, X } from 'lucide-react'
+import { Loader2, Users, Share2, LogOut, SkipForward, Check, Crown, BookOpen, BookOpenCheck, Feather, X } from 'lucide-react'
 import { db } from '@/lib/firebase-client'
 import { useAuth } from '@/components/Providers'
 import { trackEvent } from '@/lib/track-client'
@@ -23,6 +24,7 @@ function initials(name: string): string {
 
 export function RoomReader({ roomId }: { roomId: string }) {
   const { user, loading, openAuthModal } = useAuth()
+  const router = useRouter()
   const [room, setRoom] = useState<Room | null>(null)
   const [roomMissing, setRoomMissing] = useState(false)
   const [node, setNode] = useState<StoryNode | null>(null)
@@ -95,10 +97,14 @@ export function RoomReader({ roomId }: { roomId: string }) {
   }, [user, roomId])
 
   // Join once confirmed — either a button click (first-time visitor) or
-  // already being a known member (returning mid-session) — leave on unmount.
-  // Deliberately does NOT depend on `room` itself: the doc updates on every
-  // heartbeat, and re-running this effect would call the cleanup (leave!) on
-  // every tick. `isKnownMember` is a derived boolean that settles once.
+  // already being a known member (returning mid-session). Deliberately does
+  // NOT leave on unmount: navigating away (or just closing the tab) shouldn't
+  // instantly evict you — you can come right back. Presence instead decays
+  // naturally via the heartbeat/stale-prune mechanism (see rooms.ts), and an
+  // explicit "Leave room" action (below) is available for a deliberate exit.
+  // Also does NOT depend on `room` itself: the doc updates on every heartbeat,
+  // and re-running this effect on that would call `/join` repeatedly.
+  // `isKnownMember` is a derived boolean that settles once.
   useEffect(() => {
     if (!user || joinedRef.current || !(joinConfirmed || isKnownMember)) return
     joinedRef.current = true
@@ -106,9 +112,6 @@ export function RoomReader({ roomId }: { roomId: string }) {
       if (e.message.includes('age_restricted')) setAgeBlocked(true)
       else toast.error(e.message)
     })
-    return () => {
-      api('/leave').catch(() => {})
-    }
   }, [user, api, joinConfirmed, isKnownMember])
 
   // Presence heartbeat.
@@ -202,6 +205,13 @@ export function RoomReader({ roomId }: { roomId: string }) {
       .writeText(window.location.href)
       .then(() => toast.success('Room link copied — share it to read together.'))
       .catch(() => toast.error('Could not copy the link.'))
+  }
+
+  // A deliberate exit — unlike simply navigating away (which no longer leaves
+  // you, so you can come right back), this frees your spot immediately.
+  async function leaveForGood() {
+    await api('/leave').catch(() => {})
+    router.push('/stories')
   }
 
   // Write a new path at a frontier (reuses the normal contribution endpoint),
@@ -342,6 +352,9 @@ export function RoomReader({ roomId }: { roomId: string }) {
           </div>
           <button onClick={share} title="Copy room link" className="text-muted-foreground/50 hover:text-amber-300 transition-colors">
             <Share2 className="h-4 w-4" />
+          </button>
+          <button onClick={leaveForGood} title="Leave this room" className="text-muted-foreground/50 hover:text-red-400 transition-colors">
+            <LogOut className="h-4 w-4" />
           </button>
         </div>
       </div>

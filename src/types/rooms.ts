@@ -22,6 +22,12 @@ export interface Room {
   status: RoomStatus
   /** Only meaningful while `status === 'reading'` — what to become once the gate resolves. */
   pendingStatus?: RoomStatus
+  /**
+   * Only meaningful while `status === 'ended'` — distinguishes a genuine story
+   * conclusion ('story') from every member having left ('empty'), so a later
+   * rejoin can revive an 'empty' room instead of showing a false ending.
+   */
+  endedReason?: 'story' | 'empty'
   currentNodeId: string
   round: number
   /** ISO timestamp the current phase (reading gate or voting round) closes. */
