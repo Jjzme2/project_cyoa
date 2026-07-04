@@ -121,9 +121,16 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
   const ambientEffect = story.readingTheme?.ambientEffect ?? 'none'
 
   // Start/stop the looping soundscape with the toggle (and clean up on unmount).
+  // Delayed slightly: ambient can auto-start from a preference saved in a PRIOR
+  // session, with no fresh gesture — the short delay gives FirstSoundNotice
+  // (shown ~300ms after mount) time to be on screen before audio actually begins.
   useEffect(() => {
-    if (ambientOn && ambientEffect !== 'none') startAmbient(ambientEffect)
-    return () => stopAmbient()
+    if (!(ambientOn && ambientEffect !== 'none')) return
+    const id = setTimeout(() => startAmbient(ambientEffect), 500)
+    return () => {
+      clearTimeout(id)
+      stopAmbient()
+    }
   }, [ambientOn, ambientEffect])
 
   function toggleAmbient() {
