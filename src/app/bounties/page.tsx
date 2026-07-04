@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
+import { connection } from 'next/server'
 import Link from 'next/link'
 import { Coins, BookOpen } from 'lucide-react'
 import { listOpenBounties } from '@/lib/firestore-helpers'
@@ -19,6 +20,7 @@ function timeAgo(iso: string): string {
 }
 
 async function BountiesContent() {
+  await connection() // live data — render at request time (Cache Components)
   let bounties: Awaited<ReturnType<typeof listOpenBounties>> = []
   let ready = true
   try {

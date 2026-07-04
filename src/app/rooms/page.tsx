@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
+import { connection } from 'next/server'
 import Link from 'next/link'
 import { Users, BookOpen } from 'lucide-react'
 import { listActiveRooms } from '@/lib/rooms'
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
 }
 
 async function RoomsContent() {
+  await connection() // live data — render at request time (Cache Components)
   const rooms = await listActiveRooms(30).catch(() => [])
 
   return (
