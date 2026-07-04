@@ -149,6 +149,12 @@ validation, lint-debt cleanup)._
   (reader, profile, library), tracks its own stats, and levels up as the
   reader/writer plays; progression ties into the existing achievement system
   (Tier 2 #9 in `docs/EXECUTION-PLAN.md`; richer triggers need 9b first).
+- [ ] **Custom AI-generated narrative shapes** — an author spends credits to
+  have the AI generate a wholly custom narrative shape for their world (its
+  own arc pool, pacing/stakes flavor, climax types), instead of picking from a
+  fixed dramatic/gentle/preset list. Distinct from EXECUTION-PLAN.md M6 (more
+  *preset* shapes chosen by the team + AI auto-classification) — this is
+  per-world, author-initiated, and AI-generated on demand.
 
 ## 💡 Ideas & suggestions (surfaced while building)
 
