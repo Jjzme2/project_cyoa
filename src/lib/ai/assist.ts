@@ -1,7 +1,6 @@
-import { generateText, APICallError } from 'ai'
-import { createOpenAI } from '@ai-sdk/openai'
 import type { ContentRating } from '@/types'
-import { PRIMARY_MODEL, OPENROUTER_MODEL, VALID_TONES, VALID_TAGS, tryParseJSON } from './shared'
+import { VALID_TONES, VALID_TAGS, NAME_DIVERSITY_NOTE, tryParseJSON } from './shared'
+import { runTextWaterfall } from './waterfall'
 import { userInputBlock } from './prompts'
 
 /**
@@ -48,7 +47,7 @@ const STORY_FIELD_SPECS: Record<string, string> = {
   title: '"title": the story title',
   description: '"description": a 1-2 sentence tagline (under 240 characters)',
   opening: '"opening": the opening chapter, 130-160 words, immersive, ending at a moment of decision or tension',
-  protagonistName: '"protagonistName": the protagonist\'s name, or an empty string if the story has no fixed protagonist',
+  protagonistName: `"protagonistName": the protagonist's name, or an empty string if the story has no fixed protagonist — if named, ${NAME_DIVERSITY_NOTE}`,
   protagonistDesc: '"protagonistDesc": a one-line protagonist description, or an empty string if none',
   choice1: '"choice1": first path option, under 10 words',
   choice2: '"choice2": second path option, under 10 words',
@@ -77,28 +76,15 @@ const STATIC_QUESTIONS: Record<AssistType, string[]> = {
 
 // ── Model plumbing ──────────────────────────────────────────────────────────
 
-/** Run a JSON-returning prompt on the primary model, falling back to OpenRouter. */
+/** Run a JSON-returning prompt through the shared text waterfall. */
 async function runJSON(
   aiPrompt: string,
   userId: string,
   maxOutputTokens: number,
   feature: string,
 ): Promise<Record<string, unknown>> {
-  try {
-    const result = await generateText({
-      model: PRIMARY_MODEL,
-      prompt: aiPrompt,
-      maxOutputTokens,
-      providerOptions: { gateway: { user: userId, tags: [`feature:${feature}`, 'env:production'] } },
-    })
-    return tryParseJSON(result.text)
-  } catch (error) {
-    if (APICallError.isInstance(error) && (error.statusCode === 402 || error.statusCode === 429)) throw error
-    if (!process.env.OPENROUTER_API_KEY) throw error
-    const openrouter = createOpenAI({ baseURL: 'https://openrouter.ai/api/v1', apiKey: process.env.OPENROUTER_API_KEY })
-    const result = await generateText({ model: openrouter(OPENROUTER_MODEL), prompt: aiPrompt, maxOutputTokens })
-    return tryParseJSON(result.text)
-  }
+  const { text } = await runTextWaterfall({ prompt: aiPrompt, userId, maxOutputTokens, feature })
+  return tryParseJSON(text)
 }
 
 /** A prompt-injection-guarded block carrying the idea and any clarifying answers. */

@@ -1,7 +1,6 @@
-import { generateText, APICallError } from 'ai'
-import { createOpenAI } from '@ai-sdk/openai'
 import type { ModerationResult, ModerationAction } from '../moderation'
-import { PRIMARY_MODEL, OPENROUTER_MODEL, tryParseJSON } from './shared'
+import { tryParseJSON } from './shared'
+import { runTextWaterfall } from './waterfall'
 import { type WorldContext } from './prompts'
 
 export interface ContributionReview {
@@ -64,25 +63,10 @@ Respond with ONLY valid JSON, no markdown:
   }
 
   try {
-    const result = await generateText({
-      model: PRIMARY_MODEL,
-      prompt: aiPrompt,
-      maxOutputTokens: 200,
-      providerOptions: { gateway: { user: userId, tags: ['feature:editor', 'env:production'] } },
-    })
-    return normalize(tryParseJSON(result.text))
-  } catch (error) {
-    if (APICallError.isInstance(error) && (error.statusCode === 402 || error.statusCode === 429)) {
-      return { verdict: 'ok', text: original } // fail open
-    }
-    if (!process.env.OPENROUTER_API_KEY) return { verdict: 'ok', text: original }
-    try {
-      const openrouter = createOpenAI({ baseURL: 'https://openrouter.ai/api/v1', apiKey: process.env.OPENROUTER_API_KEY })
-      const result = await generateText({ model: openrouter(OPENROUTER_MODEL), prompt: aiPrompt, maxOutputTokens: 200 })
-      return normalize(tryParseJSON(result.text))
-    } catch {
-      return { verdict: 'ok', text: original } // fail open
-    }
+    const { text } = await runTextWaterfall({ prompt: aiPrompt, userId, maxOutputTokens: 200, feature: 'editor' })
+    return normalize(tryParseJSON(text))
+  } catch {
+    return { verdict: 'ok', text: original } // fail open — the editor must never block legitimate contributions
   }
 }
 
@@ -176,25 +160,10 @@ Respond with ONLY valid JSON, no markdown:
   }
 
   try {
-    const result = await generateText({
-      model: PRIMARY_MODEL,
-      prompt: aiPrompt,
-      maxOutputTokens: 200,
-      providerOptions: { gateway: { user: userId, tags: ['feature:content-judge', 'env:production'] } },
-    })
-    return normalize(tryParseJSON(result.text))
-  } catch (error) {
-    if (APICallError.isInstance(error) && (error.statusCode === 402 || error.statusCode === 429)) {
-      return null // fall back to rules-only moderation
-    }
-    if (!process.env.OPENROUTER_API_KEY) return null
-    try {
-      const openrouter = createOpenAI({ baseURL: 'https://openrouter.ai/api/v1', apiKey: process.env.OPENROUTER_API_KEY })
-      const result = await generateText({ model: openrouter(OPENROUTER_MODEL), prompt: aiPrompt, maxOutputTokens: 200 })
-      return normalize(tryParseJSON(result.text))
-    } catch {
-      return null
-    }
+    const { text } = await runTextWaterfall({ prompt: aiPrompt, userId, maxOutputTokens: 200, feature: 'content-judge' })
+    return normalize(tryParseJSON(text))
+  } catch {
+    return null // fall back to rules-only moderation
   }
 }
 

@@ -13,6 +13,7 @@ import { BeginSagaControl } from './BeginSagaControl'
 import { LivingWorldPanel } from './LivingWorldPanel'
 import { EndingReveal } from './EndingReveal'
 import { WelcomeWhisper } from './WelcomeWhisper'
+import { FirstSoundNotice } from './FirstSoundNotice'
 import { BookmarkButton } from './BookmarkButton'
 import { GalleryButton } from './GalleryButton'
 import { AmbientBackground } from './AmbientBackground'
@@ -120,9 +121,16 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
   const ambientEffect = story.readingTheme?.ambientEffect ?? 'none'
 
   // Start/stop the looping soundscape with the toggle (and clean up on unmount).
+  // Delayed slightly: ambient can auto-start from a preference saved in a PRIOR
+  // session, with no fresh gesture — the short delay gives FirstSoundNotice
+  // (shown ~300ms after mount) time to be on screen before audio actually begins.
   useEffect(() => {
-    if (ambientOn && ambientEffect !== 'none') startAmbient(ambientEffect)
-    return () => stopAmbient()
+    if (!(ambientOn && ambientEffect !== 'none')) return
+    const id = setTimeout(() => startAmbient(ambientEffect), 500)
+    return () => {
+      clearTimeout(id)
+      stopAmbient()
+    }
   }, [ambientOn, ambientEffect])
 
   function toggleAmbient() {
@@ -473,6 +481,7 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
   return (
     <div className="flex flex-col items-center gap-5 w-full max-w-4xl mx-auto">
       <AmbientBackground effect={ambientEffect} />
+      <FirstSoundNotice />
       <WelcomeWhisper />
 
       {/* Initial choice overlay — shown once before story begins */}

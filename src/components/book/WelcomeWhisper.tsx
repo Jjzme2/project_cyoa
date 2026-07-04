@@ -54,7 +54,7 @@ export function WelcomeWhisper() {
           <div className="flex items-start gap-3 rounded-2xl border border-amber-500/25 bg-stone-950/95 backdrop-blur px-4 py-3.5 shadow-2xl">
             <BookOpen className="h-4 w-4 text-amber-300/80 mt-0.5 shrink-0" />
             <p className="text-sm text-stone-200/90 leading-relaxed" style={{ fontFamily: 'Georgia, serif' }}>
-              Read. Choose. And when you reach a path no one has written&hairsp;—&hairsp;
+              Read. Choose. And when you reach a path no one has written —{' '}
               <em className="text-amber-200/90">write what happens next.</em>
             </p>
             <button onClick={dismiss} aria-label="Dismiss" className="p-1 -m-1 text-stone-400 hover:text-stone-200 transition-colors shrink-0">

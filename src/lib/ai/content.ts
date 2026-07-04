@@ -1,7 +1,6 @@
-import { generateText, APICallError } from 'ai'
-import { createOpenAI } from '@ai-sdk/openai'
 import type { ContentRating, EndingType, StoryCharacter, StoryPathSegment, WorldBible } from '@/types'
-import { PRIMARY_MODEL, OPENROUTER_MODEL, VALID_TONES, VALID_TAGS, parseAIResponse, tryParseJSON, pickStr } from './shared'
+import { VALID_TONES, VALID_TAGS, NAME_DIVERSITY_NOTE, parseAIResponse, tryParseJSON, pickStr } from './shared'
+import { runTextWaterfall, isBillingOrRateLimitError } from './waterfall'
 import { buildPrompt, buildSagaOpeningPrompt, userInputBlock, type WorldContext } from './prompts'
 
 export async function generateWorldFromPrompt(
@@ -35,21 +34,8 @@ ${userInputBlock("User's world idea", prompt)}`
       : 'Everyone',
   })
 
-  try {
-    const result = await generateText({
-      model: PRIMARY_MODEL,
-      prompt: aiPrompt,
-      maxOutputTokens: 900,
-      providerOptions: { gateway: { user: userId, tags: ['feature:world-assist', 'env:production'] } },
-    })
-    return normalize(tryParseJSON(result.text))
-  } catch (error) {
-    if (APICallError.isInstance(error) && (error.statusCode === 402 || error.statusCode === 429)) throw error
-    if (!process.env.OPENROUTER_API_KEY) throw error
-    const openrouter = createOpenAI({ baseURL: 'https://openrouter.ai/api/v1', apiKey: process.env.OPENROUTER_API_KEY })
-    const result = await generateText({ model: openrouter(OPENROUTER_MODEL), prompt: aiPrompt, maxOutputTokens: 900 })
-    return normalize(tryParseJSON(result.text))
-  }
+  const { text } = await runTextWaterfall({ prompt: aiPrompt, userId, maxOutputTokens: 900, feature: 'world-assist' })
+  return normalize(tryParseJSON(text))
 }
 
 export async function generateStoryFromPrompt(
@@ -82,6 +68,8 @@ Respond with ONLY valid JSON (no markdown fences, no explanation) in this exact 
   "tags": ["tag1", "tag2"]
 }
 
+If you give the protagonist a name, ${NAME_DIVERSITY_NOTE}.
+
 tags must only include values from: Fantasy, Horror, Sci-Fi, Mystery, Romance, Adventure, Comedy, Thriller, Historical, Cosmic Horror, Fairy Tale, Noir, Post-Apocalyptic, Steampunk, Western. Pick 1-3.
 
 ${worldSection}${userInputBlock("User's story idea", prompt)}`
@@ -100,21 +88,8 @@ ${worldSection}${userInputBlock("User's story idea", prompt)}`
       : [],
   })
 
-  try {
-    const result = await generateText({
-      model: PRIMARY_MODEL,
-      prompt: aiPrompt,
-      maxOutputTokens: 900,
-      providerOptions: { gateway: { user: userId, tags: ['feature:story-assist', 'env:production'] } },
-    })
-    return normalize(tryParseJSON(result.text))
-  } catch (error) {
-    if (APICallError.isInstance(error) && (error.statusCode === 402 || error.statusCode === 429)) throw error
-    if (!process.env.OPENROUTER_API_KEY) throw error
-    const openrouter = createOpenAI({ baseURL: 'https://openrouter.ai/api/v1', apiKey: process.env.OPENROUTER_API_KEY })
-    const result = await generateText({ model: openrouter(OPENROUTER_MODEL), prompt: aiPrompt, maxOutputTokens: 900 })
-    return normalize(tryParseJSON(result.text))
-  }
+  const { text } = await runTextWaterfall({ prompt: aiPrompt, userId, maxOutputTokens: 900, feature: 'story-assist' })
+  return normalize(tryParseJSON(text))
 }
 
 /** Build the prompt that renders a single saga entry-point's opening chapter. */
@@ -127,24 +102,17 @@ export async function generateSagaOpening(
   const prompt = buildSagaOpeningPrompt(world, sagaPremise, entry)
 
   try {
-    const result = await generateText({
-      model: PRIMARY_MODEL,
-      prompt,
-      maxOutputTokens: 600,
-      providerOptions: { gateway: { user: userId, tags: ['feature:saga-opening', 'env:production'] } },
-    })
-    return { ...parseAIResponse(result.text), model: PRIMARY_MODEL }
+    const { text, model } = await runTextWaterfall({ prompt, userId, maxOutputTokens: 600, feature: 'saga-opening' })
+    return { ...parseAIResponse(text), model }
   } catch (error) {
-    if (APICallError.isInstance(error) && error.statusCode === 402) {
-      throw new Error('AI budget limit reached. Please try again later.')
+    if (isBillingOrRateLimitError(error)) {
+      throw new Error(
+        (error as { statusCode: number }).statusCode === 402
+          ? 'AI budget limit reached. Please try again later.'
+          : 'Too many requests. Please slow down.',
+      )
     }
-    if (APICallError.isInstance(error) && error.statusCode === 429) {
-      throw new Error('Too many requests. Please slow down.')
-    }
-    if (!process.env.OPENROUTER_API_KEY) throw error
-    const openrouter = createOpenAI({ baseURL: 'https://openrouter.ai/api/v1', apiKey: process.env.OPENROUTER_API_KEY })
-    const result = await generateText({ model: openrouter(OPENROUTER_MODEL), prompt, maxOutputTokens: 600 })
-    return { ...parseAIResponse(result.text), model: `openrouter/${OPENROUTER_MODEL}` }
+    throw error
   }
 }
 
@@ -160,40 +128,17 @@ export async function generateStoryNode(
   const prompt = buildPrompt(world, storyPath, choiceText, includeImage, systemNarrativeEvents, endingDirective)
 
   try {
-    const result = await generateText({
-      model: PRIMARY_MODEL,
-      prompt,
-      maxOutputTokens: 600,
-      providerOptions: {
-        gateway: {
-          user: userId,
-          tags: ['feature:story-generation', 'env:production'],
-        },
-      },
-    })
-    const parsed = parseAIResponse(result.text)
-    return { ...parsed, model: PRIMARY_MODEL }
+    const { text, model } = await runTextWaterfall({ prompt, userId, maxOutputTokens: 600, feature: 'story-generation' })
+    return { ...parseAIResponse(text), model }
   } catch (error) {
-    if (APICallError.isInstance(error) && error.statusCode === 402) {
-      throw new Error('AI budget limit reached. Please try again later.')
+    if (isBillingOrRateLimitError(error)) {
+      throw new Error(
+        (error as { statusCode: number }).statusCode === 402
+          ? 'AI budget limit reached. Please try again later.'
+          : 'Too many requests. Please slow down.',
+      )
     }
-    if (APICallError.isInstance(error) && error.statusCode === 429) {
-      throw new Error('Too many requests. Please slow down.')
-    }
-
-    if (!process.env.OPENROUTER_API_KEY) throw error
-
-    const openrouter = createOpenAI({
-      baseURL: 'https://openrouter.ai/api/v1',
-      apiKey: process.env.OPENROUTER_API_KEY,
-    })
-    const result = await generateText({
-      model: openrouter(OPENROUTER_MODEL),
-      prompt,
-      maxOutputTokens: 600,
-    })
-    const parsed = parseAIResponse(result.text)
-    return { ...parsed, model: `openrouter/${OPENROUTER_MODEL}` }
+    throw error
   }
 }
 
@@ -241,22 +186,9 @@ Respond with ONLY valid JSON in the same shape (no markdown):
   }
 
   try {
-    const result = await generateText({
-      model: PRIMARY_MODEL,
-      prompt: aiPrompt,
-      maxOutputTokens: 900,
-      providerOptions: { gateway: { user: userId, tags: ['feature:world-genesis', 'env:production'] } },
-    })
-    return merge(tryParseJSON(result.text))
-  } catch (error) {
-    if (APICallError.isInstance(error) && (error.statusCode === 402 || error.statusCode === 429)) return skeleton
-    if (!process.env.OPENROUTER_API_KEY) return skeleton
-    try {
-      const openrouter = createOpenAI({ baseURL: 'https://openrouter.ai/api/v1', apiKey: process.env.OPENROUTER_API_KEY })
-      const result = await generateText({ model: openrouter(OPENROUTER_MODEL), prompt: aiPrompt, maxOutputTokens: 900 })
-      return merge(tryParseJSON(result.text))
-    } catch {
-      return skeleton
-    }
+    const { text } = await runTextWaterfall({ prompt: aiPrompt, userId, maxOutputTokens: 900, feature: 'world-genesis' })
+    return merge(tryParseJSON(text))
+  } catch {
+    return skeleton // fail open — the procedural skeleton alone is still a usable world bible
   }
 }

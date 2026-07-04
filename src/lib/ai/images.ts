@@ -1,6 +1,29 @@
 import { put } from '@vercel/blob'
-import { IMAGE_MODEL } from './shared'
+import { runImageWaterfall } from './waterfall'
 import { buildImagePrompt, type WorldContext } from './prompts'
+
+async function generateAndUpload(
+  prompt: string,
+  apiKey: string,
+  blobPath: string,
+): Promise<{ url: string | null; error?: string }> {
+  try {
+    const { imageUrl } = await runImageWaterfall({ prompt, apiKey })
+
+    // Fetch and re-upload to Vercel Blob so we control the URL lifetime
+    const imgRes = await fetch(imageUrl)
+    const blob = await imgRes.blob()
+    const { url } = await put(blobPath, blob, {
+      access: 'public',
+      contentType: 'image/webp',
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    })
+    return { url }
+  } catch (error) {
+    console.error(`[generateAndUpload] Failed to generate/upload image (${blobPath}):`, error)
+    return { url: null, error: error instanceof Error ? error.message : 'Unknown image generation error' }
+  }
+}
 
 export async function generateStoryImage(
   world: WorldContext,
@@ -16,43 +39,7 @@ export async function generateStoryImage(
   if (!apiKey) return { url: null, error: 'No OpenRouter API key configured on server.' }
 
   const prompt = buildImagePrompt(world, storyContent, choiceText)
-
-  try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: IMAGE_MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        modalities: ['image', 'text'],
-      }),
-    })
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      throw new Error(err.error?.message ?? `Image generation failed (${res.status})`)
-    }
-
-    const data = await res.json()
-    const imageUrl: string | undefined = data.choices?.[0]?.message?.images?.[0]?.image_url?.url
-    if (!imageUrl) return { url: null, error: 'OpenRouter response did not contain an image URL.' }
-
-    // Fetch and re-upload to Vercel Blob so we control the URL lifetime
-    const imgRes = await fetch(imageUrl)
-    const blob = await imgRes.blob()
-    const { url } = await put(`story-images/${nodeId}.webp`, blob, {
-      access: 'public',
-      contentType: 'image/webp',
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-    })
-    return { url }
-  } catch (error) {
-    console.error('[generateStoryImage] Failed to generate/upload image:', error)
-    return { url: null, error: error instanceof Error ? error.message : 'Unknown image generation error' }
-  }
+  return generateAndUpload(prompt, apiKey, `story-images/${nodeId}.webp`)
 }
 
 export async function generatePortraitImage(
@@ -67,41 +54,7 @@ export async function generatePortraitImage(
   const desc = [tagline, description].filter((s) => s && s.trim()).join('. ').slice(0, 220)
   const prompt = `Character portrait illustration for a fantasy story. Subject: "${name}"${desc ? ` — ${desc}` : ''}. A SINGLE character, head-and-shoulders or upper-body portrait, centered, facing the viewer, with an expressive face. Painterly fantasy art, dramatic cinematic lighting, richly detailed. Portrait orientation, plain or softly atmospheric background. No text, no letters, no words anywhere in the image.`
 
-  try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: IMAGE_MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        modalities: ['image', 'text'],
-      }),
-    })
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      throw new Error(err.error?.message ?? `Image generation failed (${res.status})`)
-    }
-
-    const data = await res.json()
-    const imageUrl: string | undefined = data.choices?.[0]?.message?.images?.[0]?.image_url?.url
-    if (!imageUrl) return { url: null, error: 'OpenRouter response did not contain an image URL.' }
-
-    const imgRes = await fetch(imageUrl)
-    const blob = await imgRes.blob()
-    const { url } = await put(`character-portraits/${blobKey}.webp`, blob, {
-      access: 'public',
-      contentType: 'image/webp',
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-    })
-    return { url }
-  } catch (error) {
-    console.error('[generatePortraitImage] Failed to generate/upload image:', error)
-    return { url: null, error: error instanceof Error ? error.message : 'Unknown image generation error' }
-  }
+  return generateAndUpload(prompt, apiKey, `character-portraits/${blobKey}.webp`)
 }
 
 export async function generateCoverImage(
@@ -118,40 +71,5 @@ export async function generateCoverImage(
   const tagLine = tags.length > 0 ? `Genres: ${tags.join(', ')}. ` : ''
   const prompt = `Epic book cover illustration for a choose-your-own-adventure story. Title: "${title}". ${description ? `Premise: "${description}". ` : ''}${tagLine}${worldName ? `World: "${worldName}" — ${worldDescription.slice(0, 150)}. ` : ''}Dramatic composition, detailed fantasy art, painterly style, cinematic lighting. Portrait orientation, no text, no letters, no words anywhere in the image. Professional book cover art.`
 
-  try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: IMAGE_MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        modalities: ['image', 'text'],
-      }),
-    })
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      throw new Error(err.error?.message ?? `Image generation failed (${res.status})`)
-    }
-
-    const data = await res.json()
-    const imageUrl: string | undefined = data.choices?.[0]?.message?.images?.[0]?.image_url?.url
-    if (!imageUrl) return { url: null, error: 'OpenRouter response did not contain an image URL.' }
-
-    const imgRes = await fetch(imageUrl)
-    const blob = await imgRes.blob()
-    const { url } = await put(`cover-images/${blobKey}.webp`, blob, {
-      access: 'public',
-      contentType: 'image/webp',
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-    })
-    return { url }
-  } catch (error) {
-    console.error('[generateCoverImage] Failed to generate/upload image:', error)
-    return { url: null, error: error instanceof Error ? error.message : 'Unknown image generation error' }
-  }
+  return generateAndUpload(prompt, apiKey, `cover-images/${blobKey}.webp`)
 }
-

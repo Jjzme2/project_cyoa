@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Bookmark, Clock } from 'lucide-react'
+import { toast } from 'sonner'
+import { Bookmark, Clock, Archive } from 'lucide-react'
 import { useAuth } from '@/components/Providers'
 import type { Story } from '@/types'
 import { StoryCard } from '@/components/StoryCard'
@@ -65,6 +66,27 @@ export function ContinueReadingSection() {
     load()
   }, [user, loading])
 
+  // Put a book back on the shelf — hides it here without touching progress;
+  // it reappears the moment the reader opens it and turns another page.
+  async function shelve(storyId: string) {
+    if (!user) return
+    const removed = history.find((item) => item.story?.id === storyId)
+    setHistory((h) => h.filter((item) => item.story?.id !== storyId))
+    try {
+      const token = await user.getIdToken()
+      const res = await fetch(`/api/reading-history/${storyId}/shelve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ shelved: true }),
+      })
+      if (!res.ok) throw new Error()
+      toast.message('Put back on the shelf — keep reading it anytime to bring it back here.')
+    } catch {
+      if (removed) setHistory((h) => [...h, removed])
+      toast.error('Could not shelve this book — try again.')
+    }
+  }
+
   if (loading || !user || fetching) return null
   if (history.length === 0 && bookmarks.length === 0) return null
 
@@ -98,6 +120,14 @@ export function ContinueReadingSection() {
                       p.{depth} · {timeAgo(progress.updatedAt)}
                     </span>
                   </div>
+                  <button
+                    onClick={() => shelve(story.id)}
+                    title="Put back on the shelf — hide from Continue Reading"
+                    aria-label="Shelve this book"
+                    className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-black/60 flex items-center justify-center text-white/50 hover:text-amber-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Archive className="h-3 w-3" />
+                  </button>
                 </div>
               )
             })}

@@ -2,15 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { toast } from 'sonner'
-import { Loader2, Users, Share2, SkipForward, Check, Crown, BookOpen, Feather, X } from 'lucide-react'
-import { db } from '@/lib/firebase-client'
+import { Loader2, Users, Share2, LogOut, SkipForward, Check, Crown, BookOpen, BookOpenCheck, Feather, X } from 'lucide-react'
+import { auth as firebaseAuth, db } from '@/lib/firebase-client'
 import { useAuth } from '@/components/Providers'
 import { trackEvent } from '@/lib/track-client'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { StoryContent } from '@/components/book/StoryContent'
+import { LivingWorldPanel } from '@/components/book/LivingWorldPanel'
 import type { Room, StoryNode } from '@/types'
 
 const outlineLink =
@@ -22,6 +24,7 @@ function initials(name: string): string {
 
 export function RoomReader({ roomId }: { roomId: string }) {
   const { user, loading, openAuthModal } = useAuth()
+  const router = useRouter()
   const [room, setRoom] = useState<Room | null>(null)
   const [roomMissing, setRoomMissing] = useState(false)
   const [node, setNode] = useState<StoryNode | null>(null)
@@ -30,10 +33,20 @@ export function RoomReader({ roomId }: { roomId: string }) {
   const [voting, setVoting] = useState(false)
   const [writeText, setWriteText] = useState('')
   const [submittingWrite, setSubmittingWrite] = useState(false)
+  const [markingReady, setMarkingReady] = useState(false)
   const [now, setNow] = useState(() => Date.now())
+  // Gates the actual join call behind an explanation screen for first-time
+  // visitors (see the interstitial below); already-known members skip it.
+  const [joinConfirmed, setJoinConfirmed] = useState(false)
+
+  // A returning member (e.g. refreshing mid-session) is already listed on the
+  // room doc the moment it loads — derived, not stored, so it settles once
+  // and never flip-flops on the frequent heartbeat-driven room updates.
+  const isKnownMember = !!(user && room && room.members[user.uid])
 
   const joinedRef = useRef(false)
   const resolvedRoundRef = useRef(-1)
+  const resolvedReadingRoundRef = useRef(-1)
   const fetchedNodeRef = useRef('')
   const openedTrackedRef = useRef<string | null>(null)
 
@@ -83,18 +96,23 @@ export function RoomReader({ roomId }: { roomId: string }) {
     return () => unsub()
   }, [user, roomId])
 
-  // Join on mount, leave on unmount.
+  // Join once confirmed — either a button click (first-time visitor) or
+  // already being a known member (returning mid-session). Deliberately does
+  // NOT leave on unmount: navigating away (or just closing the tab) shouldn't
+  // instantly evict you — you can come right back. Presence instead decays
+  // naturally via the heartbeat/stale-prune mechanism (see rooms.ts), and an
+  // explicit "Leave room" action (below) is available for a deliberate exit.
+  // Also does NOT depend on `room` itself: the doc updates on every heartbeat,
+  // and re-running this effect on that would call `/join` repeatedly.
+  // `isKnownMember` is a derived boolean that settles once.
   useEffect(() => {
-    if (!user || joinedRef.current) return
+    if (!user || joinedRef.current || !(joinConfirmed || isKnownMember)) return
     joinedRef.current = true
     api('/join').catch((e: Error) => {
       if (e.message.includes('age_restricted')) setAgeBlocked(true)
       else toast.error(e.message)
     })
-    return () => {
-      api('/leave').catch(() => {})
-    }
-  }, [user, api])
+  }, [user, api, joinConfirmed, isKnownMember])
 
   // Presence heartbeat.
   useEffect(() => {
@@ -145,6 +163,18 @@ export function RoomReader({ roomId }: { roomId: string }) {
     }
   }, [now, room, api])
 
+  // Auto-resolve the reading gate once its own timer expires — a separate ref
+  // from the voting one above since a chapter's reading and voting phases
+  // share the same round number.
+  useEffect(() => {
+    if (!room || room.status !== 'reading') return
+    const ends = new Date(room.roundEndsAt).getTime()
+    if (now >= ends && resolvedReadingRoundRef.current !== room.round) {
+      resolvedReadingRoundRef.current = room.round
+      api('/resolve', { round: room.round }).catch(() => {})
+    }
+  }, [now, room, api])
+
   async function vote(slotId: string) {
     if (!room) return
     setVoting(true)
@@ -157,11 +187,42 @@ export function RoomReader({ roomId }: { roomId: string }) {
     }
   }
 
+  // Acknowledge the current chapter as read (the "ready" gate).
+  async function markRead() {
+    if (!room) return
+    setMarkingReady(true)
+    try {
+      await api('/ready', { round: room.round })
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not mark this chapter as read')
+    } finally {
+      setMarkingReady(false)
+    }
+  }
+
   function share() {
     navigator.clipboard
       .writeText(window.location.href)
       .then(() => toast.success('Room link copied — share it to read together.'))
       .catch(() => toast.error('Could not copy the link.'))
+  }
+
+  // A deliberate exit — unlike simply navigating away (which no longer leaves
+  // you, so you can come right back), this frees your spot immediately.
+  async function leaveForGood() {
+    await api('/leave').catch(() => {})
+    router.push('/stories')
+  }
+
+  // Read-only guest access — no account needed to follow along, but a guest
+  // can never write a path or use AI (server-enforced, not just hidden here).
+  async function continueAsGuest() {
+    try {
+      const { signInAnonymously } = await import('firebase/auth')
+      await signInAnonymously(firebaseAuth)
+    } catch {
+      toast.error('Could not join as a guest — try signing in instead.')
+    }
   }
 
   // Write a new path at a frontier (reuses the normal contribution endpoint),
@@ -186,7 +247,16 @@ export function RoomReader({ roomId }: { roomId: string }) {
         toast.success('The story continues, together!')
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not write this path')
+      const msg = e instanceof Error ? e.message : 'Could not write this path'
+      // Benign in a room: someone else got there first (filled the slot, or
+      // already advanced the room past it). The room's snapshot will pick up
+      // their write and move everyone on — not a real failure.
+      if (/already (filled|writing)|isn.t reachable/i.test(msg)) {
+        toast.message('Someone else in the room just wrote this path — the story continues any moment.')
+        setWriteText('')
+      } else {
+        toast.error(msg)
+      }
     } finally {
       setSubmittingWrite(false)
     }
@@ -209,6 +279,12 @@ export function RoomReader({ roomId }: { roomId: string }) {
       <Centered>
         <p className="text-sm text-muted-foreground/60">Sign in to join this reading room.</p>
         <Button size="sm" onClick={openAuthModal}>Sign in</Button>
+        <button
+          onClick={continueAsGuest}
+          className="text-xs text-muted-foreground/50 hover:text-amber-300 underline underline-offset-2 transition-colors"
+        >
+          Or continue as a guest (read-only)
+        </button>
       </Centered>
     )
   }
@@ -234,12 +310,38 @@ export function RoomReader({ roomId }: { roomId: string }) {
   }
 
   const members = Object.entries(room.members)
+
+  // First-time visitor from a shared link: explain what joining actually
+  // does before we add them as a member. Returning members skip straight past this.
+  if (!isKnownMember && !joinConfirmed) {
+    return (
+      <Centered>
+        <Users className="h-6 w-6 text-amber-400/60" />
+        <p className="text-base font-medium text-foreground/85">Join “{room.storyTitle}” to read together</p>
+        <p className="text-sm text-muted-foreground/65 max-w-sm">
+          {members.length === 0
+            ? 'You’ll be the first one here.'
+            : `${members.length} ${members.length === 1 ? 'person is' : 'people are'} already here.`}{' '}
+          Joining adds you to the room: everyone reads each chapter together, marks it as read (or waits out a
+          short timer) before the group moves on, and votes together on what happens next. You can leave anytime
+          — just close this tab.
+        </p>
+        <Button onClick={() => setJoinConfirmed(true)}>Join & start reading</Button>
+        <Link href="/stories" className={outlineLink}>Not now</Link>
+      </Centered>
+    )
+  }
+
   const navSlots = (node?.slots ?? []).filter((s) => s.filled && s.childNodeId)
   const openSlots = (node?.slots ?? []).filter((s) => !s.filled && !s.pendingReview)
   const totalVotes = Object.keys(room.votes).length
   const myVote = room.votes[user.uid]
   const isHost = room.hostId === user.uid
   const secondsLeft = Math.max(0, Math.ceil((new Date(room.roundEndsAt).getTime() - now) / 1000))
+  const readyCount = members.filter(([uid]) => room.ready?.[uid]).length
+  const myReady = !!room.ready?.[user.uid]
+  const guestCount = members.filter(([, m]) => m.guest).length
+  const isGuest = !!room.members[user.uid]?.guest
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
@@ -248,15 +350,22 @@ export function RoomReader({ roomId }: { roomId: string }) {
         <div className="flex items-center gap-2 min-w-0">
           <Users className="h-4 w-4 text-amber-400/70 shrink-0" />
           <span className="text-sm font-medium text-foreground/80 truncate">{room.storyTitle}</span>
-          <span className="text-[11px] text-muted-foreground/45 font-sans">· reading together</span>
+          <span className="text-[11px] text-muted-foreground/45 font-sans">
+            · {members.length} {members.length === 1 ? 'reader' : 'readers'}
+            {guestCount > 0 && ` (${guestCount} guest${guestCount === 1 ? '' : 's'}, ${members.length - guestCount} registered)`}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex -space-x-1.5">
             {members.slice(0, 6).map(([uid, m]) => (
               <span
                 key={uid}
-                title={m.name}
-                className="h-6 w-6 rounded-full bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-[9px] font-sans font-semibold text-amber-200"
+                title={m.guest ? `${m.name} (guest)` : m.name}
+                className={`h-6 w-6 rounded-full border flex items-center justify-center text-[9px] font-sans font-semibold ${
+                  m.guest
+                    ? 'bg-white/5 border-white/15 text-muted-foreground/70'
+                    : 'bg-amber-500/20 border-amber-400/30 text-amber-200'
+                }`}
               >
                 {initials(m.name)}
               </span>
@@ -269,6 +378,9 @@ export function RoomReader({ roomId }: { roomId: string }) {
           </div>
           <button onClick={share} title="Copy room link" className="text-muted-foreground/50 hover:text-amber-300 transition-colors">
             <Share2 className="h-4 w-4" />
+          </button>
+          <button onClick={leaveForGood} title="Leave this room" className="text-muted-foreground/50 hover:text-red-400 transition-colors">
+            <LogOut className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -284,8 +396,43 @@ export function RoomReader({ roomId }: { roomId: string }) {
         )}
       </div>
 
-      {/* Ended / writing / voting */}
-      {room.status === 'ended' ? (
+      {node?.worldPulse && <LivingWorldPanel pulse={node.worldPulse} />}
+
+      {/* Reading gate / ended / writing / voting */}
+      {room.status === 'reading' ? (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] uppercase tracking-widest font-sans text-amber-400/55">
+              Catching everyone up
+            </p>
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] font-sans text-muted-foreground/55 tabular-nums">
+                {secondsLeft}s · {readyCount}/{members.length} ready
+              </span>
+              {isHost && (
+                <button
+                  onClick={() => api('/resolve', { round: room.round, force: true }).catch((e: Error) => toast.error(e.message))}
+                  className="flex items-center gap-1 text-[11px] font-sans text-amber-400/70 hover:text-amber-300 transition-colors"
+                  title="Skip the wait and continue now"
+                >
+                  <SkipForward className="h-3.5 w-3.5" /> Skip
+                </button>
+              )}
+            </div>
+          </div>
+          <Button
+            onClick={markRead}
+            disabled={markingReady || myReady}
+            className="w-full gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 disabled:opacity-80"
+          >
+            {myReady ? <Check className="h-4 w-4" /> : markingReady ? <Loader2 className="h-4 w-4 animate-spin" /> : <BookOpenCheck className="h-4 w-4" />}
+            {myReady ? 'You’re ready — waiting on the others' : 'I’ve read this — ready to continue'}
+          </Button>
+          <p className="text-[10px] font-sans text-muted-foreground/40 text-center">
+            Once everyone’s marked ready (or the timer ends), the room moves on together.
+          </p>
+        </div>
+      ) : room.status === 'ended' ? (
         <div className="glass-card rounded-xl p-6 text-center space-y-3">
           <BookOpen className="h-6 w-6 mx-auto text-amber-400/60" />
           <p className="text-sm text-foreground/75">Your tale has reached its end, together.</p>
@@ -302,6 +449,10 @@ export function RoomReader({ roomId }: { roomId: string }) {
           </p>
           {openSlots.length === 0 ? (
             <p className="text-sm text-muted-foreground/50 py-4 text-center">Waiting for an open path…</p>
+          ) : isGuest ? (
+            <p className="text-sm text-muted-foreground/50 py-4 text-center">
+              Reading as a guest — create a free account to write the next path.
+            </p>
           ) : (
             <div className="space-y-2">
               <Textarea
@@ -393,6 +544,7 @@ export function RoomReader({ roomId }: { roomId: string }) {
           >
             {room.hostId === uid && <Crown className="h-2.5 w-2.5 text-amber-400/70" />}
             {m.name}
+            {m.guest && <span className="text-muted-foreground/40">· guest</span>}
             {isHost && room.hostId !== uid && (
               <button
                 onClick={() => kick(uid)}

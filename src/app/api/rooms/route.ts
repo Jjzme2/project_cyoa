@@ -12,6 +12,9 @@ const CreateRoomSchema = z.object({ storyId: z.string().min(1, 'storyId required
 export async function POST(req: NextRequest) {
   const auth = await getAuthContext(req)
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (auth.isAnonymous) {
+    return NextResponse.json({ error: 'Create a free account to start a reading room.' }, { status: 403 })
+  }
 
   const parsed = await parseJson(req, CreateRoomSchema)
   if (!parsed.ok) return parsed.response
