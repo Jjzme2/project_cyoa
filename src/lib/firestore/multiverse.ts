@@ -1,6 +1,6 @@
 import { getWorldsByMultiverse, getPublicWorlds, getWorld } from './worlds'
 import { getWorldChronicle } from './chronicle'
-import { getCharactersByWorld } from './characters'
+import { getCharactersByWorld, getCharacter } from './characters'
 import { ratingRank } from '@/lib/ratings'
 import type { WorldEcho, CharacterCameo } from '@/lib/ai/prompts'
 import type { ContentRating, WorldLink } from '@/types'
@@ -118,7 +118,7 @@ export async function getMultiverseCameos(
 
   const cameos = await Promise.all(
     siblings.map(async (w) => {
-      const chars = await getCharactersByWorld(w.id).catch(() => [])
+      const chars = await getCharactersByWorld(w.id, 40, 'loved').catch(() => [])
       const figures = chars
         .filter((c) => c.name?.trim())
         .slice(0, perWorld)
@@ -148,7 +148,7 @@ export async function getLinkedCameos(
       const world = await getWorld(link.worldId).catch(() => null)
       if (!world) return null
       if (ceiling !== null && ratingRank(world.rating ?? 'Everyone') > ceiling) return null
-      const chars = await getCharactersByWorld(link.worldId).catch(() => [])
+      const chars = await getCharactersByWorld(link.worldId, 40, 'loved').catch(() => [])
       const figures = chars
         .filter((c) => c.name?.trim())
         .slice(0, perWorld)
@@ -160,6 +160,40 @@ export async function getLinkedCameos(
   )
 
   return cameos.filter((c): c is CharacterCameo => c !== null)
+}
+
+/**
+ * Hand-picked "guest star" cameos (Characters Fold 2d): specific first-class
+ * Characters the world's author features directly, by registry id —
+ * independent of the multiverse/links system above, which only ever surfaces
+ * figures from worlds this one has explicitly connected to. A `scope:'world'`
+ * guest star is still rating-gated against its OWN origin world (never let a
+ * curated pick leak mature content into a lower-rated world); a `scope:'author'`
+ * personal hero has no origin world rating to check, so it's trusted as-is —
+ * the same trust already extended to authored protagonists elsewhere.
+ */
+export async function getGuestStarCameos(
+  characterIds: string[],
+  { maxRating }: { maxRating?: ContentRating } = {},
+): Promise<CharacterCameo[]> {
+  if (!characterIds?.length) return []
+  const ceiling = maxRating ? ratingRank(maxRating) : null
+
+  const figures = (
+    await Promise.all(
+      characterIds.slice(0, 5).map(async (id) => {
+        const char = await getCharacter(id).catch(() => null)
+        if (!char?.name?.trim()) return null
+        if (ceiling !== null && char.scope === 'world') {
+          const origin = await getWorld(char.ownerId).catch(() => null)
+          if (origin && ratingRank(origin.rating ?? 'Everyone') > ceiling) return null
+        }
+        return { name: char.name, ...(char.tagline ? { note: char.tagline } : {}) }
+      }),
+    )
+  ).filter((f): f is { name: string; note?: string } => f !== null)
+
+  return figures.length ? [{ worldName: 'Guest Stars', figures }] : []
 }
 
 /**

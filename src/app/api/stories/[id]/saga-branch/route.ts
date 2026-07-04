@@ -16,6 +16,7 @@ import {
   getLinkedEchoes,
   getMultiverseCameos,
   getLinkedCameos,
+  getGuestStarCameos,
 } from '@/lib/firestore-helpers'
 import { mergeEchoes, mergeCameos } from '@/lib/multiverse'
 import { CreditManager } from '@/lib/credit-manager'
@@ -92,18 +93,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!credit.success) return creditFailureResponse(credit)
 
   try {
-    const [poolEchoes, linkEchoes, poolCameos, linkCameos, recap] = await Promise.all([
+    const [poolEchoes, linkEchoes, poolCameos, linkCameos, guestStarCameos, recap] = await Promise.all([
       world.multiverse?.id ? getMultiverseEchoes(world.multiverse.id, world.id, { maxRating: effectiveRating }).catch(() => []) : Promise.resolve([]),
       world.links?.length ? getLinkedEchoes(world.links, { maxRating: effectiveRating }).catch(() => []) : Promise.resolve([]),
       world.multiverse?.id ? getMultiverseCameos(world.multiverse.id, world.id, { maxRating: effectiveRating }).catch(() => []) : Promise.resolve([]),
       world.links?.length ? getLinkedCameos(world.links, { maxRating: effectiveRating }).catch(() => []) : Promise.resolve([]),
+      world.guestStarCharacterIds?.length ? getGuestStarCameos(world.guestStarCharacterIds, { maxRating: effectiveRating }).catch(() => []) : Promise.resolve([]),
       recapPath(sourceStoryId, [...(nodeHistory ?? []), nodeId]),
     ])
 
     const worldCtx = buildWorldContext(world, {
       rating: effectiveRating,
       echoes: mergeEchoes(poolEchoes, linkEchoes),
-      cameos: mergeCameos(poolCameos, linkCameos),
+      cameos: mergeCameos(poolCameos, linkCameos, guestStarCameos),
     })
 
     const sagaPremise = `You step into this world's story already in motion. ${prompt}`.slice(0, 1000)

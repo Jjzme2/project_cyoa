@@ -94,6 +94,12 @@ export interface World {
   multiverse?: WorldMultiverse
   /** Explicit, hand-picked worlds whose legends also echo into this one. */
   links?: WorldLink[]
+  /**
+   * Hand-picked first-class Characters (registry ids) the author features as
+   * guest stars in this world — independent of the multiverse/links system,
+   * which only surfaces figures from CONNECTED worlds. Capped at 5.
+   */
+  guestStarCharacterIds?: string[]
   createdAt: string
 }
 

@@ -21,18 +21,74 @@ export async function getCharacter(id: string): Promise<Character | null> {
   return { id: doc.id, ...doc.data() } as Character
 }
 
-/** Directory listing, most-recently-active first. */
-export async function listCharacters(limit = 60): Promise<Character[]> {
+/**
+ * Directory listing: most-recently-active, or community-voted "most loved"
+ * first. `voteCount` is absent on characters that predate voting (or have
+ * none yet) — a plain `orderBy('voteCount')` would silently exclude them
+ * (Firestore drops docs missing the ordered field), so "loved" instead reads
+ * a bounded recent batch and re-ranks it in memory. Fine at this app's scale;
+ * matches the same bounded-scan trade-off already made in admin user search.
+ */
+export async function listCharacters(limit = 60, sort: 'recent' | 'loved' = 'recent'): Promise<Character[]> {
   'use cache'
   cacheLife('minutes')
   cacheTag('characters')
 
-  const snap = await charactersCollection().orderBy('updatedAt', 'desc').limit(limit).get()
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Character))
+  const fetchLimit = sort === 'loved' ? Math.min(limit * 3, 200) : limit
+  const snap = await charactersCollection().orderBy('updatedAt', 'desc').limit(fetchLimit).get()
+  const chars = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Character))
+  if (sort !== 'loved') return chars
+  return chars.sort((a, b) => (b.voteCount ?? 0) - (a.voteCount ?? 0)).slice(0, limit)
 }
 
-/** Characters that have appeared in a given world (canon figures + visiting heroes). */
-export async function getCharactersByWorld(worldId: string, limit = 40): Promise<Character[]> {
+const VOTE_CAP = 2000
+
+/**
+ * Toggle the caller's "best character" vote — community curation for the
+ * directory's "most loved" sort. Capped like `endingKeys`: past the cap, votes
+ * stop deduping (harmless at that popularity) rather than growing unboundedly.
+ */
+export async function toggleCharacterVote(id: string, userId: string): Promise<{ voted: boolean; count: number }> {
+  const ref = charactersCollection().doc(id)
+  let voted = false
+  let count = 0
+
+  await adminDb.runTransaction(async (txn) => {
+    const doc = await txn.get(ref)
+    if (!doc.exists) return
+    const data = doc.data() as Character
+    const voterIds = data.voterIds ?? []
+    const hasVoted = voterIds.includes(userId)
+
+    if (hasVoted) {
+      txn.update(ref, {
+        voterIds: voterIds.filter((v) => v !== userId),
+        voteCount: Math.max(0, (data.voteCount ?? 1) - 1),
+      })
+      voted = false
+      count = Math.max(0, (data.voteCount ?? 1) - 1)
+    } else {
+      const nextVoterIds = voterIds.length < VOTE_CAP ? [...voterIds, userId] : voterIds
+      const nextCount = (data.voteCount ?? 0) + 1
+      txn.update(ref, { voterIds: nextVoterIds, voteCount: nextCount })
+      voted = true
+      count = nextCount
+    }
+  })
+
+  return { voted, count }
+}
+
+/**
+ * Characters that have appeared in a given world (canon figures + visiting
+ * heroes) — most recent, or community-voted "most loved" first (surfaces the
+ * community's favorites when picking cross-world cameo figures).
+ */
+export async function getCharactersByWorld(
+  worldId: string,
+  limit = 40,
+  sort: 'recent' | 'loved' = 'recent',
+): Promise<Character[]> {
   'use cache'
   cacheLife('minutes')
   cacheTag(`characters-world-${worldId}`, 'characters')
@@ -40,7 +96,9 @@ export async function getCharactersByWorld(worldId: string, limit = 40): Promise
   const snap = await charactersCollection().where('worldIds', 'array-contains', worldId).limit(limit).get()
   return snap.docs
     .map((d) => ({ id: d.id, ...d.data() } as Character))
-    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+    .sort((a, b) =>
+      sort === 'loved' ? (b.voteCount ?? 0) - (a.voteCount ?? 0) : Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
+    )
 }
 
 export interface RegisterCharacterParams {
@@ -76,6 +134,8 @@ export async function registerCharacterAppearance(params: RegisterCharacterParam
         worldIds: [appearance.worldId],
         storyCount: 1,
         appearances: [appearance],
+        voteCount: 0,
+        voterIds: [],
         firstSeenAt: now,
         updatedAt: now,
       })

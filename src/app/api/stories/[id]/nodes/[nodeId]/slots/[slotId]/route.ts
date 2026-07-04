@@ -30,6 +30,7 @@ import {
   getLinkedEchoes,
   getMultiverseCameos,
   getLinkedCameos,
+  getGuestStarCameos,
 } from '@/lib/firestore-helpers'
 import { mergeEchoes, mergeCameos } from '@/lib/multiverse'
 import { CreditManager } from '@/lib/credit-manager'
@@ -177,7 +178,7 @@ export async function POST(
     // Multiverse pool: only if THIS world opted into a multiverse do we draw a
     // few legends from its sibling worlds — surfaced as clearly-foreign echoes.
     // An unconnected world is never queried, so nothing crosses in.
-    const [poolEchoes, linkEchoes, poolCameos, linkCameos] = await Promise.all([
+    const [poolEchoes, linkEchoes, poolCameos, linkCameos, guestStarCameos] = await Promise.all([
       world.multiverse?.id
         ? getMultiverseEchoes(world.multiverse.id, story.worldId, { maxRating: effectiveRating }).catch(() => [])
         : Promise.resolve([]),
@@ -192,9 +193,13 @@ export async function POST(
       world.links?.length
         ? getLinkedCameos(world.links, { maxRating: effectiveRating }).catch(() => [])
         : Promise.resolve([]),
+      // Hand-picked guest stars (Fold 2d) — independent of any connection.
+      world.guestStarCharacterIds?.length
+        ? getGuestStarCameos(world.guestStarCharacterIds, { maxRating: effectiveRating }).catch(() => [])
+        : Promise.resolve([]),
     ])
     const echoes = mergeEchoes(poolEchoes, linkEchoes)
-    const cameos = mergeCameos(poolCameos, linkCameos)
+    const cameos = mergeCameos(poolCameos, linkCameos, guestStarCameos)
     // Assembled through the single audited seam (buildWorldContext): the chronicle
     // is read with story.worldId and passed in here, so only THIS world's legends
     // can reach the prompt — never another world's (save for declared echoes above).

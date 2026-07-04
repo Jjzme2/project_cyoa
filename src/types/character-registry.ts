@@ -36,6 +36,11 @@ export interface Character {
   storyCount: number
   /** Recent appearances, capped to keep the doc bounded. */
   appearances: CharacterAppearance[]
+  /** Community "best character" votes — surfaces favorites in the directory. */
+  voteCount?: number
+  /** Voter uids, capped (like `endingKeys`) — stops deduping past the cap rather
+   * than growing unboundedly; harmless at that point for a popularity signal. */
+  voterIds?: string[]
   firstSeenAt: string
   updatedAt: string
 }
