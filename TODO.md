@@ -213,9 +213,11 @@ presets and makes ambient dynamic rather than a single static per-story pick.
   `TONE_ATMOSPHERES`, so no new tone mappings were needed. Also folded the
   3 new ambient effects (aurora/lightning/moonbeams) into `rollWorldTheme`'s
   pool, closing a gap left by the ReadingTheme preset expansion.
-- [ ] **Decouple ambient sound from ambient visual** — today one
-  `ambientEffect` enum drives both 1:1; split into independent
-  visual/sound fields.
+- [x] **Decouple ambient sound from ambient visual** — new
+  `ReadingTheme.ambientSoundMode` (`match` / `auto` / `off`) resolved via
+  `resolveAmbientSound()`; the visual (`ambientEffect`) is unchanged and
+  always author-set, while the sound can now mirror it, go silent, or
+  (once the next item lands) auto-follow the chapter's own scene.
 - [ ] **Per-world default ambient** — stories inherit the world's default
   ambient unless the author overrides it.
 - [ ] **Auto per-chapter ambient matching** — an "Auto" mode where the

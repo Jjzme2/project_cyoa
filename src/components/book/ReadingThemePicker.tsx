@@ -3,7 +3,13 @@
 import { Feather, Dices } from 'lucide-react'
 import { Label } from '@/components/ui/label'
 import { ContainedAmbient } from './ContainedAmbient'
-import type { ReadingTheme, PageStyle, AmbientEffect } from '@/types'
+import type { ReadingTheme, PageStyle, AmbientEffect, AmbientSoundMode } from '@/types'
+
+const AMBIENT_SOUND_MODES: { id: AmbientSoundMode; label: string; hint: string }[] = [
+  { id: 'match', label: 'Match visual',      hint: 'Sound follows whatever ambient effect is picked above' },
+  { id: 'auto',  label: 'Auto (per chapter)', hint: "Sound follows each chapter's own scene, when detected" },
+  { id: 'off',   label: 'Off',                hint: 'No ambient sound, whatever the visual' },
+]
 
 export const PAGE_STYLES: { id: PageStyle; label: string; bg: string; text: string }[] = [
   { id: 'parchment', label: 'Parchment',    bg: '#f0e6d0', text: '#3d2b1f' },
@@ -143,6 +149,27 @@ export function ReadingThemePicker({
             >
               <span>{e.emoji}</span>
               {e.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <Label className="text-xs text-muted-foreground/60 uppercase tracking-wider">Ambient Sound</Label>
+        <div className="flex flex-wrap gap-2">
+          {AMBIENT_SOUND_MODES.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              title={m.hint}
+              onClick={() => onChange({ ...value, ambientSoundMode: m.id })}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-sans border transition-all ${
+                (value.ambientSoundMode ?? 'match') === m.id
+                  ? 'bg-violet-500/20 border-violet-500/40 text-violet-300'
+                  : 'border-white/10 text-muted-foreground/40 hover:border-white/20'
+              }`}
+            >
+              {m.label}
             </button>
           ))}
         </div>

@@ -45,6 +45,7 @@ import {
   pageTransition,
   loadLocalProgress,
   saveLocalProgress,
+  resolveAmbientSound,
 } from './book-viewer-internals'
 import { CastDialog, EndingsDialog, MapDialog } from './ReaderDialogs'
 
@@ -119,19 +120,24 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
   const hasCast = !!story.protagonist?.name || (story.characters?.length ?? 0) > 0
 
   const ambientEffect = story.readingTheme?.ambientEffect ?? 'none'
+  // The sound can diverge from the visual (auto-follow the scene, or be
+  // silenced outright) — see resolveAmbientSound. No per-chapter scene cue
+  // yet (that's the auto-matching work), so 'auto' currently just falls
+  // back to the visual, same as 'match'.
+  const ambientSound = resolveAmbientSound(story.readingTheme)
 
   // Start/stop the looping soundscape with the toggle (and clean up on unmount).
   // Delayed slightly: ambient can auto-start from a preference saved in a PRIOR
   // session, with no fresh gesture — the short delay gives FirstSoundNotice
   // (shown ~300ms after mount) time to be on screen before audio actually begins.
   useEffect(() => {
-    if (!(ambientOn && ambientEffect !== 'none')) return
-    const id = setTimeout(() => startAmbient(ambientEffect), 500)
+    if (!(ambientOn && ambientSound !== 'none')) return
+    const id = setTimeout(() => startAmbient(ambientSound), 500)
     return () => {
       clearTimeout(id)
       stopAmbient()
     }
-  }, [ambientOn, ambientEffect])
+  }, [ambientOn, ambientSound])
 
   function toggleAmbient() {
     setAmbientState((on) => {
@@ -744,7 +750,7 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
             </button>
           )}
           <GalleryButton storyId={story.id} />
-          {ambientEffect !== 'none' && (
+          {ambientSound !== 'none' && (
             <button
               type="button"
               onClick={toggleAmbient}

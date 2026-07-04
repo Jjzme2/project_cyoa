@@ -1,4 +1,4 @@
-import type { StoryNode, EndingType } from '@/types'
+import type { StoryNode, EndingType, ReadingTheme, AmbientEffect } from '@/types'
 
 export type ResourceMap = Record<string, number | string | string[] | number[]>
 
@@ -40,6 +40,23 @@ export const PAGE_PALETTES: Record<string, { bg: string; text: string; spine: st
   moonlit:     { bg: '#dde6f0', text: '#1c2733', spine: 'rgba(28,39,51,0.12)' },
   aurora:      { bg: '#16232f', text: '#bfe8de', spine: 'rgba(191,232,222,0.10)' },
   storm:       { bg: '#232a35', text: '#c7d2de', spine: 'rgba(199,210,222,0.10)' },
+}
+
+/**
+ * The ambient VISUAL (`AmbientBackground`, `readingTheme.ambientEffect`) is
+ * always author-set and unconditional. The ambient SOUND is resolved
+ * separately so it can diverge from the visual: it can auto-follow a
+ * per-chapter scene cue, or be silenced outright, independent of what's on
+ * screen.
+ */
+export function resolveAmbientSound(
+  theme: ReadingTheme | null | undefined,
+  sceneAmbient?: AmbientEffect | null,
+): AmbientEffect {
+  const mode = theme?.ambientSoundMode ?? 'match'
+  if (mode === 'off') return 'none'
+  if (mode === 'auto' && sceneAmbient) return sceneAmbient
+  return theme?.ambientEffect ?? 'none'
 }
 
 export function saveDiscoveredEndings(storyId: string, endings: DiscoveredEnding[]) {
