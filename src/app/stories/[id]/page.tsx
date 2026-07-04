@@ -66,6 +66,7 @@ async function StoryContent({ params }: { params: Promise<{ id: string }> }) {
   const endingCount = countEndings(tree)
   const worldGenesis = world?.genesis
   const worldSeed = world?.seed ?? 0
+  const worldAmbientEffect = world?.theme?.ambientEffect
 
   after(() => incrementStoryViews(id).catch(() => {}))
 
@@ -118,9 +119,9 @@ async function StoryContent({ params }: { params: Promise<{ id: string }> }) {
       </div>
 
       {gated ? (
-        <GatedStoryReader story={story} endingCount={endingCount} worldGenesis={worldGenesis} worldSeed={worldSeed} />
+        <GatedStoryReader story={story} endingCount={endingCount} worldGenesis={worldGenesis} worldSeed={worldSeed} worldAmbientEffect={worldAmbientEffect} />
       ) : rootNode ? (
-        <BookViewerClient story={story} initialNode={rootNode} endingCount={endingCount} worldGenesis={worldGenesis} worldSeed={worldSeed} />
+        <BookViewerClient story={story} initialNode={rootNode} endingCount={endingCount} worldGenesis={worldGenesis} worldSeed={worldSeed} worldAmbientEffect={worldAmbientEffect} />
       ) : (
         <div className="glass-card rounded-2xl p-14 text-center">
           <p className="text-muted-foreground/45 text-sm">

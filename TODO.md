@@ -218,8 +218,11 @@ presets and makes ambient dynamic rather than a single static per-story pick.
   `resolveAmbientSound()`; the visual (`ambientEffect`) is unchanged and
   always author-set, while the sound can now mirror it, go silent, or
   (once the next item lands) auto-follow the chapter's own scene.
-- [ ] **Per-world default ambient** — stories inherit the world's default
-  ambient unless the author overrides it.
+- [x] **Per-world default ambient** — `resolveAmbientVisual()` falls back to
+  the world's `theme.ambientEffect` when a story hasn't set its own; sound
+  inherits the same fallback via `resolveAmbientSound`. Threaded
+  `worldAmbientEffect` through `stories/[id]/page.tsx` →
+  `BookViewerClient`/`GatedStoryReader` → `BookViewer`.
 - [ ] **Auto per-chapter ambient matching** — an "Auto" mode where the
   ambient (visual+sound) switches per-chapter to match the scene (e.g. a
   rain scene switches to the rain ambient for that chapter). Folded into the

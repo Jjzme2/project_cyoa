@@ -33,7 +33,7 @@ import {
   setAmbientOn,
 } from '@/lib/page-sound'
 import { ACHIEVEMENT_DEFS } from '@/types'
-import type { Story, StoryNode, ChoiceSlot, ChoiceEffect, SaveSlot, WorldBible } from '@/types'
+import type { Story, StoryNode, ChoiceSlot, ChoiceEffect, SaveSlot, WorldBible, AmbientEffect } from '@/types'
 import {
   type DiscoveredEnding,
   type Direction,
@@ -46,6 +46,7 @@ import {
   loadLocalProgress,
   saveLocalProgress,
   resolveAmbientSound,
+  resolveAmbientVisual,
 } from './book-viewer-internals'
 import { CastDialog, EndingsDialog, MapDialog } from './ReaderDialogs'
 
@@ -55,10 +56,12 @@ interface Props {
   endingCount?: number
   worldGenesis?: WorldBible
   worldSeed?: number
+  /** The story's world's default ambient — inherited when the story has none of its own. */
+  worldAmbientEffect?: AmbientEffect
 }
 
 
-export function BookViewer({ story, initialNode, endingCount, worldGenesis, worldSeed }: Props) {
+export function BookViewer({ story, initialNode, endingCount, worldGenesis, worldSeed, worldAmbientEffect }: Props) {
   const { user } = useAuth()
   const [node, setNode] = useState<StoryNode>(initialNode)
   const [history, setHistory] = useState<StoryNode[]>([])
@@ -119,12 +122,14 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
 
   const hasCast = !!story.protagonist?.name || (story.characters?.length ?? 0) > 0
 
-  const ambientEffect = story.readingTheme?.ambientEffect ?? 'none'
+  // An untouched story inherits its world's default ambient (visual and,
+  // via 'match'/'auto', sound too).
+  const ambientEffect = resolveAmbientVisual(story.readingTheme, worldAmbientEffect)
   // The sound can diverge from the visual (auto-follow the scene, or be
   // silenced outright) — see resolveAmbientSound. No per-chapter scene cue
   // yet (that's the auto-matching work), so 'auto' currently just falls
   // back to the visual, same as 'match'.
-  const ambientSound = resolveAmbientSound(story.readingTheme)
+  const ambientSound = resolveAmbientSound(story.readingTheme, undefined, worldAmbientEffect)
 
   // Start/stop the looping soundscape with the toggle (and clean up on unmount).
   // Delayed slightly: ambient can auto-start from a preference saved in a PRIOR

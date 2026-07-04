@@ -43,8 +43,22 @@ export const PAGE_PALETTES: Record<string, { bg: string; text: string; spine: st
 }
 
 /**
- * The ambient VISUAL (`AmbientBackground`, `readingTheme.ambientEffect`) is
- * always author-set and unconditional. The ambient SOUND is resolved
+ * The story's own ambient effect wins; an untouched story (still 'none')
+ * inherits its world's default ambient, so a world feels consistently
+ * atmospheric even before an author has set anything on any one story.
+ */
+export function resolveAmbientVisual(
+  theme: ReadingTheme | null | undefined,
+  worldDefault?: AmbientEffect | null,
+): AmbientEffect {
+  const effect = theme?.ambientEffect
+  if (effect && effect !== 'none') return effect
+  return worldDefault ?? 'none'
+}
+
+/**
+ * The ambient VISUAL (`AmbientBackground`, resolved above) is always
+ * author/world-set and unconditional. The ambient SOUND is resolved
  * separately so it can diverge from the visual: it can auto-follow a
  * per-chapter scene cue, or be silenced outright, independent of what's on
  * screen.
@@ -52,11 +66,12 @@ export const PAGE_PALETTES: Record<string, { bg: string; text: string; spine: st
 export function resolveAmbientSound(
   theme: ReadingTheme | null | undefined,
   sceneAmbient?: AmbientEffect | null,
+  worldDefault?: AmbientEffect | null,
 ): AmbientEffect {
   const mode = theme?.ambientSoundMode ?? 'match'
   if (mode === 'off') return 'none'
   if (mode === 'auto' && sceneAmbient) return sceneAmbient
-  return theme?.ambientEffect ?? 'none'
+  return resolveAmbientVisual(theme, worldDefault)
 }
 
 export function saveDiscoveredEndings(storyId: string, endings: DiscoveredEnding[]) {
