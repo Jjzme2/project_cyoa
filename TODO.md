@@ -145,6 +145,10 @@ validation, lint-debt cleanup)._
   write-race errors.
 - [ ] Global leaderboards (denormalized aggregate counters).
 - [ ] Global bounty board (collection-group query + index).
+- [ ] **Reader Pal** — a visual companion (no AI) that shows up across the app
+  (reader, profile, library), tracks its own stats, and levels up as the
+  reader/writer plays; progression ties into the existing achievement system
+  (Tier 2 #9 in `docs/EXECUTION-PLAN.md`; richer triggers need 9b first).
 
 ## 💡 Ideas & suggestions (surfaced while building)
 
