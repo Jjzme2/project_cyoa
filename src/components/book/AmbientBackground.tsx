@@ -277,7 +277,6 @@ function AuroraEffect() {
 
 function LightningEffect() {
   const streaks = useParticles(24)
-  const flashes = useParticles(3)
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden z-[1]">
       {streaks.map((p, i) => (
@@ -298,20 +297,19 @@ function LightningEffect() {
           }}
         />
       ))}
-      {flashes.map((p, i) => (
-        <div
-          key={`f${i}`}
-          className="absolute inset-0"
-          style={{
-            background: 'rgba(220,225,255,0.9)',
-            animationName: 'lightning-flash',
-            animationTimingFunction: 'ease-out',
-            animationIterationCount: 'infinite',
-            animationDelay: `${p.delay * 3 + i * 4}s`,
-            animationDuration: `${9 + p.duration * 6}s`,
-          }}
-        />
-      ))}
+      {/* A single, gentler flash layer. Three stacked opaque overlays could
+          coincide into a near-white full-viewport strobe behind the text — a
+          photosensitivity/comfort hazard in the core reading surface. */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: 'rgba(220,225,255,0.4)',
+          animationName: 'lightning-flash',
+          animationTimingFunction: 'ease-out',
+          animationIterationCount: 'infinite',
+          animationDuration: '11s',
+        }}
+      />
     </div>
   )
 }

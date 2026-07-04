@@ -47,7 +47,11 @@ export const POST = apiHandler(async (req: NextRequest) => {
 
   const id = await createFeedback({ type, title, body }, auth.uid, auth.name ?? 'Anonymous')
   await insights.track('feedback.created', { uid: auth.uid, props: { feedbackId: id, type } })
-  checkAndAwardAchievements(auth.uid, 'feedback_submitted').catch(() => {})
+  // `voice_heard` grants credits — only registered accounts earn it, so guests
+  // can't farm it by posting throwaway feedback.
+  if (!auth.isAnonymous) {
+    checkAndAwardAchievements(auth.uid, 'feedback_submitted').catch(() => {})
+  }
 
   return NextResponse.json({ id }, { status: 201 })
 })

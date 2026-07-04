@@ -69,7 +69,7 @@ export function ContainedAmbient({ effect, density = 1 }: { effect: AmbientEffec
             return <span key={i} style={{ ...base, top: '-10%', width: p.size * 10 + 14, height: '120%', background: 'linear-gradient(180deg, rgba(210,225,255,0.2) 0%, transparent 70%)', filter: 'blur(4px)', animationName: 'mist-drift', animationTimingFunction: 'ease-in-out', animationDuration: `${9 + p.dur * 5}s` }} />
           case 'lightning':
             return i === 0
-              ? <span key={i} className="absolute inset-0" style={{ animationDelay: base.animationDelay, animationIterationCount: 'infinite', background: 'rgba(220,225,255,0.85)', animationName: 'lightning-flash', animationTimingFunction: 'ease-out', animationDuration: `${5 + p.dur * 3}s` }} />
+              ? <span key={i} className="absolute inset-0" style={{ animationDelay: base.animationDelay, animationIterationCount: 'infinite', background: 'rgba(220,225,255,0.4)', animationName: 'lightning-flash', animationTimingFunction: 'ease-out', animationDuration: `${5 + p.dur * 3}s` }} />
               : <span key={i} style={{ ...base, top: '-10%', width: 1, height: `${p.size * 6 + 5}px`, background: `rgba(180,195,220,${p.op * 0.3})`, animationName: 'mini-fall', animationDuration: `${0.4 + p.dur * 0.5}s` }} />
           default:
             return null

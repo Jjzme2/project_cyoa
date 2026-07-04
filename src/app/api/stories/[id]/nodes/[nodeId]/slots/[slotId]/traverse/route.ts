@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { parseJson } from '@/lib/api-validation'
-import { incrementTraversal, getChoiceSlot, checkAndAwardAchievements } from '@/lib/firestore-helpers'
+import { incrementTraversal, checkAndAwardAchievements } from '@/lib/firestore-helpers'
 
 const TraverseSchema = z.object({ childNodeId: z.string().min(1, 'childNodeId required') })
 
@@ -22,10 +22,11 @@ export async function POST(
   if (!parsed.ok) return parsed.response
 
   try {
-    await incrementTraversal(storyId, nodeId, slotId, parsed.data.childNodeId)
-    const slot = await getChoiceSlot(storyId, nodeId, slotId)
-    if (slot?.submittedBy && slot.traversals === PATH_PIONEER_THRESHOLD) {
-      checkAndAwardAchievements(slot.submittedBy, 'path_traversal_milestone').catch(() => {})
+    const { slotTraversals, submittedBy } = await incrementTraversal(
+      storyId, nodeId, slotId, parsed.data.childNodeId,
+    )
+    if (submittedBy && slotTraversals === PATH_PIONEER_THRESHOLD) {
+      checkAndAwardAchievements(submittedBy, 'path_traversal_milestone').catch(() => {})
     }
   } catch {
     // best-effort; popularity counters should never break reading

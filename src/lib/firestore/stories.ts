@@ -117,11 +117,21 @@ export async function incrementTraversal(
   nodeId: string,
   slotId: string,
   childNodeId: string,
-): Promise<void> {
-  const batch = adminDb.batch()
-  batch.update(slotRef(storyId, nodeId, slotId), { traversals: FieldValue.increment(1) })
-  batch.update(nodeRef(storyId, childNodeId), { traversals: FieldValue.increment(1) })
-  await batch.commit()
+): Promise<{ slotTraversals: number; submittedBy: string | null }> {
+  const sRef = slotRef(storyId, nodeId, slotId)
+  const cRef = nodeRef(storyId, childNodeId)
+  // A transaction (not a blind batch) so we learn the exact resulting count and
+  // the path's author in the same round trip — the caller no longer needs a
+  // second read to detect the Path Pioneer milestone, and concurrent traversals
+  // serialize so exactly one of them observes the threshold.
+  return adminDb.runTransaction(async (txn) => {
+    const slotDoc = await txn.get(sRef)
+    const prev = (slotDoc.data()?.traversals as number) ?? 0
+    const submittedBy = (slotDoc.data()?.submittedBy as string | undefined) ?? null
+    txn.update(sRef, { traversals: FieldValue.increment(1) })
+    txn.update(cRef, { traversals: FieldValue.increment(1) })
+    return { slotTraversals: prev + 1, submittedBy }
+  })
 }
 
 export interface GalleryImage {
@@ -171,11 +181,10 @@ export async function getAuthoredPathStats(uid: string): Promise<AuthoredPathSta
   for (const d of snap.docs) {
     const data = d.data()
     totalReads += (data.traversals as number) ?? 0
-    // Legacy per-node `reactions` maps predate sharded counters — kept as a frozen
-    // baseline that `totalReactions` (the sharded aggregate) accrues on top of.
-    const legacyReactions = (data.reactions as Record<string, number>) ?? {}
-    totalLoves += Object.values(legacyReactions).reduce((sum, n) => sum + (n ?? 0), 0)
-    totalLoves += (data.totalReactions as number) ?? 0
+    // Per-type reaction counts live in the node's `reactions` map, the single
+    // source of truth (see firestore/reactions.ts) — sum it for total loves.
+    const reactions = (data.reactions as Record<string, number>) ?? {}
+    totalLoves += Object.values(reactions).reduce((sum, n) => sum + (n ?? 0), 0)
   }
   return { pathsWritten: snap.size, totalReads, totalLoves }
 }

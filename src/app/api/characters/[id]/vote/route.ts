@@ -18,6 +18,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const auth = await getAuthContext(req)
   if (!auth) return NextResponse.json({ error: 'Sign in to vote' }, { status: 401 })
+  // Guests are free and disposable; requiring a registered account keeps the
+  // "most loved" ranking from being stuffed with throwaway anonymous votes.
+  if (auth.isAnonymous) {
+    return NextResponse.json({ error: 'Create a free account to vote' }, { status: 403 })
+  }
 
   const character = await getCharacter(id)
   if (!character) return NextResponse.json({ error: 'Character not found' }, { status: 404 })
