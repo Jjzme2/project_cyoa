@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, useCallback, Suspense } from 'react'
-import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -20,6 +19,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/components/Providers'
 import { ApiKeySettings } from '@/components/profile/ApiKeySettings'
+import { ProfileAvatar } from '@/components/profile/ProfileAvatar'
 import { APP_CONFIG } from '@/lib/config'
 import { AchievementDisplay } from '@/components/achievements/AchievementDisplay'
 import { TwoFactorSetup } from '@/components/auth/TwoFactorSetup'
@@ -256,13 +256,7 @@ function ProfileContent() {
       {/* Header Profile Info card */}
       <section className="glass border-white/10 p-6 rounded-xl flex flex-col sm:flex-row items-center gap-6 justify-between">
         <div className="flex items-center gap-4 flex-col sm:flex-row text-center sm:text-left">
-          <div className="w-20 h-20 rounded-full ring-2 ring-amber-500/30 overflow-hidden bg-amber-500/10 flex items-center justify-center text-xl text-amber-300 font-sans font-bold">
-            {user.photoURL ? (
-              <Image src={user.photoURL} alt="Avatar" fill className="object-cover" sizes="80px" />
-            ) : (
-              initials
-            )}
-          </div>
+          <ProfileAvatar photoURL={user.photoURL} initials={initials} />
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-2.5 justify-center sm:justify-start">
               <h1 className="text-2xl font-bold tracking-tight">{user.displayName || 'Chronicle Member'}</h1>
