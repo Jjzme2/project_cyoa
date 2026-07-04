@@ -56,10 +56,11 @@ export async function getWorldsByMultiverse(multiverseId: string, limit = 12): P
   return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as World))
 }
 
-export async function getWorldsByAuthor(authorId: string): Promise<World[]> {
+export async function getWorldsByAuthor(authorId: string, limit = 100): Promise<World[]> {
   const snap = await adminDb
     .collection('worlds')
     .where('authorId', '==', authorId)
+    .limit(limit)
     .get()
 
   return snap.docs

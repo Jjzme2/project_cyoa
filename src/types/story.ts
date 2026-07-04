@@ -192,6 +192,10 @@ export interface StoryNode {
   /** How many readers have branched a personal saga from this chapter (a 4th,
    * non-community branch type). Surfaced in the reader. */
   sagaBranches?: number
+  /** Denormalized sum of all sharded reaction-type counters on this node (see
+   * `reactionShards` subcollection) — cheap to read for reputation stats
+   * without scanning every shard of every authored node. */
+  totalReactions?: number
   /** A compact, reader-facing snapshot of the living simulation at this chapter
    * (tension, factions, economy, cast mood) — computed server-side from the
    * engine so the reader can SEE the world move. */
