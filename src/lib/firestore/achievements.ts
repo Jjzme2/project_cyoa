@@ -28,7 +28,7 @@ export type AchievementEvent =
   | 'contribution' | 'illustration' | 'world_created' | 'story_created' | 'story_read'
   | 'bookmark' | 'ending_reached'
   | 'saga_created' | 'feedback_submitted' | 'bounty_posted' | 'bounty_filled'
-  | 'world_standing' | 'npc_bond' | 'path_traversal_milestone'
+  | 'world_standing' | 'npc_bond' | 'path_traversal_milestone' | 'first_choice'
 
 /**
  * Update counts for `event`, then award any newly-earned achievements —
@@ -39,7 +39,7 @@ export type AchievementEvent =
 export async function checkAndAwardAchievements(
   userId: string,
   event: AchievementEvent,
-  meta?: { endingType?: EndingType; endingKey?: string; standing?: number },
+  meta?: { endingType?: EndingType; endingKey?: string; standing?: number; storyId?: string },
 ): Promise<string[]> {
   const ref = achievementsRef(userId)
   const newlyEarned: string[] = []
@@ -57,7 +57,6 @@ export async function checkAndAwardAchievements(
     if (event === 'illustration') counts.illustrations = (counts.illustrations ?? 0) + 1
     if (event === 'world_created') counts.worlds = (counts.worlds ?? 0) + 1
     if (event === 'story_created') counts.stories = (counts.stories ?? 0) + 1
-    if (event === 'story_read') counts.storiesRead = (counts.storiesRead ?? 0) + 1
     if (event === 'bookmark') counts.bookmarks = (counts.bookmarks ?? 0) + 1
     if (event === 'saga_created') counts.sagasCreated = (counts.sagasCreated ?? 0) + 1
     if (event === 'feedback_submitted') counts.feedbackSubmitted = (counts.feedbackSubmitted ?? 0) + 1
@@ -67,6 +66,15 @@ export async function checkAndAwardAchievements(
     if (event === 'path_traversal_milestone') counts.pathMilestones = (counts.pathMilestones ?? 0) + 1
     if (event === 'world_standing' && meta?.standing !== undefined) {
       counts.bestWorldStanding = Math.max(counts.bestWorldStanding ?? -1, meta.standing)
+    }
+    if (event === 'story_read') {
+      // Idempotent per story: re-saving progress within the same story (every
+      // page turn) never inflates the distinct-stories-read count.
+      const ids = counts.storiesReadIds ?? []
+      if (!meta?.storyId || !ids.includes(meta.storyId)) {
+        counts.storiesRead = (counts.storiesRead ?? 0) + 1
+        if (meta?.storyId && ids.length < 500) counts.storiesReadIds = [...ids, meta.storyId]
+      }
     }
     if (event === 'ending_reached') {
       // Idempotent per ending: re-reaching (or re-posting) the same ending never
@@ -114,6 +122,7 @@ export async function checkAndAwardAchievements(
     check('renowned', (counts.bestWorldStanding ?? -1) >= 0.7)
     check('kindred_spirit', (counts.deepBonds ?? 0) >= 1)
     check('path_pioneer', (counts.pathMilestones ?? 0) >= 1)
+    check('first_choice', event === 'first_choice')
     // Capstone — checked last so it sees everything earned this same round.
     check('completionist', earned.length >= ACHIEVEMENT_DEFS.length - 1)
 

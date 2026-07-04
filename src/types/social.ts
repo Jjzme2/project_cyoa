@@ -59,6 +59,7 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
   { id: 'renowned',      name: 'Renowned',        description: 'Earned deep standing in a world',    icon: '👑', reward: 10 },
   { id: 'kindred_spirit', name: 'Kindred Spirit', description: 'A character’s regard for you deepened to full trust', icon: '💞', reward: 10 },
   { id: 'path_pioneer',  name: 'Path Pioneer',    description: 'A path you wrote was chosen by 25 readers', icon: '🌟', reward: 15 },
+  { id: 'first_choice',  name: 'First Choice',    description: 'Made your first choice in a story',   icon: '🎲', reward: 3 },
   { id: 'completionist', name: 'Completionist',   description: 'Earned every other achievement',     icon: '💎', reward: 25 },
 ]
 
@@ -78,6 +79,9 @@ export interface UserAchievements {
     /** storyId:nodeId keys already counted, so re-reaching an ending is
      * idempotent (capped). */
     endingKeys?: string[]
+    /** Distinct story ids already counted toward storiesRead, so re-saving
+     * progress within the same story never inflates the count (capped). */
+    storiesReadIds?: string[]
     /** Personal sagas begun. */
     sagasCreated?: number
     /** Community feedback items submitted. */

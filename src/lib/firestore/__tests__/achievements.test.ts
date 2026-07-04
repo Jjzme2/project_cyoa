@@ -115,6 +115,26 @@ describe('checkAndAwardAchievements', () => {
     expect(earned).toEqual([achievementId])
   })
 
+  it('"first_choice" earns once no matter how many stories trigger it', async () => {
+    const first = await checkAndAwardAchievements('u1', 'first_choice')
+    expect(first).toEqual(['first_choice'])
+    const second = await checkAndAwardAchievements('u1', 'first_choice')
+    expect(second).toEqual([])
+  })
+
+  it('"story_read" counts distinct stories, not every page turn within one', async () => {
+    for (let i = 0; i < 6; i++) await checkAndAwardAchievements('u1', 'story_read', { storyId: 'storyA' })
+    let user = await getUserAchievements('u1')
+    expect(user.counts.storiesRead).toBe(1)
+    expect(user.earned).not.toContain('explorer')
+    for (const storyId of ['storyB', 'storyC', 'storyD', 'storyE']) {
+      await checkAndAwardAchievements('u1', 'story_read', { storyId })
+    }
+    user = await getUserAchievements('u1')
+    expect(user.counts.storiesRead).toBe(5)
+    expect(user.earned).toContain('explorer')
+  })
+
   it('awards "renowned" once world standing reaches 0.7', async () => {
     const low = await checkAndAwardAchievements('u1', 'world_standing', { standing: 0.4 })
     expect(low).toEqual([])

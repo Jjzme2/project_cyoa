@@ -25,6 +25,7 @@ const CLIENT_EVENT_ALLOWLIST = new Set([
   'onboarding.welcome_shown',
   'onboarding.welcome_dismissed',
   'onboarding.first_write_nudged',
+  'onboarding.teaser_choice_clicked',
 ])
 
 /**
