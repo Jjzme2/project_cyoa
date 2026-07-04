@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, type Variants } from 'framer-motion'
 import Image from 'next/image'
 import { ImagePlus, Volume2, Pause, Play, Square } from 'lucide-react'
 
@@ -147,24 +147,35 @@ function ListenControl({ text }: { text: string }) {
   )
 }
 
+// Staggers each paragraph's own reveal rather than fading the whole chapter
+// in as one flat block — the text unfurls, beat by beat.
+const paragraphContainer: Variants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.09, delayChildren: 0.12 } },
+}
+const paragraphReveal: Variants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: 'easeOut' } },
+}
+
 export function StoryContent({ content, depth, choiceText, imageUrl }: Props) {
   const paragraphs = content.split('\n').filter((p) => p.trim())
 
   return (
     <motion.div
       key={content}
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.12, ease: 'easeOut' }}
+      initial="hidden"
+      animate="visible"
+      variants={paragraphContainer}
       className="flex flex-col h-full overflow-hidden"
     >
       {choiceText && (
-        <p className="text-xs italic mb-5 pb-4 border-b border-amber-900/20 opacity-55">
+        <motion.p variants={paragraphReveal} className="text-xs italic mb-5 pb-4 border-b border-amber-900/20 opacity-55">
           ❝ {choiceText} ❞
-        </p>
+        </motion.p>
       )}
 
-      <div className="flex items-center justify-between mb-4">
+      <motion.div variants={paragraphReveal} className="flex items-center justify-between mb-4">
         <p className="text-[9px] uppercase tracking-[0.25em] opacity-35 font-sans">
           Chapter {depth + 1}
         </p>
@@ -184,10 +195,10 @@ export function StoryContent({ content, depth, choiceText, imageUrl }: Props) {
             </span>
           )}
         </div>
-      </div>
+      </motion.div>
 
       {imageUrl && (
-        <div className="relative w-full mb-4 rounded-lg overflow-hidden" style={{ aspectRatio: '16/9' }}>
+        <motion.div variants={paragraphReveal} className="relative w-full mb-4 rounded-lg overflow-hidden" style={{ aspectRatio: '16/9' }}>
           <Image
             src={imageUrl}
             alt="Story illustration"
@@ -196,18 +207,19 @@ export function StoryContent({ content, depth, choiceText, imageUrl }: Props) {
             sizes="(max-width: 768px) 100vw, 50vw"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
-        </div>
+        </motion.div>
       )}
 
       <div className="flex-1 overflow-y-auto space-y-3.5 pr-1">
         {paragraphs.map((p, i) => (
-          <p
+          <motion.p
             key={i}
+            variants={paragraphReveal}
             className="text-[15px] leading-[1.9]"
             style={{ textIndent: i === 0 ? '1.5em' : undefined }}
           >
             {p}
-          </p>
+          </motion.p>
         ))}
       </div>
 

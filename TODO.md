@@ -244,7 +244,11 @@ presets and makes ambient dynamic rather than a single static per-story pick.
   its own pace (parallax), via a new `WorldPortalBreath.tsx` client wrapper;
   the dense `card` variant (world listings) is untouched and stays
   server-safe.
-- [ ] **Choice/chapter micro-interaction animations.**
+- [x] **Choice/chapter micro-interaction animations** — a written choice
+  button now springs on tap (`whileTap`); `StoryContent` replaced its
+  flat fade-in with a staggered, block-by-block reveal (quote → header →
+  image → each paragraph) so a new chapter unfurls rather than snapping
+  in as one piece.
 
 ## 🔒 Blocked on ops / deploy
 
