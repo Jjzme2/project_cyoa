@@ -386,7 +386,7 @@ export default function NewWorldPage() {
         </select>
         <p className="text-[11px] text-muted-foreground/40 leading-relaxed">
           Gentle worlds get conflict-free story arcs — the climax is a shared wonder or a heartfelt moment, never a
-          threat. Auto detects this from your rules (e.g. &ldquo;no bad happens here&rdquo;).
+          threat. Auto detects this from your rules (e.g. “no bad happens here”).
         </p>
       </div>
 
