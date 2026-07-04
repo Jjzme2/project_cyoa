@@ -124,7 +124,7 @@ export async function generateStoryNode(
   includeImage: boolean,
   systemNarrativeEvents: string = '',
   endingDirective: string = '',
-): Promise<{ content: string; choices: string[]; model: string; newCharacters: StoryCharacter[]; location?: string; sceneAmbient?: AmbientEffect; ending?: { title: string; type: EndingType } }> {
+): Promise<{ content: string; choices: string[]; model: string; newCharacters: StoryCharacter[]; location?: string; sceneAmbient?: AmbientEffect; ending?: { title: string; type: EndingType }; correctedChoiceText?: string }> {
   const prompt = buildPrompt(world, storyPath, choiceText, includeImage, systemNarrativeEvents, endingDirective)
 
   try {

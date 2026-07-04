@@ -29,11 +29,18 @@ export function parseAIResponse(text: string): {
   location?: string
   sceneAmbient?: AmbientEffect
   ending?: { title: string; type: EndingType }
+  /** The reader's choice, silently typo/grammar-corrected by the same call
+   * that validated and wrote the chapter — undefined if the model omitted
+   * the line (callers fall back to the original submitted text). */
+  correctedChoiceText?: string
 } {
   const rejectionMatch = text.match(/^REJECTED:\s*(.+)/im)
   if (rejectionMatch) {
     throw new PromptRejectedError(rejectionMatch[1].trim())
   }
+
+  const choiceTextMatch = text.match(/^CHOICE_TEXT:\s*(.+)/im)
+  const correctedChoiceText = choiceTextMatch ? choiceTextMatch[1].trim().slice(0, 200) || undefined : undefined
 
   // A definitive conclusion: `ENDING: <title> | <type>`. When present, this
   // chapter is terminal (we drop any choices the model also emitted).
@@ -78,6 +85,7 @@ export function parseAIResponse(text: string): {
 
   const content = text
     .replace(/CHOICE_\d:.+/g, '')
+    .replace(/^CHOICE_TEXT:.+/gim, '')
     .replace(/NEW_CHARACTER:.+/gi, '')
     .replace(/^LOCATION:.+/gim, '')
     .replace(/^AMBIENT:.+/gim, '')
@@ -93,6 +101,7 @@ export function parseAIResponse(text: string): {
     location,
     ...(sceneAmbient ? { sceneAmbient } : {}),
     ...(ending ? { ending } : {}),
+    ...(correctedChoiceText ? { correctedChoiceText } : {}),
   }
 }
 

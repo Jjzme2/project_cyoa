@@ -35,7 +35,7 @@ import {
 import { mergeEchoes, mergeCameos } from '@/lib/multiverse'
 import { CreditManager } from '@/lib/credit-manager'
 import { creditFailureResponse } from '@/lib/credit-response'
-import { generateStoryNode, generateStoryImage, reviewContribution, judgeContent, buildWorldContext, PromptRejectedError } from '@/lib/ai'
+import { generateStoryNode, generateStoryImage, judgeContent, buildWorldContext, PromptRejectedError } from '@/lib/ai'
 import { trackGenerationCompleted, trackGenerationFailed } from '@/lib/generation-telemetry'
 import type { ModerationResult } from '@/lib/moderation'
 import { validatePromptLocal } from '@/lib/validate'
@@ -218,21 +218,6 @@ export async function POST(
       cameos,
     })
 
-    // Autonomous Editor: void genuinely illegitimate / world-breaking entries
-    // (no chapter is generated for them), and silently fix typos & grammar while
-    // preserving the author's voice. The (possibly corrected) text is what gets
-    // generated from and stored as the choice label.
-    const review = await reviewContribution(promptText, worldCtx, uid)
-    if (review.verdict === 'void') {
-      await Promise.all([
-        releaseChoiceSlot(storyId, nodeId, slotId),
-        CreditManager.refund(uid, tier, credits, source),
-      ])
-      trackGenerationFailed({ kind: 'chapter', credits, source, uid, reason: 'voided', context: { storyId } })
-      return NextResponse.json({ error: review.reason, voided: true }, { status: 422 })
-    }
-    const editedPrompt = review.text
-
     // The narrative engine runs for EVERY story now. Its always-on subsystems —
     // the AI Director (pacing/tension beats), procedural environment & encounters,
     // and the autonomous faction + economy sim — need no per-story config. GOAP
@@ -289,15 +274,22 @@ export async function POST(
       ? `a definitive ${forceEnding.type} ending has been reached. Conclude the story NOW with a final chapter that lands this ${forceEnding.type} ending titled "${forceEnding.title}".`
       : endingDirective(parentNode.depth + 1, updatedEngineState, storyMode)
 
-    const { content, choices, model, newCharacters, location, sceneAmbient, ending } = await generateStoryNode(
-      worldCtx,
-      storyPath,
-      editedPrompt,
-      uid,
-      includeImage,
-      systemNarrativeEvents,
-      endDirective,
-    )
+    // Validation (does this choice even make sense?), typo/grammar correction,
+    // and chapter generation all happen in this ONE call — the model emits a
+    // REJECTED line to void an illegitimate choice, or a corrected CHOICE_TEXT
+    // line before writing (see buildPrompt/parseAIResponse). This replaces what
+    // used to be a separate "Editor" round-trip before generation ever started.
+    const { content, choices, model, newCharacters, location, sceneAmbient, ending, correctedChoiceText } =
+      await generateStoryNode(
+        worldCtx,
+        storyPath,
+        promptText.trim(),
+        uid,
+        includeImage,
+        systemNarrativeEvents,
+        endDirective,
+      )
+    const editedPrompt = correctedChoiceText ?? promptText.trim()
 
     // Moderate the generated prose. The rules-based check is the reliable floor;
     // the AI Content Judge can only escalate it (flag/refuse), never loosen it —
