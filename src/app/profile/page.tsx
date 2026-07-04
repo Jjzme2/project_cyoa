@@ -22,6 +22,7 @@ import { ApiKeySettings } from '@/components/profile/ApiKeySettings'
 import { ProfileAvatar } from '@/components/profile/ProfileAvatar'
 import { APP_CONFIG } from '@/lib/config'
 import { AchievementDisplay } from '@/components/achievements/AchievementDisplay'
+import { ReaderPal } from '@/components/profile/ReaderPal'
 import { TwoFactorSetup } from '@/components/auth/TwoFactorSetup'
 
 interface ProfileApiData {
@@ -495,6 +496,9 @@ function ProfileContent() {
           </div>
         </section>
       )}
+
+      {/* Reader Pal */}
+      <ReaderPal />
 
       {/* Achievements */}
       <AchievementDisplay />
