@@ -146,6 +146,12 @@ export interface Story {
   economyEffects?: import('@/types/economy').EconomyResourceEffect[]
   /** Author win/lose conditions: a resource threshold that forces a definitive ending. */
   endingConditions?: EndingCondition[]
+  /**
+   * This story's narrative shape, CLAMPED by its world: a dramatic world may
+   * host a gentle story; a gentle world's stories are always gentle. Absent =
+   * inherit the world's shape.
+   */
+  narrativeMode?: 'gentle' | 'dramatic'
 }
 
 export interface StoryNode {

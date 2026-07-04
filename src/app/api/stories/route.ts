@@ -7,6 +7,7 @@ import { adminAuth } from '@/lib/firebase-admin'
 import { getStories, createStory, getWorld, checkAndAwardAchievements, registerCharacterAppearance } from '@/lib/firestore-helpers'
 import { clampRating } from '@/lib/ratings'
 import { sanitizeDirector } from '@/lib/director'
+import { resolveNarrativeMode } from '@/lib/engine/narrative-mode'
 import { sanitizeStyleChoices } from '@/lib/story-style'
 import { analytics } from '@/lib/telemetry'
 import { CONTENT_RATINGS, DEFAULT_CONTENT_RATING } from '@/types'
@@ -23,6 +24,7 @@ const CreateStorySchema = z.object({
   coverGradient: z.string().optional(),
   resources: z.custom<ResourceDefinition[]>().optional(),
   endingConditions: z.custom<EndingCondition[]>().optional(),
+  narrativeMode: z.enum(['gentle', 'dramatic']).optional(),
   tags: z.array(z.string()).optional(),
   coverTheme: z.custom<CoverTheme>().optional(),
   readingTheme: z.custom<ReadingTheme>().optional(),
@@ -62,7 +64,7 @@ export async function POST(req: NextRequest) {
 
   const parsed = await parseJson(req, CreateStorySchema)
   if (!parsed.ok) return parsed.response
-  const { title, description, worldId, worldName, coverGradient, resources, tags, coverTheme, readingTheme, rating, protagonist, director, styleChoices, youMode, shared, goapEnabled, implementQuests, endingConditions } = parsed.data
+  const { title, description, worldId, worldName, coverGradient, resources, tags, coverTheme, readingTheme, rating, protagonist, director, styleChoices, youMode, shared, goapEnabled, implementQuests, endingConditions, narrativeMode } = parsed.data
 
   // Authored director persona (optional). Axes are clamped to [-1, 1]; only kept
   // if the author actually set something.
@@ -110,6 +112,13 @@ export async function POST(req: NextRequest) {
     youMode: !!youMode,
     ...(Array.isArray(endingConditions) && endingConditions.length
       ? { endingConditions: endingConditions.slice(0, 10) }
+      : {}),
+    // Per-story narrative shape, CLAMPED by the world: a gentle world is law
+    // (drop any override — it's implied), and 'dramatic' inside a dramatic
+    // world is the default (don't store). Only a gentle story in a dramatic
+    // world is a real override worth persisting.
+    ...(narrativeMode === 'gentle' && resolveNarrativeMode(world ?? { tone: '', rules: '', lore: '', description: '' }) !== 'gentle'
+      ? { narrativeMode: 'gentle' as const }
       : {}),
     // Default to shared/listed; only store `unlisted` when the author opts out.
     ...(shared === false ? { unlisted: true } : {}),

@@ -63,6 +63,41 @@ export function resolveNarrativeMode(
 }
 
 /**
+ * Resolve the EFFECTIVE mode for one story: a gentle world is law (its stories
+ * can never be overridden dramatic — same clamp philosophy as content ratings),
+ * while a dramatic world may host an individual gentle story via the story's
+ * own `narrativeMode`.
+ */
+export function resolveStoryNarrativeMode(
+  world: Parameters<typeof resolveNarrativeMode>[0],
+  story?: { narrativeMode?: NarrativeMode },
+): NarrativeMode {
+  const worldMode = resolveNarrativeMode(world)
+  if (worldMode === 'gentle') return 'gentle'
+  return story?.narrativeMode ?? worldMode
+}
+
+/** Actions the cast may never take — or even plan — in a gentle world. */
+const HOSTILE_ACTIONS = new Set(['social_betray', 'social_intimidate', 'combat_attack_player'])
+
+/**
+ * Strip hostility from a GOAP config for a gentle world: hostile actions leave
+ * the action set, and goals that work AGAINST the protagonist are dropped. An
+ * agent left goalless simply idles warmly (no planned action) — which is
+ * exactly right for a world where nothing bad happens. Applied at the single
+ * agent-registration chokepoint, so authored and default configs alike comply.
+ */
+export function gentleGoapFilter<
+  T extends { goals: Array<{ sentiment?: string }>; availableActions: string[] },
+>(config: T): T {
+  return {
+    ...config,
+    goals: config.goals.filter((g) => g.sentiment !== 'anti_protagonist'),
+    availableActions: config.availableActions.filter((a) => !HOSTILE_ACTIONS.has(a)),
+  }
+}
+
+/**
  * The overriding instruction block for a gentle world — leads the system-driven
  * narrative events so it governs everything after it (encounters, pacing,
  * quests). Explicit about what tension means here, so the model doesn't

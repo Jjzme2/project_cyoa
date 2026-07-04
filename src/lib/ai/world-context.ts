@@ -1,4 +1,5 @@
 import type { ContentRating, DirectorPersona, Protagonist, StoryCharacter, World } from '@/types'
+import type { NarrativeMode } from '@/lib/engine/narrative-mode'
 import type { WorldContext, WorldEcho, CharacterCameo } from './prompts'
 
 export interface WorldContextOptions {
@@ -27,6 +28,8 @@ export interface WorldContextOptions {
    * unconnected world — no implicit cross-world read here.
    */
   cameos?: CharacterCameo[]
+  /** The story's EFFECTIVE narrative shape (already clamped by the world). */
+  narrativeMode?: NarrativeMode
 }
 
 /**
@@ -58,5 +61,6 @@ export function buildWorldContext(world: World, opts: WorldContextOptions = {}):
     ...(opts.styleChoices ? { styleChoices: opts.styleChoices } : {}),
     ...(opts.echoes && opts.echoes.length ? { echoes: opts.echoes } : {}),
     ...(opts.cameos && opts.cameos.length ? { cameos: opts.cameos } : {}),
+    ...(opts.narrativeMode ? { narrativeMode: opts.narrativeMode } : {}),
   }
 }

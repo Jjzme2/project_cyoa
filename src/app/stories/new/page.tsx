@@ -24,6 +24,7 @@ import type { StoryAssistResult } from '@/components/ai/AIAssistModal'
 import { CreationWizard, type CreationMode, type WizardStep } from '@/components/creation/CreationWizard'
 import { useDraft } from '@/hooks/useDraft'
 import { SAGA_HANDOFF_KEY, type SagaHandoff } from '@/lib/saga-handoff'
+import { resolveNarrativeMode } from '@/lib/engine/narrative-mode'
 
 export default function NewStoryPage() {
   const { user, loading } = useAuth()
@@ -70,6 +71,7 @@ export default function NewStoryPage() {
 
   const [economyEffects, setEconomyEffects] = useState<EconomyEffectRow[]>([])
   const [endingConditions, setEndingConditions] = useState<EndingCondition[]>([])
+  const [storyNarrativeMode, setStoryNarrativeMode] = useState<'inherit' | 'gentle'>('inherit')
   const [resources, setResources] = useState<StoryResourceDraft[]>([])
 
   const draft = useDraft<{
@@ -267,6 +269,7 @@ export default function NewStoryPage() {
                 .filter((eff) => eff.resourceName.trim() !== '' && eff.value.trim() !== '')
                 .map((eff) => ({ ...eff, value: Number(eff.value) }))
             : undefined,
+          narrativeMode: storyNarrativeMode === 'gentle' ? 'gentle' : undefined,
           endingConditions: endingConditions.length > 0
             ? endingConditions.filter((c) => c.resourceName.trim() !== '' && c.title.trim() !== '')
             : undefined,
@@ -462,6 +465,26 @@ export default function NewStoryPage() {
             : 'Defaults to the world’s rating; a moderator may adjust it.'}
         </p>
       </div>
+
+      {/* Story mood — only offered when the world itself isn't gentle (a gentle
+          world is law: all its stories are gentle, no override possible). */}
+      {selectedWorld && resolveNarrativeMode(selectedWorld) !== 'gentle' && (
+        <div className="space-y-2">
+          <Label htmlFor="story-mood">Story mood</Label>
+          <select
+            id="story-mood"
+            value={storyNarrativeMode}
+            onChange={(e) => setStoryNarrativeMode(e.target.value as 'inherit' | 'gentle')}
+            className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            <option value="inherit" className="bg-background">Match the world — dramatic arcs, real stakes</option>
+            <option value="gentle" className="bg-background">🌿 Gentle — wonder, friendship, and joy; no conflict</option>
+          </select>
+          <p className="text-[11px] text-muted-foreground/45">
+            A gentle story has climaxes of connection and discovery — never threats or villains.
+          </p>
+        </div>
+      )}
     </div>
   )
 

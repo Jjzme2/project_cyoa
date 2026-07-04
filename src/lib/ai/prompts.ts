@@ -3,7 +3,16 @@ import { describeDirector } from '@/lib/director'
 import { formatCast } from './context-budget'
 import { worldStyleBlock } from './world-style'
 import { formatStoryPath } from './story-memory'
-import { resolveNarrativeMode, gentleModeDirective } from '@/lib/engine/narrative-mode'
+import { resolveNarrativeMode, gentleModeDirective, type NarrativeMode } from '@/lib/engine/narrative-mode'
+
+/**
+ * The context's EFFECTIVE narrative shape: an explicitly resolved story-level
+ * mode (threaded through buildWorldContext) wins; otherwise derive from the
+ * world's own signals.
+ */
+function modeOf(world: WorldContext): NarrativeMode {
+  return world.narrativeMode ?? resolveNarrativeMode(world)
+}
 
 export interface WorldContext {
   name: string
@@ -23,6 +32,9 @@ export interface WorldContext {
   storySettings?: WorldStorySettings
   /** This story's pick for each of the world's configurable style options. */
   styleChoices?: Record<string, string>
+  /** The story's EFFECTIVE narrative shape, already clamped by the world
+   * (see resolveStoryNarrativeMode). Absent = derive from the world. */
+  narrativeMode?: NarrativeMode
   /**
    * Faint legends drifting in from OTHER worlds this world is explicitly
    * connected to (the multiverse layer). Present only when the world declared a
@@ -162,7 +174,7 @@ function ratingGuidance(rating: ContentRating | undefined): string {
  * builder's system events instead, so it isn't duplicated there.
  */
 function narrativeShapeBlock(world: WorldContext): string {
-  if (resolveNarrativeMode(world) !== 'gentle') return ''
+  if (modeOf(world) !== 'gentle') return ''
   return `\nNARRATIVE SHAPE (governs everything below): ${gentleModeDirective()}\n`
 }
 
@@ -198,7 +210,7 @@ export function buildPrompt(
   // A gentle world reframes the fixed prompt scaffolding too: chapters end on
   // warm anticipation rather than tension, and choices differ by what they
   // explore rather than what they risk.
-  const gentle = resolveNarrativeMode(world) === 'gentle'
+  const gentle = modeOf(world) === 'gentle'
   const endBeatLine = gentle
     ? 'End at a moment of warm anticipation or an inviting choice'
     : 'End at a moment of decision or tension'
@@ -312,14 +324,14 @@ THIS ENTRY POINT — one of several doorways into the saga the reader could have
 
 Write the opening chapter. It MUST:
 - Be written in second person ("you"), placing the reader inside this entry point's situation from the first sentence.
-- Establish the scene, the world's texture, and ${resolveNarrativeMode(world) === 'gentle' ? 'what makes this moment inviting' : 'immediate stakes'} — hook the reader fast.
+- Establish the scene, the world's texture, and ${modeOf(world) === 'gentle' ? 'what makes this moment inviting' : 'immediate stakes'} — hook the reader fast.
 - Stay strictly within the CONTENT RATING above and match the world's tone, lore, and rules.
 - Treat the reader as an outsider newly arriving here (no established standing yet) unless the entry premise says otherwise.
 - Never state how the reader feels — reveal mood through sensory detail and what's happening around them.
-- ${resolveNarrativeMode(world) === 'gentle' ? 'End at a genuine moment of warm anticipation or an inviting choice.' : 'End at a genuine moment of decision or tension.'}
+- ${modeOf(world) === 'gentle' ? 'End at a genuine moment of warm anticipation or an inviting choice.' : 'End at a genuine moment of decision or tension.'}
 - Be EXACTLY between 130 and 160 words (no more than 1100 characters). Do NOT truncate sentences.
 
-After the chapter, provide exactly 3 brief choice prompts for what the reader does next (10 words or less each). ${resolveNarrativeMode(world) === 'gentle' ? 'Make them GENUINELY DISTINCT — different delights to pursue (e.g. one curious, one social, one hands-on), each leading somewhere meaningfully different. No throwaway or near-duplicate options.' : 'Make them GENUINELY DISTINCT — different approaches with different risks (e.g. one bold, one cautious, one cunning), each leading somewhere meaningfully different. No throwaway or near-duplicate options.'}
+After the chapter, provide exactly 3 brief choice prompts for what the reader does next (10 words or less each). ${modeOf(world) === 'gentle' ? 'Make them GENUINELY DISTINCT — different delights to pursue (e.g. one curious, one social, one hands-on), each leading somewhere meaningfully different. No throwaway or near-duplicate options.' : 'Make them GENUINELY DISTINCT — different approaches with different risks (e.g. one bold, one cautious, one cunning), each leading somewhere meaningfully different. No throwaway or near-duplicate options.'}
 CHOICE_1: [choice text]
 CHOICE_2: [choice text]
 CHOICE_3: [choice text]

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveNarrativeMode, gentleModeDirective } from '@/lib/engine/narrative-mode'
+import { resolveNarrativeMode, resolveStoryNarrativeMode, gentleModeDirective, gentleGoapFilter } from '@/lib/engine/narrative-mode'
 import { PlotPlanner } from '@/lib/engine/plot-planner'
 import { DramaManager } from '@/lib/engine/drama-manager'
 import { DifficultyManager } from '@/lib/engine/difficulty'
@@ -47,6 +47,45 @@ describe('resolveNarrativeMode', () => {
     const d = gentleModeDirective()
     expect(d).toMatch(/no villains/i)
     expect(d).toMatch(/Do not manufacture conflict/i)
+  })
+})
+
+describe('resolveStoryNarrativeMode (the world clamp)', () => {
+  const gentleWorld = { ...base, rules: 'No bad happens here' }
+
+  it('a dramatic world may host a gentle story', () => {
+    expect(resolveStoryNarrativeMode(base, { narrativeMode: 'gentle' })).toBe('gentle')
+  })
+
+  it('a gentle world is law — a story can never be overridden dramatic', () => {
+    expect(resolveStoryNarrativeMode(gentleWorld, { narrativeMode: 'dramatic' })).toBe('gentle')
+  })
+
+  it('absent story mode inherits the world', () => {
+    expect(resolveStoryNarrativeMode(base, {})).toBe('dramatic')
+    expect(resolveStoryNarrativeMode(gentleWorld, undefined)).toBe('gentle')
+  })
+})
+
+describe('gentleGoapFilter (the cast never plans hostility)', () => {
+  it('strips hostile actions and anti-protagonist goals', () => {
+    const config = {
+      goals: [
+        { sentiment: 'pro_protagonist' },
+        { sentiment: 'anti_protagonist' },
+      ],
+      availableActions: ['social_offer_aid', 'social_betray', 'social_intimidate', 'combat_attack_player', 'utility_observe'],
+      personality: {},
+    }
+    const out = gentleGoapFilter(config)
+    expect(out.goals).toHaveLength(1)
+    expect(out.goals[0].sentiment).toBe('pro_protagonist')
+    expect(out.availableActions).toEqual(['social_offer_aid', 'utility_observe'])
+  })
+
+  it('leaves a friendly config untouched', () => {
+    const config = { goals: [{ sentiment: 'pro_protagonist' }], availableActions: ['social_offer_aid'], personality: {} }
+    expect(gentleGoapFilter(config)).toEqual(config)
   })
 })
 

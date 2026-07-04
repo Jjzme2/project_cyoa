@@ -42,7 +42,7 @@ import { moderateText, moderationToNodeFields } from '@/lib/moderation'
 import { NarrativeBuilder } from '@/lib/engine/narrative-builder'
 import { buildWorldPulse } from '@/lib/engine/world-pulse'
 import { endingDirective } from '@/lib/engine/ending'
-import { resolveNarrativeMode } from '@/lib/engine/narrative-mode'
+import { resolveStoryNarrativeMode } from '@/lib/engine/narrative-mode'
 import type { WorldPulse } from '@/types'
 import type { WorldState } from '@/types/goap'
 import type { AgentMemory } from '@/types/goap'
@@ -195,7 +195,11 @@ export async function POST(
     // Assembled through the single audited seam (buildWorldContext): the chronicle
     // is read with story.worldId and passed in here, so only THIS world's legends
     // can reach the prompt — never another world's (save for declared echoes above).
+    // The story's effective narrative shape, clamped by the world (a gentle
+    // world is law; a dramatic world may host an individual gentle story).
+    const storyMode = resolveStoryNarrativeMode(world, story)
     const worldCtx = buildWorldContext(world, {
+      narrativeMode: storyMode,
       rating: effectiveRating,
       protagonist,
       characters: story.characters,
@@ -267,7 +271,7 @@ export async function POST(
       systemNarrativeEvents = builder.formatForPrompt(context)
       updatedEngineState = nextState
       // Reader-facing snapshot of the living world at this chapter.
-      nodeWorldPulse = buildWorldPulse(context, nextState, resolveNarrativeMode(world))
+      nodeWorldPulse = buildWorldPulse(context, nextState, storyMode)
     }
 
     // An author win/lose condition met on the reader's side FORCES a conclusion;
@@ -275,7 +279,7 @@ export async function POST(
     // endingDirective). The model writes the final chapter either way.
     const endDirective = forceEnding
       ? `a definitive ${forceEnding.type} ending has been reached. Conclude the story NOW with a final chapter that lands this ${forceEnding.type} ending titled "${forceEnding.title}".`
-      : endingDirective(parentNode.depth + 1, updatedEngineState, resolveNarrativeMode(world))
+      : endingDirective(parentNode.depth + 1, updatedEngineState, storyMode)
 
     const { content, choices, model, newCharacters, location, ending } = await generateStoryNode(
       worldCtx,
