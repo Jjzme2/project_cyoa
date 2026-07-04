@@ -27,7 +27,7 @@ The working order. Within each bucket, top-to-bottom is the suggested sequence;
 
 ### 🚶 Same-day items (roughly 2–5 hours each)
 
-- [ ] ★ **S1. "Jump Right In" mode — the newcomer's first five minutes.** The
+- [x] ★ **S1. "Jump Right In" mode — the newcomer's first five minutes.** The
   app currently front-loads its depth (worlds, sagas, directors, engines) and
   can overwhelm; the goal is: *one tap to reading, one nudge to writing.*
   - **v1 scope:** a hero "Jump right in" action on the homepage that opens a

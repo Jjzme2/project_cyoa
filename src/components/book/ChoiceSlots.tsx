@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { Loader2, Feather, ChevronRight, Scroll, Lock, PenLine, Wand2, ImagePlus, ShieldAlert, Check, Trash2, Hourglass, Flag } from 'lucide-react'
@@ -50,6 +50,34 @@ export function ChoiceSlots({
 }: Props) {
   const { user, tier, isAdmin, openAuthModal, aiUsesRemaining, updateAiUses } = useAuth()
   const [inputs, setInputs] = useState<Record<string, string>>({})
+
+  // A newcomer's words survive the sign-in round-trip: drafts written while
+  // signed out are mirrored to localStorage before auth opens; when the user
+  // arrives (popup OR redirect), restore them into the editors and clean up.
+  useEffect(() => {
+    if (!user) return
+    // Deferred a tick: an external-store (localStorage) read, applied off the
+    // effect body so it can't cascade renders.
+    const t = setTimeout(() => {
+      const restored: Record<string, string> = {}
+      for (const slot of slots) {
+        try {
+          const key = `chronicle:slotdraft:${storyId}:${slot.id}`
+          const saved = localStorage.getItem(key)
+          if (saved) {
+            restored[slot.id] = saved
+            localStorage.removeItem(key)
+          }
+        } catch {}
+      }
+      if (Object.keys(restored).length > 0) {
+        setInputs((prev) => ({ ...restored, ...prev }))
+        toast.success('Welcome! Your words are right where you left them — press publish when ready.')
+      }
+    }, 0)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot restore on sign-in
+  }, [user])
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [imageEnabled, setImageEnabled] = useState<Record<string, boolean>>({})
   const [submitting, setSubmitting] = useState<string | null>(null)
@@ -541,25 +569,59 @@ export function ChoiceSlots({
                 {!isSaga && <BountyControl storyId={storyId} nodeId={nodeId} slot={slot} onChange={onModerated} />}
               </div>
             ) : (
-              /* Logged-out: sign-in prompt */
-              <div className="space-y-1.5">
-              <button
-                onClick={openAuthModal}
-                className="w-full text-left px-4 py-3 rounded-lg border transition-all hover:brightness-95 active:scale-[0.98] group"
+              /* Logged-out: write first, sign in only to publish. The words are
+                 kept in state AND mirrored to localStorage before auth, so
+                 nothing a newcomer writes is ever lost to the sign-in step. */
+              <div
+                className="space-y-2 px-4 py-3 rounded-lg border"
                 style={{
                   background: 'color-mix(in oklch, var(--page-text) 5%, transparent)',
                   borderColor: 'color-mix(in oklch, var(--page-text) 15%, transparent)',
                   borderStyle: 'dashed',
                 }}
               >
-                <div className="flex items-center gap-2.5 opacity-65 group-hover:opacity-90 transition-opacity">
-                  <Lock className="h-3.5 w-3.5 shrink-0" />
+                <div className="flex items-center gap-2 opacity-70">
+                  <Feather className="h-3.5 w-3.5 shrink-0" />
                   <span className="text-[12px] font-sans italic">
-                    Sign in to write path {i + 1}…
+                    This path hasn&apos;t been written yet — it&apos;s waiting for you.
                   </span>
                 </div>
-              </button>
-              {!isSaga && <BountyControl storyId={storyId} nodeId={nodeId} slot={slot} readOnly />}
+                <Textarea
+                  placeholder={slot.promptText ? `Perhaps: ${slot.promptText}` : 'Write where this path leads…'}
+                  value={inputs[slot.id] ?? ''}
+                  onChange={(e) => setInputs((prev) => ({ ...prev, [slot.id]: e.target.value }))}
+                  className="text-[13px] min-h-[68px] resize-none focus-visible:ring-1 placeholder:text-[var(--page-text)] placeholder:opacity-60"
+                  style={{
+                    background: 'color-mix(in oklch, var(--page-text) 10%, transparent)',
+                    borderColor: 'color-mix(in oklch, var(--page-text) 32%, transparent)',
+                    fontFamily: 'Georgia, serif',
+                    color: 'var(--page-text)',
+                  }}
+                />
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-sans opacity-45">Your words are kept safe through sign-in.</span>
+                  <button
+                    onClick={() => {
+                      const text = (inputs[slot.id] ?? '').trim()
+                      if (text) {
+                        try {
+                          localStorage.setItem(`chronicle:slotdraft:${storyId}:${slot.id}`, text)
+                        } catch {}
+                      }
+                      openAuthModal()
+                    }}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-sans px-2.5 py-1.5 rounded border transition-all hover:brightness-110"
+                    style={{
+                      background: 'color-mix(in oklch, var(--page-text) 14%, transparent)',
+                      borderColor: 'color-mix(in oklch, var(--page-text) 34%, transparent)',
+                      color: 'var(--page-text)',
+                    }}
+                  >
+                    <Lock className="h-3 w-3" />
+                    {(inputs[slot.id] ?? '').trim() ? 'Sign in to publish your path' : `Sign in to write path ${i + 1}`}
+                  </button>
+                </div>
+                {!isSaga && <BountyControl storyId={storyId} nodeId={nodeId} slot={slot} readOnly />}
               </div>
             )}
           </motion.div>

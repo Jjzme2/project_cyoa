@@ -33,6 +33,15 @@ export default function NewStoryPage() {
   const [loadingWorlds, setLoadingWorlds] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [aiModalOpen, setAiModalOpen] = useState(false)
+
+  // "60-second start": arriving with ?assist=1 opens the AI inspiration wizard
+  // immediately, so a newcomer is writing within a couple of taps.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (new URLSearchParams(window.location.search).get('assist') !== '1') return
+    const t = setTimeout(() => setAiModalOpen(true), 400)
+    return () => clearTimeout(t)
+  }, [])
   const [hasDraft, setHasDraft] = useState(false)
   const [mode, setMode] = useState<CreationMode>('simple')
 
