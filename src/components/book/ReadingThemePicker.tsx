@@ -3,9 +3,15 @@
 import { Feather, Dices } from 'lucide-react'
 import { Label } from '@/components/ui/label'
 import { ContainedAmbient } from './ContainedAmbient'
-import type { ReadingTheme, PageStyle, AmbientEffect } from '@/types'
+import type { ReadingTheme, PageStyle, AmbientEffect, AmbientSoundMode } from '@/types'
 
-const PAGE_STYLES: { id: PageStyle; label: string; bg: string; text: string }[] = [
+const AMBIENT_SOUND_MODES: { id: AmbientSoundMode; label: string; hint: string }[] = [
+  { id: 'match', label: 'Match visual',      hint: 'Sound follows whatever ambient effect is picked above' },
+  { id: 'auto',  label: 'Auto (per chapter)', hint: "Sound follows each chapter's own scene, when detected" },
+  { id: 'off',   label: 'Off',                hint: 'No ambient sound, whatever the visual' },
+]
+
+export const PAGE_STYLES: { id: PageStyle; label: string; bg: string; text: string }[] = [
   { id: 'parchment', label: 'Parchment',    bg: '#f0e6d0', text: '#3d2b1f' },
   { id: 'sepia',     label: 'Sepia',        bg: '#d4b896', text: '#2d1a0e' },
   { id: 'papyrus',   label: 'Papyrus',      bg: '#e6dcc0', text: '#43331b' },
@@ -15,9 +21,13 @@ const PAGE_STYLES: { id: PageStyle; label: string; bg: string; text: string }[] 
   { id: 'night',     label: 'Night Scroll', bg: '#1a1a2e', text: '#c0c8e0' },
   { id: 'dusk',      label: 'Dusk',         bg: '#2a2440', text: '#d8d2ea' },
   { id: 'slate',     label: 'Slate',        bg: '#222831', text: '#cfd6df' },
+  { id: 'candlelight', label: 'Candlelight', bg: '#f4dfb8', text: '#4a2f12' },
+  { id: 'moonlit',     label: 'Moonlit',     bg: '#dde6f0', text: '#1c2733' },
+  { id: 'aurora',      label: 'Aurora',      bg: '#16232f', text: '#bfe8de' },
+  { id: 'storm',       label: 'Storm',       bg: '#232a35', text: '#c7d2de' },
 ]
 
-const AMBIENT_EFFECTS: { id: AmbientEffect; label: string; emoji: string }[] = [
+export const AMBIENT_EFFECTS: { id: AmbientEffect; label: string; emoji: string }[] = [
   { id: 'none',      label: 'None',      emoji: '—'  },
   { id: 'rain',      label: 'Rain',      emoji: '🌧️' },
   { id: 'embers',    label: 'Embers',    emoji: '🔥' },
@@ -27,6 +37,9 @@ const AMBIENT_EFFECTS: { id: AmbientEffect; label: string; emoji: string }[] = [
   { id: 'petals',    label: 'Petals',    emoji: '🌸' },
   { id: 'mist',      label: 'Mist',      emoji: '🌫️' },
   { id: 'motes',     label: 'Dust Motes', emoji: '🌬️' },
+  { id: 'aurora',    label: 'Aurora',    emoji: '🌌' },
+  { id: 'lightning', label: 'Lightning', emoji: '⚡' },
+  { id: 'moonbeams', label: 'Moonbeams', emoji: '🌙' },
 ]
 
 /** Reader-facing page style + ambient effect picker (controlled). */
@@ -95,7 +108,7 @@ export function ReadingThemePicker({
 
       <div className="space-y-3">
         <Label className="text-xs text-muted-foreground/60 uppercase tracking-wider">Page Style</Label>
-        <div className="grid grid-cols-3 sm:grid-cols-9 gap-2">
+        <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
           {PAGE_STYLES.map((s) => (
             <button
               key={s.id}
@@ -136,6 +149,27 @@ export function ReadingThemePicker({
             >
               <span>{e.emoji}</span>
               {e.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <Label className="text-xs text-muted-foreground/60 uppercase tracking-wider">Ambient Sound</Label>
+        <div className="flex flex-wrap gap-2">
+          {AMBIENT_SOUND_MODES.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              title={m.hint}
+              onClick={() => onChange({ ...value, ambientSoundMode: m.id })}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-sans border transition-all ${
+                (value.ambientSoundMode ?? 'match') === m.id
+                  ? 'bg-violet-500/20 border-violet-500/40 text-violet-300'
+                  : 'border-white/10 text-muted-foreground/40 hover:border-white/20'
+              }`}
+            >
+              {m.label}
             </button>
           ))}
         </div>

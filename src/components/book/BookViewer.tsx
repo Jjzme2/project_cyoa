@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
+import { AchievementUnlockToast } from './AchievementUnlockToast'
 import { ChevronLeft, Sparkles, Volume2, VolumeX, Waves, Trophy, Users, Map as MapIcon } from 'lucide-react'
 import { StoryContent } from './StoryContent'
 import { ChoiceSlots } from './ChoiceSlots'
@@ -33,7 +34,7 @@ import {
   setAmbientOn,
 } from '@/lib/page-sound'
 import { ACHIEVEMENT_DEFS } from '@/types'
-import type { Story, StoryNode, ChoiceSlot, ChoiceEffect, SaveSlot, WorldBible } from '@/types'
+import type { Story, StoryNode, ChoiceSlot, ChoiceEffect, SaveSlot, WorldBible, AmbientEffect } from '@/types'
 import {
   type DiscoveredEnding,
   type Direction,
@@ -45,6 +46,8 @@ import {
   pageTransition,
   loadLocalProgress,
   saveLocalProgress,
+  resolveAmbientSound,
+  resolveAmbientVisual,
 } from './book-viewer-internals'
 import { CastDialog, EndingsDialog, MapDialog } from './ReaderDialogs'
 
@@ -54,10 +57,12 @@ interface Props {
   endingCount?: number
   worldGenesis?: WorldBible
   worldSeed?: number
+  /** The story's world's default ambient — inherited when the story has none of its own. */
+  worldAmbientEffect?: AmbientEffect
 }
 
 
-export function BookViewer({ story, initialNode, endingCount, worldGenesis, worldSeed }: Props) {
+export function BookViewer({ story, initialNode, endingCount, worldGenesis, worldSeed, worldAmbientEffect }: Props) {
   const { user } = useAuth()
   const [node, setNode] = useState<StoryNode>(initialNode)
   const [history, setHistory] = useState<StoryNode[]>([])
@@ -118,20 +123,27 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
 
   const hasCast = !!story.protagonist?.name || (story.characters?.length ?? 0) > 0
 
-  const ambientEffect = story.readingTheme?.ambientEffect ?? 'none'
+  // An untouched story inherits its world's default ambient (visual and,
+  // via 'match'/'auto', sound too).
+  const ambientEffect = resolveAmbientVisual(story.readingTheme, worldAmbientEffect)
+  // The sound can diverge from the visual: in 'auto' mode it follows this
+  // chapter's own detected scene cue (falling back to the visual when the
+  // current chapter has none), or it can be silenced outright — see
+  // resolveAmbientSound.
+  const ambientSound = resolveAmbientSound(story.readingTheme, node.sceneAmbient, worldAmbientEffect)
 
   // Start/stop the looping soundscape with the toggle (and clean up on unmount).
   // Delayed slightly: ambient can auto-start from a preference saved in a PRIOR
   // session, with no fresh gesture — the short delay gives FirstSoundNotice
   // (shown ~300ms after mount) time to be on screen before audio actually begins.
   useEffect(() => {
-    if (!(ambientOn && ambientEffect !== 'none')) return
-    const id = setTimeout(() => startAmbient(ambientEffect), 500)
+    if (!(ambientOn && ambientSound !== 'none')) return
+    const id = setTimeout(() => startAmbient(ambientSound), 500)
     return () => {
       clearTimeout(id)
       stopAmbient()
     }
-  }, [ambientOn, ambientEffect])
+  }, [ambientOn, ambientSound])
 
   function toggleAmbient() {
     setAmbientState((on) => {
@@ -177,7 +189,7 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
           const { newlyEarned }: { newlyEarned: string[] } = await res.json()
           for (const id of newlyEarned ?? []) {
             const def = ACHIEVEMENT_DEFS.find((d) => d.id === id)
-            if (def) toast.success(`${def.icon} Achievement unlocked — ${def.name}`)
+            if (def) toast.custom(() => <AchievementUnlockToast icon={def.icon} name={def.name} />, { duration: 4500 })
           }
         } catch {
           /* best-effort */
@@ -744,7 +756,7 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
             </button>
           )}
           <GalleryButton storyId={story.id} />
-          {ambientEffect !== 'none' && (
+          {ambientSound !== 'none' && (
             <button
               type="button"
               onClick={toggleAmbient}

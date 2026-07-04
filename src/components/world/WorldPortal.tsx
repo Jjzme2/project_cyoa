@@ -2,6 +2,7 @@ import type { WorldTheme } from '@/types'
 import { patternStyle } from '@/components/book/cover-theme'
 import { CoverBorder } from '@/components/book/cover-border'
 import { ContainedAmbient } from '@/components/book/ContainedAmbient'
+import { WorldPortalBackdrop, WorldPortalEmblem } from './WorldPortalBreath'
 
 interface Props {
   theme: WorldTheme
@@ -25,6 +26,24 @@ export function WorldPortal({ theme, name, tagline, variant = 'card', animate = 
   const accent = theme.accentColor || '#fbbf24'
   const emblemSize = isBanner ? 'text-5xl sm:text-6xl' : 'text-3xl'
 
+  const backdrop = (
+    <>
+      {/* Pattern */}
+      {theme.pattern !== 'none' && (
+        <div className="absolute inset-0 pointer-events-none opacity-60" style={patternStyle(theme.pattern)} />
+      )}
+
+      {/* Drifting atmosphere */}
+      {animate && <ContainedAmbient effect={theme.ambientEffect} density={isBanner ? 1.2 : 0.7} />}
+    </>
+  )
+
+  const emblem = (
+    <span className={emblemSize} style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.6))' }}>
+      {theme.emblem}
+    </span>
+  )
+
   return (
     <div
       className={`relative overflow-hidden ${isBanner ? 'rounded-2xl' : 'rounded-lg'} ${className ?? ''}`}
@@ -33,13 +52,9 @@ export function WorldPortal({ theme, name, tagline, variant = 'card', animate = 
         height: isBanner ? 184 : 96,
       }}
     >
-      {/* Pattern */}
-      {theme.pattern !== 'none' && (
-        <div className="absolute inset-0 pointer-events-none opacity-60" style={patternStyle(theme.pattern)} />
-      )}
-
-      {/* Drifting atmosphere */}
-      {animate && <ContainedAmbient effect={theme.ambientEffect} density={isBanner ? 1.2 : 0.7} />}
+      {/* Background + pattern + atmosphere — on a banner, breathes slowly for a
+          living, not-static feel. */}
+      {isBanner ? <WorldPortalBackdrop>{backdrop}</WorldPortalBackdrop> : backdrop}
 
       {/* Vignette for legibility */}
       <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/55 via-transparent to-black/15" />
@@ -47,11 +62,9 @@ export function WorldPortal({ theme, name, tagline, variant = 'card', animate = 
       {/* Frame */}
       <CoverBorder frame={theme.borderFrame} accent={accent} insetPct={isBanner ? 4 : 7} corner={isBanner ? 16 : 9} />
 
-      {/* Emblem */}
+      {/* Emblem — on a banner, drifts gently at its own pace for parallax. */}
       <div className={`absolute inset-0 flex items-center justify-center ${name ? 'opacity-25' : 'opacity-90'}`}>
-        <span className={emblemSize} style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.6))' }}>
-          {theme.emblem}
-        </span>
+        {isBanner ? <WorldPortalEmblem>{emblem}</WorldPortalEmblem> : emblem}
       </div>
 
       {/* Optional name / tagline overlay */}

@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { Loader2, Sparkles } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Loader2, Shield, Sparkles } from 'lucide-react'
 import { useAuth } from '@/components/Providers'
 import { useAdminGuard, AdminSpinner, AdminHeading } from '../admin-ui'
 
@@ -30,12 +30,13 @@ export default function AdminInsightsPage() {
   const { user } = useAuth()
   const [events, setEvents] = useState<InsightEvent[]>([])
   const [loading, setLoading] = useState(true)
+  const [auditOnly, setAuditOnly] = useState(false)
 
   const load = useCallback(async () => {
     if (!user) return
     try {
       const token = await user.getIdToken()
-      const res = await fetch('/api/admin/insights?limit=100', { headers: { Authorization: `Bearer ${token}` } })
+      const res = await fetch('/api/admin/insights?limit=200', { headers: { Authorization: `Bearer ${token}` } })
       if (res.ok) setEvents((await res.json()).events ?? [])
     } catch {
       // non-critical
@@ -43,6 +44,9 @@ export default function AdminInsightsPage() {
       setLoading(false)
     }
   }, [user])
+
+  const auditCount = useMemo(() => events.filter((e) => e.name.startsWith('admin.')).length, [events])
+  const visibleEvents = auditOnly ? events.filter((e) => e.name.startsWith('admin.')) : events
 
   useEffect(() => {
     if (!ready) return
@@ -55,7 +59,23 @@ export default function AdminInsightsPage() {
 
   return (
     <main className="max-w-3xl mx-auto px-4 sm:px-6 py-12 space-y-8">
-      <AdminHeading eyebrow="Admin" title="Insights" subtitle="Notable signals — admin actions, milestones, and anomalies, newest first." />
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <AdminHeading eyebrow="Admin" title="Insights" subtitle="Notable signals — admin actions, milestones, and anomalies, newest first." />
+        {!loading && events.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setAuditOnly((v) => !v)}
+            aria-pressed={auditOnly}
+            className={`flex items-center gap-1.5 shrink-0 px-3 py-1.5 rounded-lg text-xs font-sans border transition-colors ${
+              auditOnly
+                ? 'bg-amber-500/15 border-amber-500/35 text-amber-200'
+                : 'border-white/10 text-muted-foreground/55 hover:border-amber-500/25 hover:text-amber-200/80'
+            }`}
+          >
+            <Shield className="h-3.5 w-3.5" /> Admin actions only ({auditCount})
+          </button>
+        )}
+      </div>
 
       {loading ? (
         <div className="flex items-center gap-2 text-muted-foreground/50 text-sm">
@@ -69,30 +89,42 @@ export default function AdminInsightsPage() {
             Signals appear here once <code className="text-amber-300/60">insights.track()</code> runs (e.g. an admin grants credits).
           </p>
         </div>
+      ) : visibleEvents.length === 0 ? (
+        <div className="glass-card rounded-xl p-12 text-center border border-white/[0.07] space-y-2">
+          <Shield className="h-6 w-6 text-amber-400/40 mx-auto" />
+          <p className="text-muted-foreground/55 text-sm">No admin actions in the last {events.length} signals.</p>
+        </div>
       ) : (
         <div className="space-y-2">
-          {events.map((e) => (
-            <div key={e.id} className="glass-card rounded-xl p-4 border border-white/[0.07] flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg glass border border-amber-500/15 flex items-center justify-center shrink-0 mt-0.5">
-                <Sparkles className="h-3.5 w-3.5 text-amber-400/60" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-mono text-amber-300/80 truncate">{e.name}</p>
-                  <span className="text-[10px] text-muted-foreground/40 shrink-0">{relativeTime(e.createdAt)}</span>
+          {visibleEvents.map((e) => {
+            const isAudit = e.name.startsWith('admin.')
+            return (
+              <div key={e.id} className="glass-card rounded-xl p-4 border border-white/[0.07] flex items-start gap-3">
+                <div className={`w-8 h-8 rounded-lg glass flex items-center justify-center shrink-0 mt-0.5 border ${isAudit ? 'border-amber-500/30' : 'border-amber-500/15'}`}>
+                  {isAudit ? (
+                    <Shield className="h-3.5 w-3.5 text-amber-300/80" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5 text-amber-400/60" />
+                  )}
                 </div>
-                {Object.keys(e.props).length > 0 && (
-                  <div className="mt-1 flex flex-wrap gap-1.5">
-                    {Object.entries(e.props).map(([k, v]) => (
-                      <span key={k} className="text-[10px] font-sans px-1.5 py-0.5 rounded bg-white/[0.03] border border-white/[0.06] text-muted-foreground/55">
-                        <span className="text-muted-foreground/40">{k}:</span> {String(v)}
-                      </span>
-                    ))}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-mono text-amber-300/80 truncate">{e.name}</p>
+                    <span className="text-[10px] text-muted-foreground/40 shrink-0">{relativeTime(e.createdAt)}</span>
                   </div>
-                )}
+                  {Object.keys(e.props).length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {Object.entries(e.props).map(([k, v]) => (
+                        <span key={k} className="text-[10px] font-sans px-1.5 py-0.5 rounded bg-white/[0.03] border border-white/[0.06] text-muted-foreground/55">
+                          <span className="text-muted-foreground/40">{k}:</span> {String(v)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </main>

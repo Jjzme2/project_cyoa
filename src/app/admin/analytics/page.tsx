@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Loader2, BarChart3 } from 'lucide-react'
+import { Loader2, BarChart3, Download } from 'lucide-react'
+import { toast } from 'sonner'
 import { useAuth } from '@/components/Providers'
 import { useAdminGuard, AdminSpinner, AdminHeading } from '../admin-ui'
 
@@ -43,6 +44,28 @@ export default function AdminAnalyticsPage() {
     })()
   }, [ready, load])
 
+  const exportWindow = useCallback(async (format: 'csv' | 'json') => {
+    if (!user) return
+    try {
+      const token = await user.getIdToken()
+      const res = await fetch(`/api/admin/analytics/export?days=14&format=${format}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error('export failed')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `chronicle-analytics-14d.${format}`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Export failed')
+    }
+  }, [user])
+
   if (!ready) return <AdminSpinner />
 
   const maxDay = data ? Math.max(1, ...data.buckets.map((b) => b.total)) : 1
@@ -50,7 +73,27 @@ export default function AdminAnalyticsPage() {
 
   return (
     <main className="max-w-4xl mx-auto px-4 sm:px-6 py-12 space-y-8">
-      <AdminHeading eyebrow="Admin" title="Analytics" subtitle="Tracked product events over the last 14 days." />
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <AdminHeading eyebrow="Admin" title="Analytics" subtitle="Tracked product events over the last 14 days." />
+        {!loading && data && data.grandTotal > 0 && (
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => exportWindow('csv')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans border border-white/10 text-muted-foreground/55 hover:border-amber-500/25 hover:text-amber-200/80 transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" /> CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => exportWindow('json')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans border border-white/10 text-muted-foreground/55 hover:border-amber-500/25 hover:text-amber-200/80 transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" /> JSON
+            </button>
+          </div>
+        )}
+      </div>
 
       {loading ? (
         <div className="flex items-center gap-2 text-muted-foreground/50 text-sm">

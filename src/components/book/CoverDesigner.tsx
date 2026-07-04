@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { motion } from 'framer-motion'
 import { Sparkles, X, Loader2, ImageOff, Dices } from 'lucide-react'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
@@ -87,11 +88,14 @@ export function CoverDesigner({ value, onChange, title, onGenerateImage }: Props
             {value.coverImageUrl ? (
               <div className="flex items-start gap-3">
                 <div className="relative rounded-lg overflow-hidden border border-white/10 shrink-0" style={{ width: 72, height: 108 }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <motion.img
+                    key={value.coverImageUrl}
                     src={value.coverImageUrl}
                     alt="Generated cover"
                     className="w-full h-full object-cover"
+                    initial={{ opacity: 0, scale: 1.08 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.5, ease: 'easeOut' }}
                   />
                 </div>
                 <div className="flex flex-col gap-2 pt-1">

@@ -177,16 +177,78 @@ abuse guard below was also already covered by the Tier-3 throttle work.)
   (worlds → stories → reads → purchases) and DAU/retention, beyond raw counts.
 - [ ] **Per-user activity drill-down** — from `/admin/users`, open a user's
   tracked events, authored stories, and credit history.
-- [ ] **Admin audit trail** — the `insights` channel already logs `admin.*`
-  actions; surface a filtered audit view (who granted credits / changed roles).
-- [ ] **Richer per-page SEO** — `CreativeWork`/`Article` + breadcrumb JSON-LD
-  for story and world pages (the root only has WebSite/Organization today).
+- [x] **Admin audit trail** — `/admin/insights` got an "Admin actions only"
+  toggle (count badge, `Shield` icon) that filters to `admin.*` events
+  (credits adjusted, role changed) client-side from the same feed; no new
+  index needed since the insights channel is already a low-volume signal
+  feed, not a firehose.
+- [x] **Richer per-page SEO** — `CreativeWork` + `BreadcrumbList` JSON-LD on
+  `/stories/[id]` (linked to its world via `isPartOf`) and `/worlds/[id]`;
+  story pages also picked up a missing `alternates.canonical`.
 - [ ] **Logo-based brand assets** — once the logo is hosted, generate a proper
   multi-size favicon/PWA icon set and a logo-bearing OG image.
-- [ ] **Analytics export** — CSV/JSON export of the analytics window for
-  offline analysis.
+- [x] **Analytics export** — `GET /api/admin/analytics/export` (CSV or JSON,
+  admin-only) + CSV/JSON download buttons on `/admin/analytics`, mirroring
+  the existing feedback-export pattern.
 - [x] **Abuse guard on `POST /api/track`** — already throttled (`throttle('track:${uid}', 120, 60)`
   in `src/app/api/track/route.ts`), same pass that covered `/api/feedback`.
+
+## 🎨 Atmosphere & animation pass
+
+There's already real infrastructure here — 9 reading page-styles × 9 ambient
+effects, 12 cover gradients × 8 accents × 48 icons × 8 patterns × 8 border
+frames, a 21-tone → atmosphere preset map for worlds, and framer-motion
+already driving the page-flip and ending reveal. This pass expands the
+presets and makes ambient dynamic rather than a single static per-story pick.
+
+- [x] **More ReadingTheme presets** — 4 new page styles (Candlelight, Moonlit,
+  Aurora, Storm; 9→13) and 3 new ambient effects (Aurora, Lightning,
+  Moonbeams; 9→12), each with a full-screen particle effect, a contained
+  mini preview, and a synthesized ambient soundscape.
+- [x] **More cover/world atmosphere presets** — 4 new gradients (Amber,
+  Orchid, Teal, Storm), 3 new accents (Teal, Indigo, Coral), 8 new
+  emblems/icons each for covers and worlds, and 2 new patterns (Chevron,
+  Honeycomb — a new `CoverPattern` value with its own `patternStyle()`
+  case). All 22 `VALID_TONES` were already 1:1 covered in
+  `TONE_ATMOSPHERES`, so no new tone mappings were needed. Also folded the
+  3 new ambient effects (aurora/lightning/moonbeams) into `rollWorldTheme`'s
+  pool, closing a gap left by the ReadingTheme preset expansion.
+- [x] **Decouple ambient sound from ambient visual** — new
+  `ReadingTheme.ambientSoundMode` (`match` / `auto` / `off`) resolved via
+  `resolveAmbientSound()`; the visual (`ambientEffect`) is unchanged and
+  always author-set, while the sound can now mirror it, go silent, or
+  (once the next item lands) auto-follow the chapter's own scene.
+- [x] **Per-world default ambient** — `resolveAmbientVisual()` falls back to
+  the world's `theme.ambientEffect` when a story hasn't set its own; sound
+  inherits the same fallback via `resolveAmbientSound`. Threaded
+  `worldAmbientEffect` through `stories/[id]/page.tsx` →
+  `BookViewerClient`/`GatedStoryReader` → `BookViewer`.
+- [x] **Auto per-chapter ambient matching** — a new `AMBIENT: <effect>` marker
+  (mirrors `LOCATION:`/`ENDING:`) folded into the existing chapter-generation
+  and saga-opening prompts, so there's no added AI cost. Parsed by
+  `parseAIResponse`, validated against the known effect list (unrecognized
+  → no cue, graceful fallback), and stored as `StoryNode.sceneAmbient`.
+  With `ambientSoundMode: 'auto'`, `BookViewer` now resolves the sound from
+  the current chapter's own cue — falling back to the visual/world default
+  on chapters with none.
+- [x] **Achievement unlock celebration animation** — a new
+  `AchievementUnlockToast` (framer-motion: spring-popped icon + a brief
+  radiating burst) rendered via `toast.custom()` in `BookViewer`, replacing
+  the plain text toast on a newly-earned ending achievement.
+- [x] **Cover reveal flourish animation** — `BookCoverPreview`'s cover face and
+  `CoverDesigner`'s thumbnail both fade + scale in (framer-motion, keyed by
+  `coverImageUrl`) whenever a fresh AI cover is generated, regenerated, or
+  removed.
+- [x] **World portal ambiance animation** — the banner variant's
+  pattern/atmosphere layer slowly breathes (scale) and the emblem drifts at
+  its own pace (parallax), via a new `WorldPortalBreath.tsx` client wrapper;
+  the dense `card` variant (world listings) is untouched and stays
+  server-safe.
+- [x] **Choice/chapter micro-interaction animations** — a written choice
+  button now springs on tap (`whileTap`); `StoryContent` replaced its
+  flat fade-in with a staggered, block-by-block reveal (quote → header →
+  image → each paragraph) so a new chapter unfurls rather than snapping
+  in as one piece.
 
 ## 🔒 Blocked on ops / deploy
 

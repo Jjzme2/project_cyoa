@@ -1,4 +1,11 @@
-import { ENDING_TYPES, type EndingType, type StoryCharacter } from '@/types'
+import { ENDING_TYPES, type EndingType, type StoryCharacter, type AmbientEffect } from '@/types'
+
+/** Ambient effects the model may cite in an `AMBIENT:` cue — kept in sync
+ * with the AmbientEffect union by hand (mirrors VALID_TONES/VALID_TAGS below). */
+const VALID_SCENE_AMBIENTS = [
+  'rain', 'embers', 'stars', 'snow', 'fireflies', 'petals', 'mist', 'motes',
+  'aurora', 'lightning', 'moonbeams',
+] as const
 
 /**
  * Nudges every AI naming surface (emergent characters, protagonists) away from
@@ -20,6 +27,7 @@ export function parseAIResponse(text: string): {
   choices: string[]
   newCharacters: StoryCharacter[]
   location?: string
+  sceneAmbient?: AmbientEffect
   ending?: { title: string; type: EndingType }
 } {
   const rejectionMatch = text.match(/^REJECTED:\s*(.+)/im)
@@ -34,6 +42,15 @@ export function parseAIResponse(text: string): {
   // Where this chapter takes place — used for the world map / location tracking.
   const locMatch = text.match(/^LOCATION:\s*(.+)/im)
   const location = locMatch ? locMatch[1].trim().slice(0, 80) || undefined : undefined
+
+  // An optional atmosphere cue ("it's raining") for readers with ambient sound
+  // set to auto-follow the scene. Omitted or unrecognized → no cue, and the
+  // reader falls back to their theme's own ambient (see resolveAmbientSound).
+  const ambientMatch = text.match(/^AMBIENT:\s*(.+)/im)
+  const ambientRaw = ambientMatch ? ambientMatch[1].trim().toLowerCase() : ''
+  const sceneAmbient = (VALID_SCENE_AMBIENTS as readonly string[]).includes(ambientRaw)
+    ? (ambientRaw as AmbientEffect)
+    : undefined
 
   const choicePattern = /CHOICE_(\d):\s*(.+)/g
   const choices: string[] = []
@@ -63,6 +80,7 @@ export function parseAIResponse(text: string): {
     .replace(/CHOICE_\d:.+/g, '')
     .replace(/NEW_CHARACTER:.+/gi, '')
     .replace(/^LOCATION:.+/gim, '')
+    .replace(/^AMBIENT:.+/gim, '')
     .replace(/^ENDING:.+/gim, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
@@ -73,6 +91,7 @@ export function parseAIResponse(text: string): {
     choices: ending ? [] : choices.slice(0, 3),
     newCharacters,
     location,
+    ...(sceneAmbient ? { sceneAmbient } : {}),
     ...(ending ? { ending } : {}),
   }
 }

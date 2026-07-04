@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { Skeleton } from '@/components/ui/skeleton'
-import type { Story, StoryNode, WorldBible } from '@/types'
+import type { Story, StoryNode, WorldBible, AmbientEffect } from '@/types'
 
 const BookViewer = dynamic(
   () => import('@/components/book/BookViewer').then((m) => m.BookViewer),
@@ -22,9 +22,10 @@ interface Props {
   endingCount?: number
   worldGenesis?: WorldBible
   worldSeed?: number
+  worldAmbientEffect?: AmbientEffect
 }
 
-export function BookViewerClient({ story, initialNode, endingCount, worldGenesis, worldSeed }: Props) {
+export function BookViewerClient({ story, initialNode, endingCount, worldGenesis, worldSeed, worldAmbientEffect }: Props) {
   return (
     <BookViewer
       story={story}
@@ -32,6 +33,7 @@ export function BookViewerClient({ story, initialNode, endingCount, worldGenesis
       endingCount={endingCount}
       worldGenesis={worldGenesis}
       worldSeed={worldSeed}
+      worldAmbientEffect={worldAmbientEffect}
     />
   )
 }

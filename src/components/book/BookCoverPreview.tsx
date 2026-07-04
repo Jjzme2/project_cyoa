@@ -1,3 +1,6 @@
+'use client'
+
+import { motion } from 'framer-motion'
 import type { CoverTheme } from '@/types'
 import { coverFontFamily, patternStyle } from './cover-theme'
 import { CoverBorder } from './cover-border'
@@ -47,8 +50,14 @@ export function BookCoverPreview({ theme, title, size = 'md' }: PreviewProps) {
         </div>
       </div>
 
-      {/* Cover face — clean: gradient/image + title at bottom only */}
-      <div
+      {/* Cover face — clean: gradient/image + title at bottom only. Keyed by
+          coverImageUrl so a freshly-generated (or removed) image remounts
+          and plays its reveal flourish. */}
+      <motion.div
+        key={theme.coverImageUrl ?? 'gradient'}
+        initial={theme.coverImageUrl ? { opacity: 0, scale: 1.06 } : false}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5, ease: 'easeOut' }}
         className={`flex-1 relative flex flex-col justify-end ${pad} overflow-hidden`}
         style={{
           background: theme.coverImageUrl
@@ -81,7 +90,7 @@ export function BookCoverPreview({ theme, title, size = 'md' }: PreviewProps) {
         </h3>
 
         <div className="absolute right-0 top-0 bottom-0 w-px bg-white/8 z-10" />
-      </div>
+      </motion.div>
     </div>
   )
 }

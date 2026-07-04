@@ -177,13 +177,13 @@ export async function POST(req: NextRequest) {
     // model's safety pass, surface it rather than shipping a half-built saga.
     const openings = await Promise.all(
       entries.map(async (entry) => {
-        const { content, choices, model, newCharacters, location } = await generateSagaOpening(
+        const { content, choices, model, newCharacters, location, sceneAmbient } = await generateSagaOpening(
           worldCtx,
           sagaPremise,
           entry,
           uid,
         )
-        return { label: entry.label, content, choices, aiModel: model, newCharacters, location }
+        return { label: entry.label, content, choices, aiModel: model, newCharacters, location, sceneAmbient }
       }),
     )
 
@@ -250,7 +250,7 @@ export async function POST(req: NextRequest) {
       storyId,
       thresholdContent,
       uid,
-      openings.map((o) => ({ label: o.label, content: o.content, choices: o.choices, aiModel: o.aiModel, location: o.location })),
+      openings.map((o) => ({ label: o.label, content: o.content, choices: o.choices, aiModel: o.aiModel, location: o.location, sceneAmbient: o.sceneAmbient })),
     )
 
     revalidateTag('stories', 'max')

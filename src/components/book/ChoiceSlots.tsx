@@ -306,7 +306,7 @@ export function ChoiceSlots({
                     : null
                 return (
                   <div className="space-y-1.5">
-                  <button
+                  <motion.button
                     onClick={() => {
                       if (meetsReqs && slot.childNodeId) {
                         recordTraversal(slot)
@@ -314,9 +314,11 @@ export function ChoiceSlots({
                       }
                     }}
                     disabled={!meetsReqs}
+                    whileTap={meetsReqs ? { scale: 0.96 } : undefined}
+                    transition={{ type: 'spring', stiffness: 400, damping: 20 }}
                     className={`w-full text-left px-4 py-3 rounded-lg border transition-all ${
                       meetsReqs
-                        ? 'hover:brightness-90 active:scale-[0.98] shadow-md hover:shadow-lg'
+                        ? 'hover:brightness-90 shadow-md hover:shadow-lg'
                         : 'opacity-50 cursor-not-allowed'
                     }`}
                     style={{
@@ -370,7 +372,7 @@ export function ChoiceSlots({
                         </span>
                       )}
                     </div>
-                  </button>
+                  </motion.button>
                   {showAdmin && (
                     <div
                       className="flex items-center gap-2 rounded-lg border px-2.5 py-1.5"

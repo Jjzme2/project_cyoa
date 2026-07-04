@@ -26,6 +26,10 @@ export const WORLD_GRADIENTS = [
   { label: 'Forest',   from: '#001a08', to: '#000703' },
   { label: 'Volcano',  from: '#3d0e00', to: '#150400' },
   { label: 'Midnight', from: '#050520', to: '#02020c' },
+  { label: 'Amber',    from: '#3d2800', to: '#160f00' },
+  { label: 'Orchid',   from: '#3d0030', to: '#170012' },
+  { label: 'Teal',     from: '#002e2e', to: '#001010' },
+  { label: 'Storm',    from: '#12202e', to: '#060b10' },
 ]
 
 export const WORLD_ACCENTS = [
@@ -37,6 +41,9 @@ export const WORLD_ACCENTS = [
   { label: 'Sapphire', color: '#60a5fa' },
   { label: 'Violet',   color: '#a78bfa' },
   { label: 'Rose',     color: '#fb7185' },
+  { label: 'Teal',     color: '#2dd4bf' },
+  { label: 'Indigo',   color: '#818cf8' },
+  { label: 'Coral',    color: '#fb923c' },
 ]
 
 export const WORLD_EMBLEMS = [
@@ -44,6 +51,7 @@ export const WORLD_EMBLEMS = [
   '🌋', '🌲', '🏔️', '🏜️', '🌊', '⚡', '☀️', '🌙',
   '🚀', '🤖', '🛸', '⚙️', '🦅', '🐺', '🦂', '🕯️',
   '💀', '🩸', '🌹', '🍂', '❄️', '🔥', '⚜️', '🗡️',
+  '🧭', '🪐', '🦋', '🏵️', '🌵', '🧿', '🦉', '🌾',
 ]
 
 export const WORLD_PATTERNS: { id: CoverPattern; label: string }[] = [
@@ -55,6 +63,8 @@ export const WORLD_PATTERNS: { id: CoverPattern; label: string }[] = [
   { id: 'diamonds',   label: 'Diamonds'   },
   { id: 'waves',      label: 'Waves'      },
   { id: 'crosshatch', label: 'Crosshatch' },
+  { id: 'chevron',    label: 'Chevron'    },
+  { id: 'hex',        label: 'Honeycomb'  },
 ]
 
 // ── Tone → atmosphere ───────────────────────────────────────────────────────────
@@ -112,8 +122,9 @@ export function themeForTone(tone: string, prev: WorldTheme): WorldTheme {
 const BORDER_IDS: CoverBorderFrame[] = [
   'none', 'single', 'double', 'ornate', 'runic', 'thorn', 'celestial', 'vine',
 ]
-const AMBIENTS: AmbientEffect[] = [
+export const AMBIENTS: AmbientEffect[] = [
   'none', 'rain', 'embers', 'stars', 'snow', 'fireflies', 'petals', 'mist', 'motes',
+  'aurora', 'lightning', 'moonbeams',
 ]
 
 function pick<T>(arr: readonly T[]): T {

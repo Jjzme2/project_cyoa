@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_COVER, rollCover } from '@/components/book/cover-theme'
+import { DEFAULT_COVER, rollCover, PATTERNS, patternStyle } from '@/components/book/cover-theme'
 import type { CoverTheme } from '@/types'
 import {
   DEFAULT_WORLD_THEME,
@@ -8,10 +8,13 @@ import {
   rollWorldTheme,
   WORLD_EMBLEMS,
   WORLD_PATTERNS,
+  AMBIENTS,
 } from '@/components/world/world-theme'
+import { PAGE_STYLES, AMBIENT_EFFECTS } from '@/components/book/ReadingThemePicker'
+import { PAGE_PALETTES } from '@/components/book/book-viewer-internals'
 
 const VALID_BORDERS = ['none', 'single', 'double', 'ornate', 'runic', 'thorn', 'celestial', 'vine']
-const VALID_PATTERNS = ['none', 'stars', 'grid', 'dots', 'lines', 'diamonds', 'waves', 'crosshatch']
+const VALID_PATTERNS = ['none', 'stars', 'grid', 'dots', 'lines', 'diamonds', 'waves', 'crosshatch', 'chevron', 'hex']
 
 describe('rollCover', () => {
   it('produces a fully-formed, valid cover theme', () => {
@@ -29,6 +32,13 @@ describe('rollCover', () => {
   it('preserves an existing AI cover image', () => {
     const withImage: CoverTheme = { ...DEFAULT_COVER, coverImageUrl: 'https://example.com/x.png' }
     expect(rollCover(withImage).coverImageUrl).toBe('https://example.com/x.png')
+  })
+
+  it('every non-plain pattern renders a distinct backgroundImage', () => {
+    for (const p of PATTERNS) {
+      if (p.id === 'none') continue
+      expect(patternStyle(p.id).backgroundImage).not.toBe('none')
+    }
   })
 })
 
@@ -62,11 +72,32 @@ describe('world theme helpers', () => {
   it('rollWorldTheme stays within the curated vocabulary', () => {
     const emblems = new Set(WORLD_EMBLEMS)
     const patterns = new Set(WORLD_PATTERNS.map((p) => p.id))
+    const ambients = new Set(AMBIENTS)
     for (let i = 0; i < 50; i++) {
       const t = rollWorldTheme(DEFAULT_WORLD_THEME)
       expect(emblems.has(t.emblem)).toBe(true)
       expect(patterns.has(t.pattern)).toBe(true)
+      expect(ambients.has(t.ambientEffect)).toBe(true)
       expect(VALID_BORDERS).toContain(t.borderFrame)
     }
+  })
+
+  it('the ambient roll pool includes the newer atmosphere effects', () => {
+    expect(AMBIENTS).toEqual(expect.arrayContaining(['aurora', 'lightning', 'moonbeams']))
+  })
+})
+
+describe('reading theme presets', () => {
+  it('every PAGE_STYLES entry has a matching PAGE_PALETTES palette', () => {
+    for (const s of PAGE_STYLES) {
+      expect(PAGE_PALETTES[s.id]).toBeDefined()
+      expect(PAGE_PALETTES[s.id].bg).toBe(s.bg)
+      expect(PAGE_PALETTES[s.id].text).toBe(s.text)
+    }
+  })
+
+  it('has no duplicate page style or ambient effect ids', () => {
+    expect(new Set(PAGE_STYLES.map((s) => s.id)).size).toBe(PAGE_STYLES.length)
+    expect(new Set(AMBIENT_EFFECTS.map((e) => e.id)).size).toBe(AMBIENT_EFFECTS.length)
   })
 })

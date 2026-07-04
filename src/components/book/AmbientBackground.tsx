@@ -246,6 +246,104 @@ function MotesEffect() {
   )
 }
 
+const AURORA_HUES = [170, 260, 140, 200, 300]
+
+function AuroraEffect() {
+  const bands = useParticles(5)
+  return (
+    <div className="fixed inset-0 pointer-events-none overflow-hidden z-[1]">
+      {bands.map((p, i) => (
+        <div
+          key={i}
+          className="absolute rounded-full"
+          style={{
+            left: `${p.left - 20}%`,
+            top: `${p.top * 0.35}%`,
+            width: `${p.size * 260 + 320}px`,
+            height: `${p.size * 60 + 70}px`,
+            background: `radial-gradient(ellipse, hsla(${AURORA_HUES[i % AURORA_HUES.length]},80%,65%,${p.opacity * 0.16}) 0%, transparent 70%)`,
+            filter: 'blur(26px)',
+            animationName: 'mist-drift',
+            animationTimingFunction: 'ease-in-out',
+            animationIterationCount: 'infinite',
+            animationDelay: `${p.delay}s`,
+            animationDuration: `${16 + p.duration * 10}s`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+function LightningEffect() {
+  const streaks = useParticles(24)
+  const flashes = useParticles(3)
+  return (
+    <div className="fixed inset-0 pointer-events-none overflow-hidden z-[1]">
+      {streaks.map((p, i) => (
+        <div
+          key={`s${i}`}
+          className="absolute rounded-full"
+          style={{
+            left: `${p.left}%`,
+            top: `-${p.size * 30}px`,
+            width: `${p.size * 0.5}px`,
+            height: `${p.size * 50 + 40}px`,
+            background: `rgba(180,195,220,${p.opacity * 0.18})`,
+            animationName: 'rain-fall',
+            animationTimingFunction: 'linear',
+            animationIterationCount: 'infinite',
+            animationDelay: `${p.delay}s`,
+            animationDuration: `${p.duration * 0.6 + 0.4}s`,
+          }}
+        />
+      ))}
+      {flashes.map((p, i) => (
+        <div
+          key={`f${i}`}
+          className="absolute inset-0"
+          style={{
+            background: 'rgba(220,225,255,0.9)',
+            animationName: 'lightning-flash',
+            animationTimingFunction: 'ease-out',
+            animationIterationCount: 'infinite',
+            animationDelay: `${p.delay * 3 + i * 4}s`,
+            animationDuration: `${9 + p.duration * 6}s`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+function MoonbeamsEffect() {
+  const beams = useParticles(4)
+  return (
+    <div className="fixed inset-0 pointer-events-none overflow-hidden z-[1]">
+      {beams.map((p, i) => (
+        <div
+          key={i}
+          className="absolute"
+          style={{
+            left: `${p.left}%`,
+            top: '-10%',
+            width: `${p.size * 40 + 60}px`,
+            height: '120%',
+            background: `linear-gradient(180deg, rgba(210,225,255,${p.opacity * 0.14}) 0%, transparent 70%)`,
+            filter: 'blur(18px)',
+            transform: `rotate(${i % 2 === 0 ? 8 : -8}deg)`,
+            animationName: 'mist-drift',
+            animationTimingFunction: 'ease-in-out',
+            animationIterationCount: 'infinite',
+            animationDelay: `${p.delay}s`,
+            animationDuration: `${18 + p.duration * 10}s`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 interface Props {
   effect: AmbientEffect
 }
@@ -260,6 +358,9 @@ export function AmbientBackground({ effect }: Props) {
     case 'petals':    return <PetalsEffect />
     case 'mist':      return <MistEffect />
     case 'motes':     return <MotesEffect />
+    case 'aurora':    return <AuroraEffect />
+    case 'lightning': return <LightningEffect />
+    case 'moonbeams': return <MoonbeamsEffect />
     default:          return null
   }
 }
