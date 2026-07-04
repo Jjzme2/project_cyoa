@@ -96,14 +96,14 @@ async function HeroActions() {
   return (
     <div className="flex flex-wrap items-center gap-3">
       {featuredId && (
-        <Link href={`/stories/${featuredId}`}>
+        <Link href={`/stories/${featuredId}?welcome=1`}>
           <Button className="gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300">
             <BookOpen className="h-4 w-4" />
-            Read a featured story
+            Jump right in
           </Button>
         </Link>
       )}
-      <Link href="/stories/new">
+      <Link href="/stories/new?assist=1">
         <Button
           variant="ghost"
           className={
@@ -113,7 +113,7 @@ async function HeroActions() {
           }
         >
           <Plus className="h-4 w-4" />
-          Start a story
+          Start writing in 60 seconds
         </Button>
       </Link>
       <Link href="/worlds/new">

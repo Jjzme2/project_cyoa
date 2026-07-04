@@ -19,6 +19,7 @@ import { themeForTone, DEFAULT_WORLD_THEME } from '@/components/world/world-them
 import { getWorld, getStoriesByWorld, getWorldChronicle, getWorldLegends, getWorldOutsiderRegard, getCharactersByWorld } from '@/lib/firestore-helpers'
 import { CharacterPortrait } from '@/components/character/CharacterPortrait'
 import { isCrossWorld } from '@/lib/characters'
+import { resolveNarrativeMode } from '@/lib/engine/narrative-mode'
 import { APP_CONFIG } from '@/lib/config'
 
 interface Props {
@@ -96,6 +97,14 @@ async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
             <span className={`shrink-0 text-[11px] uppercase tracking-wider font-semibold font-sans px-2.5 py-1 rounded-full border ${toneClass}`}>
               {world.tone}
             </span>
+            {resolveNarrativeMode(world) === 'gentle' && (
+              <span
+                className="shrink-0 text-[11px] uppercase tracking-wider font-semibold font-sans px-2.5 py-1 rounded-full border text-emerald-300 bg-emerald-500/10 border-emerald-500/25"
+                title="A gentle world — stories of wonder, friendship, and joy; nothing bad happens here"
+              >
+                🌿 Gentle
+              </span>
+            )}
           </div>
 
           {world.description && (

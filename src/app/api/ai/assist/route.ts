@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { parseJson } from '@/lib/api-validation'
 import { adminAuth } from '@/lib/firebase-admin'
 import { CreditManager } from '@/lib/credit-manager'
+import { throttle } from '@/lib/rate-limit'
 import { creditFailureResponse } from '@/lib/credit-response'
 import { generateAssistQuestions, generateAssistFields } from '@/lib/ai'
 import { trackGenerationCompleted, trackGenerationFailed } from '@/lib/generation-telemetry'
@@ -98,8 +99,15 @@ export async function POST(req: NextRequest) {
   const current = sanitizeCurrent(parsed.data.current)
 
   // The clarifying-questions step is free: it's a short call that helps the
-  // author spend their actual credit well.
+  // author spend their actual credit well. Free ≠ unmetered — cap it so the
+  // one uncharged model call can't be farmed.
   if (mode === 'questions') {
+    if (!(await throttle(`assistq:${uid}`, 12, 3600))) {
+      return NextResponse.json(
+        { error: 'You’ve asked for a lot of inspiration this hour — give it a little time.' },
+        { status: 429 },
+      )
+    }
     try {
       const questions = await generateAssistQuestions(type, prompt, worldContext, uid)
       return NextResponse.json({ questions })

@@ -26,6 +26,8 @@ export interface EndingCondition {
 export interface WorldPulse {
   /** 0 (calm) .. 1 (at a knife's edge) — the AI Director's tension. */
   tension: number
+  /** True in a gentle world — the panel reads the curve as anticipation. */
+  gentle?: boolean
   /** "House A rises; House B falters." */
   factions?: string
   /** "Grain is scarce; iron runs cheap." */

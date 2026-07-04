@@ -42,6 +42,7 @@ import { moderateText, moderationToNodeFields } from '@/lib/moderation'
 import { NarrativeBuilder } from '@/lib/engine/narrative-builder'
 import { buildWorldPulse } from '@/lib/engine/world-pulse'
 import { endingDirective } from '@/lib/engine/ending'
+import { resolveNarrativeMode } from '@/lib/engine/narrative-mode'
 import type { WorldPulse } from '@/types'
 import type { WorldState } from '@/types/goap'
 import type { AgentMemory } from '@/types/goap'
@@ -266,7 +267,7 @@ export async function POST(
       systemNarrativeEvents = builder.formatForPrompt(context)
       updatedEngineState = nextState
       // Reader-facing snapshot of the living world at this chapter.
-      nodeWorldPulse = buildWorldPulse(context, nextState)
+      nodeWorldPulse = buildWorldPulse(context, nextState, resolveNarrativeMode(world))
     }
 
     // An author win/lose condition met on the reader's side FORCES a conclusion;
@@ -274,7 +275,7 @@ export async function POST(
     // endingDirective). The model writes the final chapter either way.
     const endDirective = forceEnding
       ? `a definitive ${forceEnding.type} ending has been reached. Conclude the story NOW with a final chapter that lands this ${forceEnding.type} ending titled "${forceEnding.title}".`
-      : endingDirective(parentNode.depth + 1, updatedEngineState)
+      : endingDirective(parentNode.depth + 1, updatedEngineState, resolveNarrativeMode(world))
 
     const { content, choices, model, newCharacters, location, ending } = await generateStoryNode(
       worldCtx,

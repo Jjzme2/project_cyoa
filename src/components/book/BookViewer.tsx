@@ -12,6 +12,7 @@ import { SharePathButton } from './SharePathButton'
 import { BeginSagaControl } from './BeginSagaControl'
 import { LivingWorldPanel } from './LivingWorldPanel'
 import { EndingReveal } from './EndingReveal'
+import { WelcomeWhisper } from './WelcomeWhisper'
 import { BookmarkButton } from './BookmarkButton'
 import { GalleryButton } from './GalleryButton'
 import { AmbientBackground } from './AmbientBackground'
@@ -472,6 +473,7 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
   return (
     <div className="flex flex-col items-center gap-5 w-full max-w-4xl mx-auto">
       <AmbientBackground effect={ambientEffect} />
+      <WelcomeWhisper />
 
       {/* Initial choice overlay — shown once before story begins */}
       {showInitialChoices && (

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidateTag } from 'next/cache'
 import { getAuthContext } from '@/lib/auth'
+import { throttle } from '@/lib/rate-limit'
 import { getWorld, setWorldGenesis } from '@/lib/firestore-helpers'
 import { buildGenesisSkeleton } from '@/lib/engine/world-genesis'
 import { SeededRNG } from '@/lib/engine/seed-rng'
@@ -18,6 +19,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Only the world’s creator can generate its canon.' }, { status: 403 })
   }
   if (world.genesis) return NextResponse.json({ ok: true, already: true })
+
+  // Genesis is a real (multi-part) model call, gated only by once-per-world —
+  // cap per-user daily volume so world-spam can't farm it.
+  if (!(await throttle(`genesis:${auth.uid}`, 5, 86400))) {
+    return NextResponse.json(
+      { error: 'You’ve breathed life into a lot of worlds today — genesis returns tomorrow.' },
+      { status: 429 },
+    )
+  }
 
   const seed = world.seed ?? SeededRNG.hashString(world.name)
   const skeleton = buildGenesisSkeleton(seed, world.tone)
