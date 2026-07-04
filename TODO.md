@@ -193,6 +193,34 @@ abuse guard below was also already covered by the Tier-3 throttle work.)
 - [x] **Abuse guard on `POST /api/track`** — already throttled (`throttle('track:${uid}', 120, 60)`
   in `src/app/api/track/route.ts`), same pass that covered `/api/feedback`.
 
+## 🎨 Atmosphere & animation pass
+
+There's already real infrastructure here — 9 reading page-styles × 9 ambient
+effects, 12 cover gradients × 8 accents × 48 icons × 8 patterns × 8 border
+frames, a 21-tone → atmosphere preset map for worlds, and framer-motion
+already driving the page-flip and ending reveal. This pass expands the
+presets and makes ambient dynamic rather than a single static per-story pick.
+
+- [ ] **More ReadingTheme presets** — new page styles + ambient effects
+  beyond the current 9×9 (e.g. aurora, candlelight, moonlit, storm).
+- [ ] **More cover/world atmosphere presets** — more gradient/accent/emblem/
+  pattern presets + more `TONE_ATMOSPHERES` tone mappings.
+- [ ] **Decouple ambient sound from ambient visual** — today one
+  `ambientEffect` enum drives both 1:1; split into independent
+  visual/sound fields.
+- [ ] **Per-world default ambient** — stories inherit the world's default
+  ambient unless the author overrides it.
+- [ ] **Auto per-chapter ambient matching** — an "Auto" mode where the
+  ambient (visual+sound) switches per-chapter to match the scene (e.g. a
+  rain scene switches to the rain ambient for that chapter). Folded into the
+  existing single AI generation call (like `ENDING`/`NEW_CHARACTER`
+  markers) so there's no added AI cost.
+- [ ] **Achievement unlock celebration animation.**
+- [ ] **Cover reveal flourish animation.**
+- [ ] **World portal ambiance animation** (subtle breathing/parallax on the
+  banner).
+- [ ] **Choice/chapter micro-interaction animations.**
+
 ## 🔒 Blocked on ops / deploy
 
 - [ ] 🔒 Create + host the brand logo at
