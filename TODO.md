@@ -223,11 +223,14 @@ presets and makes ambient dynamic rather than a single static per-story pick.
   inherits the same fallback via `resolveAmbientSound`. Threaded
   `worldAmbientEffect` through `stories/[id]/page.tsx` →
   `BookViewerClient`/`GatedStoryReader` → `BookViewer`.
-- [ ] **Auto per-chapter ambient matching** — an "Auto" mode where the
-  ambient (visual+sound) switches per-chapter to match the scene (e.g. a
-  rain scene switches to the rain ambient for that chapter). Folded into the
-  existing single AI generation call (like `ENDING`/`NEW_CHARACTER`
-  markers) so there's no added AI cost.
+- [x] **Auto per-chapter ambient matching** — a new `AMBIENT: <effect>` marker
+  (mirrors `LOCATION:`/`ENDING:`) folded into the existing chapter-generation
+  and saga-opening prompts, so there's no added AI cost. Parsed by
+  `parseAIResponse`, validated against the known effect list (unrecognized
+  → no cue, graceful fallback), and stored as `StoryNode.sceneAmbient`.
+  With `ambientSoundMode: 'auto'`, `BookViewer` now resolves the sound from
+  the current chapter's own cue — falling back to the visual/world default
+  on chapters with none.
 - [ ] **Achievement unlock celebration animation.**
 - [ ] **Cover reveal flourish animation.**
 - [ ] **World portal ambiance animation** (subtle breathing/parallax on the

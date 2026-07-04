@@ -1,4 +1,4 @@
-import type { ContentRating, EndingType, StoryCharacter, StoryPathSegment, WorldBible } from '@/types'
+import type { ContentRating, EndingType, StoryCharacter, StoryPathSegment, WorldBible, AmbientEffect } from '@/types'
 import { VALID_TONES, VALID_TAGS, NAME_DIVERSITY_NOTE, parseAIResponse, tryParseJSON, pickStr } from './shared'
 import { runTextWaterfall, isBillingOrRateLimitError } from './waterfall'
 import { buildPrompt, buildSagaOpeningPrompt, userInputBlock, type WorldContext } from './prompts'
@@ -98,7 +98,7 @@ export async function generateSagaOpening(
   sagaPremise: string,
   entry: { label: string; premise: string },
   userId: string,
-): Promise<{ content: string; choices: string[]; model: string; newCharacters: StoryCharacter[]; location?: string }> {
+): Promise<{ content: string; choices: string[]; model: string; newCharacters: StoryCharacter[]; location?: string; sceneAmbient?: AmbientEffect }> {
   const prompt = buildSagaOpeningPrompt(world, sagaPremise, entry)
 
   try {
@@ -124,7 +124,7 @@ export async function generateStoryNode(
   includeImage: boolean,
   systemNarrativeEvents: string = '',
   endingDirective: string = '',
-): Promise<{ content: string; choices: string[]; model: string; newCharacters: StoryCharacter[]; location?: string; ending?: { title: string; type: EndingType } }> {
+): Promise<{ content: string; choices: string[]; model: string; newCharacters: StoryCharacter[]; location?: string; sceneAmbient?: AmbientEffect; ending?: { title: string; type: EndingType } }> {
   const prompt = buildPrompt(world, storyPath, choiceText, includeImage, systemNarrativeEvents, endingDirective)
 
   try {

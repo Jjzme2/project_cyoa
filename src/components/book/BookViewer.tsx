@@ -125,11 +125,11 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
   // An untouched story inherits its world's default ambient (visual and,
   // via 'match'/'auto', sound too).
   const ambientEffect = resolveAmbientVisual(story.readingTheme, worldAmbientEffect)
-  // The sound can diverge from the visual (auto-follow the scene, or be
-  // silenced outright) — see resolveAmbientSound. No per-chapter scene cue
-  // yet (that's the auto-matching work), so 'auto' currently just falls
-  // back to the visual, same as 'match'.
-  const ambientSound = resolveAmbientSound(story.readingTheme, undefined, worldAmbientEffect)
+  // The sound can diverge from the visual: in 'auto' mode it follows this
+  // chapter's own detected scene cue (falling back to the visual when the
+  // current chapter has none), or it can be silenced outright — see
+  // resolveAmbientSound.
+  const ambientSound = resolveAmbientSound(story.readingTheme, node.sceneAmbient, worldAmbientEffect)
 
   // Start/stop the looping soundscape with the toggle (and clean up on unmount).
   // Delayed slightly: ambient can auto-start from a preference saved in a PRIOR

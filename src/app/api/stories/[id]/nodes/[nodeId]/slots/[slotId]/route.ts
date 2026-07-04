@@ -284,7 +284,7 @@ export async function POST(
       ? `a definitive ${forceEnding.type} ending has been reached. Conclude the story NOW with a final chapter that lands this ${forceEnding.type} ending titled "${forceEnding.title}".`
       : endingDirective(parentNode.depth + 1, updatedEngineState, storyMode)
 
-    const { content, choices, model, newCharacters, location, ending } = await generateStoryNode(
+    const { content, choices, model, newCharacters, location, sceneAmbient, ending } = await generateStoryNode(
       worldCtx,
       storyPath,
       editedPrompt,
@@ -364,6 +364,7 @@ export async function POST(
           imageUrl: null,
           ...(qualityScore !== undefined ? { qualityScore } : {}),
           ...(location ? { location } : {}),
+          ...(sceneAmbient ? { sceneAmbient } : {}),
           ...(updatedEngineState ? { engineState: updatedEngineState } : {}),
           ...(nodeWorldPulse ? { worldPulse: nodeWorldPulse } : {}),
           // A forced (author-condition) ending is guaranteed terminal even if the

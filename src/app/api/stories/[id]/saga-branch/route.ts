@@ -146,7 +146,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       sagaId,
       `Your story begins where another's left off.`,
       uid,
-      [{ label: entry.label, content: opening.content, choices: opening.choices, aiModel: opening.model, location: opening.location }],
+      [{ label: entry.label, content: opening.content, choices: opening.choices, aiModel: opening.model, location: opening.location, sceneAmbient: opening.sceneAmbient }],
     )
 
     revalidateTag('stories', 'max')

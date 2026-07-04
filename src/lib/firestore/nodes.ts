@@ -1,7 +1,7 @@
 import { adminDb } from '../firebase-admin'
 import { FieldValue } from 'firebase-admin/firestore'
 import { cacheLife, cacheTag } from 'next/cache'
-import type { ChoiceSlot, ModerationStatus, NodeModeration, SlotBounty, StoryNode, StoryPathSegment } from '@/types'
+import type { ChoiceSlot, ModerationStatus, NodeModeration, SlotBounty, StoryNode, StoryPathSegment, AmbientEffect } from '@/types'
 import { CreditManager } from '../credit-manager'
 import { storyRef, nodesRef, nodeRef, slotsRef } from './refs'
 
@@ -274,7 +274,7 @@ export async function createSagaTree(
   storyId: string,
   thresholdContent: string,
   authorId: string,
-  openings: { label: string; content: string; choices: string[]; aiModel: string; location?: string }[],
+  openings: { label: string; content: string; choices: string[]; aiModel: string; location?: string; sceneAmbient?: AmbientEffect }[],
 ): Promise<{ rootNodeId: string; nodeCount: number }> {
   const rootRef = nodesRef(storyId).doc()
   const rootId = rootRef.id
@@ -295,6 +295,7 @@ export async function createSagaTree(
           aiModel: o.aiModel,
           imageUrl: null,
           ...(o.location ? { location: o.location } : {}),
+          ...(o.sceneAmbient ? { sceneAmbient: o.sceneAmbient } : {}),
         },
         o.choices,
       ),

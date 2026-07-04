@@ -1,6 +1,6 @@
 import type { ContentRating } from './content'
 import type { Protagonist, StoryCharacter, DirectorPersona } from './characters'
-import type { CoverTheme, ReadingTheme } from './themes'
+import type { CoverTheme, ReadingTheme, AmbientEffect } from './themes'
 import type { EngineState } from './engine'
 
 // ─── Endings ─────────────────────────────────────────────────────────────────
@@ -194,6 +194,9 @@ export interface StoryNode {
   qualityScore?: number
   /** Where this chapter takes place (a world region or place name) — for the map. */
   location?: string
+  /** A detected in-scene atmosphere (e.g. it's raining) — used by readers with
+   * ambient sound set to auto-follow the chapter, instead of their theme's own. */
+  sceneAmbient?: AmbientEffect
   createdAt: string
 }
 

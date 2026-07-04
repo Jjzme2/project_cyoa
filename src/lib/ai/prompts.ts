@@ -277,10 +277,13 @@ ${endingBlock(endingDirective)}
 Then, ONLY if this chapter introduces a brand-new named character not already listed above, add one line per new character (omit entirely if none). When naming them, ${NAME_DIVERSITY_NOTE}:
 NEW_CHARACTER: [name] — [one-line description]
 
-Finally, name where this chapter takes place on its own line — prefer a Region from WORLD CANON above when the scene is there; otherwise a short place name (4 words max):
+Name where this chapter takes place on its own line — prefer a Region from WORLD CANON above when the scene is there; otherwise a short place name (4 words max):
 LOCATION: [place]
 
-Write only the chapter, then EITHER the three choices OR (if you ended the story) the ENDING line, any NEW_CHARACTER lines, and the LOCATION line. No meta-commentary.`
+Finally, ONLY if this chapter's weather or immediate surroundings clearly evoke one of these atmospheres, name it on its own line (omit entirely if none clearly fits — never force it): rain, embers, stars, snow, fireflies, petals, mist, motes, aurora, lightning, moonbeams
+AMBIENT: [one of the above]
+
+Write only the chapter, then EITHER the three choices OR (if you ended the story) the ENDING line, any NEW_CHARACTER lines, the LOCATION line, and the optional AMBIENT line. No meta-commentary.`
 }
 
 export function buildImagePrompt(world: WorldContext, storyContent: string, choiceText: string): string {
@@ -340,10 +343,13 @@ CHOICE_3: [choice text]
 Then, ONLY if this opening introduces a brand-new named character, add one line per new character (omit entirely if none). When naming them, ${NAME_DIVERSITY_NOTE}:
 NEW_CHARACTER: [name] — [one-line description]
 
-Finally, name where this opening takes place on its own line — prefer a Region from WORLD CANON above when applicable; otherwise a short place name (4 words max):
+Name where this opening takes place on its own line — prefer a Region from WORLD CANON above when applicable; otherwise a short place name (4 words max):
 LOCATION: [place]
 
-Write only the chapter, the three choices, any NEW_CHARACTER lines, and the LOCATION line. No meta-commentary.`
+Finally, ONLY if this opening's weather or immediate surroundings clearly evoke one of these atmospheres, name it on its own line (omit entirely if none clearly fits — never force it): rain, embers, stars, snow, fireflies, petals, mist, motes, aurora, lightning, moonbeams
+AMBIENT: [one of the above]
+
+Write only the chapter, the three choices, any NEW_CHARACTER lines, the LOCATION line, and the optional AMBIENT line. No meta-commentary.`
 }
 
 /**
