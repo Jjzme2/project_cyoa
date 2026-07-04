@@ -29,6 +29,12 @@ export interface Season {
   /** Staged events are hidden from players until published. */
   published: boolean
   /**
+   * Self-sustaining live-ops: a recurring season's window rolls forward
+   * automatically (daily cron) once it ends, so the heartbeat doesn't depend on
+   * an operator remembering. Default: none (one-shot).
+   */
+  recurrence?: 'none' | 'monthly' | 'yearly'
+  /**
    * Optional scope: limit the event to a named multiverse. Null/undefined means
    * site-wide.
    */
