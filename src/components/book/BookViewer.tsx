@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
+import { AchievementUnlockToast } from './AchievementUnlockToast'
 import { ChevronLeft, Sparkles, Volume2, VolumeX, Waves, Trophy, Users, Map as MapIcon } from 'lucide-react'
 import { StoryContent } from './StoryContent'
 import { ChoiceSlots } from './ChoiceSlots'
@@ -188,7 +189,7 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
           const { newlyEarned }: { newlyEarned: string[] } = await res.json()
           for (const id of newlyEarned ?? []) {
             const def = ACHIEVEMENT_DEFS.find((d) => d.id === id)
-            if (def) toast.success(`${def.icon} Achievement unlocked — ${def.name}`)
+            if (def) toast.custom(() => <AchievementUnlockToast icon={def.icon} name={def.name} />, { duration: 4500 })
           }
         } catch {
           /* best-effort */

@@ -231,7 +231,10 @@ presets and makes ambient dynamic rather than a single static per-story pick.
   With `ambientSoundMode: 'auto'`, `BookViewer` now resolves the sound from
   the current chapter's own cue — falling back to the visual/world default
   on chapters with none.
-- [ ] **Achievement unlock celebration animation.**
+- [x] **Achievement unlock celebration animation** — a new
+  `AchievementUnlockToast` (framer-motion: spring-popped icon + a brief
+  radiating burst) rendered via `toast.custom()` in `BookViewer`, replacing
+  the plain text toast on a newly-earned ending achievement.
 - [ ] **Cover reveal flourish animation.**
 - [ ] **World portal ambiance animation** (subtle breathing/parallax on the
   banner).
