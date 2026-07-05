@@ -1,14 +1,26 @@
 import Stripe from 'stripe'
 import { adminAuth, adminDb } from './firebase-admin'
 import { CreditManager } from './credit-manager'
+import { computeStripeMocked } from './stripe-mode'
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY || ''
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+const keyLooksReal = !!stripeSecretKey && !stripeSecretKey.includes('placeholder')
 
-// If no key is set or it's a placeholder, we run in developer mock mode
-export const isStripeMocked = !stripeSecretKey || stripeSecretKey.includes('placeholder') || stripeSecretKey === ''
+/**
+ * Developer "mock" checkout — which grants credits / PREMIUM with NO real charge
+ * — is ONLY ever available OUTSIDE production (see `stripe-mode.ts`). Gated on
+ * the environment, not just the key: in production the app always talks to real
+ * Stripe, and if the key is missing there, payments fail cleanly rather than
+ * silently minting credits. Without this gate, an unset key in prod would drop
+ * the app into mock mode where any signed-in user could self-grant unlimited
+ * credits via `mock_checkout`.
+ */
+export const isStripeMocked = computeStripeMocked(process.env.NODE_ENV, process.env.STRIPE_SECRET_KEY)
 
-export const stripe = !isStripeMocked
+// A real key initializes the live client regardless of environment; a missing
+// key leaves it null (payment routes then fail cleanly instead of minting).
+export const stripe = keyLooksReal
   ? new Stripe(stripeSecretKey, {
       apiVersion: '2026-05-27.dahlia',
     })
@@ -45,7 +57,8 @@ export class StripeService {
     }
 
     if (!stripe) {
-      throw new Error('Stripe client not initialized')
+      // Production with no key configured — fail cleanly (never mint).
+      throw new Error('Payments are not configured. Please try again later.')
     }
 
     // Find or create customer
@@ -154,6 +167,12 @@ export class StripeService {
     type: 'subscription' | 'credits'
     creditsAmount: number
   }) {
+    // Hard stop: mock grants must never run in production, even if some caller
+    // forgets the `isStripeMocked` guard. Belt-and-suspenders around the
+    // environment gate in this module's header.
+    if (!isStripeMocked) {
+      throw new Error('Mock checkout is not available in this environment.')
+    }
     if (params.type === 'subscription') {
       await this.syncSubscriptionStatus(
         params.userId,
