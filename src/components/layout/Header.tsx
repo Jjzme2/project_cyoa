@@ -101,8 +101,10 @@ export function Header() {
             <span className="font-semibold text-lg tracking-tight gold-text">Chronicle</span>
           </Link>
 
-          {/* Desktop nav */}
-          <nav className="hidden sm:flex items-center gap-6">{navLinks}</nav>
+          {/* Desktop nav — shows at lg+; below that the links live in the mobile
+              sheet, since the full set (Library…Bounties…Admin) overflows at
+              tablet widths. */}
+          <nav className="hidden lg:flex items-center gap-6">{navLinks}</nav>
 
           {/* Actions */}
           <div className="flex items-center gap-2">
@@ -154,6 +156,7 @@ export function Header() {
                         onClick={() => setApiKeyModalOpen(true)}
                         className="hidden sm:flex items-center justify-center h-8 w-8 rounded-full text-amber-400/40 hover:text-amber-400/80 transition-colors"
                         title="Your Gemini API key"
+                        aria-label="Your Gemini API key"
                       >
                         <KeyRound className="h-3.5 w-3.5" />
                       </button>
@@ -190,9 +193,10 @@ export function Header() {
               </>
             )}
 
-            {/* Mobile menu */}
+            {/* Mobile / tablet menu — holds the nav links until the lg breakpoint
+                where the full desktop nav appears. */}
             <Sheet>
-              <SheetTrigger className="sm:hidden inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+              <SheetTrigger aria-label="Open menu" className="lg:hidden inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
                 <Menu className="h-4 w-4" />
               </SheetTrigger>
               <SheetContent side="right" className="glass border-white/10 w-64">

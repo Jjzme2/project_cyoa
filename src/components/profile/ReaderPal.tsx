@@ -97,10 +97,10 @@ export function ReaderPal() {
               maxLength={24}
               className="text-sm font-semibold bg-white/5 border border-white/10 rounded px-1.5 py-0.5 text-foreground/90 w-32"
             />
-            <button onClick={saveRename} disabled={saving} className="text-emerald-400/80 hover:text-emerald-300">
+            <button onClick={saveRename} disabled={saving} aria-label="Save name" className="text-emerald-400/80 hover:text-emerald-300">
               <Check className="h-3.5 w-3.5" />
             </button>
-            <button onClick={() => setRenaming(false)} className="text-muted-foreground/50 hover:text-foreground/80">
+            <button onClick={() => setRenaming(false)} aria-label="Cancel rename" className="text-muted-foreground/50 hover:text-foreground/80">
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
@@ -110,6 +110,7 @@ export function ReaderPal() {
             <button
               onClick={() => { setDraftName(pet.name); setRenaming(true) }}
               title="Rename your pal"
+              aria-label="Rename your pal"
               className="text-muted-foreground/40 hover:text-amber-300 transition-colors"
             >
               <Pencil className="h-3 w-3" />
@@ -128,6 +129,8 @@ export function ReaderPal() {
             key={s.id}
             onClick={() => reskin(s.id)}
             title={`Reskin as ${s.label}`}
+            aria-label={`Reskin as ${s.label}`}
+            aria-pressed={pet.species === s.id}
             className={`h-6 w-6 rounded-full flex items-center justify-center text-xs transition-all ${
               pet.species === s.id ? 'bg-amber-500/20 ring-1 ring-amber-400/50' : 'opacity-50 hover:opacity-90'
             }`}

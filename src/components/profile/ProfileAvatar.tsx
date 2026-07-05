@@ -59,7 +59,7 @@ export function ProfileAvatar({ photoURL, initials }: { photoURL?: string | null
   return (
     <div className="flex flex-col items-center sm:items-start gap-3">
       <div
-        className={`w-20 h-20 rounded-full overflow-hidden bg-amber-500/10 flex items-center justify-center text-xl text-amber-300 font-sans font-bold ${frame.ringClassName}`}
+        className={`relative w-20 h-20 rounded-full overflow-hidden bg-amber-500/10 flex items-center justify-center text-xl text-amber-300 font-sans font-bold ${frame.ringClassName}`}
       >
         {photoURL ? (
           <Image src={photoURL} alt="Avatar" fill className="object-cover" sizes="80px" />
@@ -77,6 +77,7 @@ export function ProfileAvatar({ photoURL, initials }: { photoURL?: string | null
                 key={f.id}
                 type="button"
                 title={unlocked ? f.name : `${f.name} — locked`}
+                aria-label={unlocked ? `Equip ${f.name} frame` : `${f.name} frame — locked`}
                 onClick={() => equip(f.id)}
                 disabled={!unlocked}
                 className={`h-6 w-6 rounded-full flex items-center justify-center transition-all ${f.ringClassName} ${
