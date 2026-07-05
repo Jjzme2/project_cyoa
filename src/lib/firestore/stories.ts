@@ -2,7 +2,7 @@ import { adminDb } from '../firebase-admin'
 import { FieldValue } from 'firebase-admin/firestore'
 import { cacheLife, cacheTag } from 'next/cache'
 import type { Story, StoryCharacter, ContentRating } from '@/types'
-import { storyRef, nodesRef, nodeRef, slotRef } from './refs'
+import { storyRef, nodesRef, nodeRef, slotRef, slotTraverserRef } from './refs'
 
 // ─── Stories ─────────────────────────────────────────────────────────────────
 
@@ -117,11 +117,43 @@ export async function incrementTraversal(
   nodeId: string,
   slotId: string,
   childNodeId: string,
-): Promise<void> {
-  const batch = adminDb.batch()
-  batch.update(slotRef(storyId, nodeId, slotId), { traversals: FieldValue.increment(1) })
-  batch.update(nodeRef(storyId, childNodeId), { traversals: FieldValue.increment(1) })
-  await batch.commit()
+  traverserUid?: string | null,
+): Promise<{ slotTraversals: number; submittedBy: string | null; milestoneTraversals: number | null }> {
+  const sRef = slotRef(storyId, nodeId, slotId)
+  const cRef = nodeRef(storyId, childNodeId)
+  // A transaction (not a blind batch) so we learn the exact resulting count and
+  // the path's author in the same round trip — the caller no longer needs a
+  // second read to detect the Path Pioneer milestone, and concurrent traversals
+  // serialize so exactly one of them observes the threshold.
+  return adminDb.runTransaction(async (txn) => {
+    const slotDoc = await txn.get(sRef)
+    const prev = (slotDoc.data()?.traversals as number) ?? 0
+    const submittedBy = (slotDoc.data()?.submittedBy as string | undefined) ?? null
+
+    // The public `traversals` counter counts EVERY read (including anonymous) —
+    // it drives "% went here". The Path Pioneer MILESTONE is separate and must
+    // not be farmable: it counts only a distinct, registered reader who is NOT
+    // the path's own author, deduped once per (reader, slot) via a marker doc.
+    // So the reward can't be self-minted by scripting traversals of one's own
+    // slot, and "chosen by 25 readers" means 25 genuinely different readers.
+    let milestoneTraversals: number | null = null
+    const eligible = !!traverserUid && traverserUid !== submittedBy
+    const markerRef = eligible ? slotTraverserRef(storyId, nodeId, slotId, traverserUid!) : null
+    const markerFresh = markerRef ? !(await txn.get(markerRef)).exists : false
+    if (eligible) {
+      const prevMilestone = (slotDoc.data()?.milestoneTraversals as number) ?? 0
+      milestoneTraversals = markerFresh ? prevMilestone + 1 : prevMilestone
+    }
+
+    txn.update(sRef, {
+      traversals: FieldValue.increment(1),
+      ...(markerFresh ? { milestoneTraversals: FieldValue.increment(1) } : {}),
+    })
+    txn.update(cRef, { traversals: FieldValue.increment(1) })
+    if (markerFresh && markerRef) txn.set(markerRef, { at: new Date().toISOString() })
+
+    return { slotTraversals: prev + 1, submittedBy, milestoneTraversals }
+  })
 }
 
 export interface GalleryImage {
@@ -171,11 +203,10 @@ export async function getAuthoredPathStats(uid: string): Promise<AuthoredPathSta
   for (const d of snap.docs) {
     const data = d.data()
     totalReads += (data.traversals as number) ?? 0
-    // Legacy per-node `reactions` maps predate sharded counters — kept as a frozen
-    // baseline that `totalReactions` (the sharded aggregate) accrues on top of.
-    const legacyReactions = (data.reactions as Record<string, number>) ?? {}
-    totalLoves += Object.values(legacyReactions).reduce((sum, n) => sum + (n ?? 0), 0)
-    totalLoves += (data.totalReactions as number) ?? 0
+    // Per-type reaction counts live in the node's `reactions` map, the single
+    // source of truth (see firestore/reactions.ts) — sum it for total loves.
+    const reactions = (data.reactions as Record<string, number>) ?? {}
+    totalLoves += Object.values(reactions).reduce((sum, n) => sum + (n ?? 0), 0)
   }
   return { pathsWritten: snap.size, totalReads, totalLoves }
 }

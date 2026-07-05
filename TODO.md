@@ -75,6 +75,60 @@ the codebase alone).
 _All cleared — see P1 for the next wave (broader test coverage, zod
 validation, lint-debt cleanup)._
 
+### Post-ship review of PRs #49–#51 (efficiency / security / aesthetic)
+
+Done in this pass:
+
+- [x] **🔴 Credit mint via forged reading progress** — `story_read` /
+  `first_choice` granted spendable credits off unvalidated, non-guest-gated
+  `POST /api/progress`. Now: reads awarded only to registered accounts, and
+  only when the story and reported node actually exist (`storyNodeExists`).
+- [x] **🟠 Reward events reachable by guests** — `voice_heard` (feedback) is
+  now registered-only; character voting rejects anonymous accounts (also
+  closes anonymous vote-stuffing of the "most loved" sort).
+- [x] **🟠 Reaction-counter regression** — dropped the shard subcollection
+  (which kept the single-doc write it was meant to remove *and* added ~10
+  reads/chapter-view). Per-type counts are now one `reactions` map on the node
+  with atomic per-field increments; a chapter view reads one doc.
+- [x] **🟠 Per-page-turn / per-choice Firestore waste** — achievements txn
+  skips the (growing) doc rewrite when nothing changed; `incrementTraversal`
+  returns the new count from its transaction (no second read; fixes the
+  Path-Pioneer equality race).
+- [x] **🟠 No `prefers-reduced-motion` + lightning strobe** — global CSS
+  reduced-motion guard neutralizes ambient/shimmer/flash motion; the
+  full-viewport lightning collapsed from 3 stacked 0.9-opacity layers to one
+  at 0.4; `WorldPortalBreath` honors `useReducedMotion()`.
+
+Remaining (P2/P3 — from the same review):
+
+- [ ] **Ambient "None" can't override a world default** — `resolveAmbientVisual`
+  treats explicit `'none'` as unset; distinguish `undefined` (inherit) from off.
+- [ ] **Header nav overflows at tablet widths** (Rooms + Bounties pushed it to
+  ~10 links from `sm:`) — raise breakpoint to `lg:` or fold into a dropdown.
+- [ ] **Profile page makes 3 API calls** (frame/pet/achievements re-read the
+  same docs) — consolidate into one profile-state endpoint.
+- [ ] **Chapter unfurl stagger unbounded** — cap total stagger so a 20-paragraph
+  chapter doesn't hide its last text ~2s per page turn.
+- [x] **Unlisted-story titles leak** through the public bounty board / rooms
+  lobby — both `listOpenBounties` and `listActiveRooms` now resolve each
+  listing's story and drop unlisted (and unresolvable) ones, so a private
+  story's title / link never surfaces publicly. Covered by
+  `unlisted-listings.test.ts`.
+- [ ] **Character votes stored as a growing `voterIds` array** on the character
+  doc — move to a `votes/{uid}` subcollection or `arrayUnion` + counter.
+- [ ] **Polish**: `ProfileAvatar` circle needs `relative` (fill Image); add
+  `aria-label`s to new icon-only buttons (frames, Reader Pal, guest-star);
+  prefix-guard `=/+/-/@` in the CSV export; swap the achievement toast's
+  ad-hoc `bg-[#1a1420]` for `glass-card` tokens.
+- [x] **Residual — Path Pioneer self-farm** — the traverse endpoint was
+  unauthenticated, so an author could script 25 hits on their own slot to mint
+  the one-time 15-credit reward. Now: the public `traversals` popularity counter
+  still counts every (incl. anonymous) read, but the credit-bearing MILESTONE
+  counts only a distinct, registered, non-author reader, deduped once per
+  (reader, slot) via a `slotTraversers` marker doc. Self-traversal and repeat
+  hits from one account no longer move it, so "chosen by 25 readers" means 25
+  genuinely different readers. Covered by `traversal-milestone.test.ts`.
+
 ## P1
 
 - [x] **🟠 Expand test coverage** (review #4) — `CreditManager`, `rate-limit`,

@@ -1,10 +1,10 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
 /**
- * Sharded reaction counters: toggles increment a random shard doc instead of
- * a read-modify-write on the node itself, so concurrent reactors never
- * contend on one document. Verifies toggle-on/off semantics, cross-shard
- * summation, and that legacy (pre-sharding) `reactions` maps still count.
+ * Node reactions: per-type counts are a single `reactions` map on the node doc,
+ * mutated with atomic per-field increments (`reactions.<type>` += ±1). Verifies
+ * toggle-on/off semantics, that many reactors sum correctly, and that a legacy
+ * map is read and incremented in place — with no shard fan-out on reads.
  */
 const h = vi.hoisted(() => {
   const store = new Map<string, Record<string, unknown>>()
@@ -14,25 +14,35 @@ const h = vi.hoisted(() => {
     return !!v && typeof v === 'object' && INCREMENT in (v as object)
   }
 
+  // Apply a write map, resolving `FieldValue.increment` sentinels and honoring
+  // Firestore dot-path keys (`reactions.👏`) as nested field updates.
+  function applyWrite(target: Record<string, unknown>, data: Record<string, unknown>) {
+    for (const [k, v] of Object.entries(data)) {
+      if (k.includes('.')) {
+        const [head, ...rest] = k.split('.')
+        const tail = rest.join('.')
+        const nested = { ...((target[head] as Record<string, unknown>) ?? {}) }
+        nested[tail] = isIncrement(v) ? ((nested[tail] as number) ?? 0) + v.delta : v
+        target[head] = nested
+      } else {
+        target[k] = isIncrement(v) ? ((target[k] as number) ?? 0) + v.delta : v
+      }
+    }
+  }
+
   function docRef(path: string): Record<string, unknown> {
     return {
       id: path.split('/').pop(),
       path,
       get: async () => ({ exists: store.has(path), data: () => store.get(path) }),
       set: async (data: Record<string, unknown>, opts?: { merge?: boolean }) => {
-        const prev = opts?.merge ? (store.get(path) ?? {}) : {}
-        const merged: Record<string, unknown> = { ...prev }
-        for (const [k, v] of Object.entries(data)) {
-          merged[k] = isIncrement(v) ? ((prev[k] as number) ?? 0) + v.delta : v
-        }
+        const merged: Record<string, unknown> = opts?.merge ? { ...(store.get(path) ?? {}) } : {}
+        applyWrite(merged, data)
         store.set(path, merged)
       },
       update: async (data: Record<string, unknown>) => {
-        const prev = store.get(path) ?? {}
-        const merged: Record<string, unknown> = { ...prev }
-        for (const [k, v] of Object.entries(data)) {
-          merged[k] = isIncrement(v) ? ((prev[k] as number) ?? 0) + v.delta : v
-        }
+        const merged: Record<string, unknown> = { ...(store.get(path) ?? {}) }
+        applyWrite(merged, data)
         store.set(path, merged)
       },
       collection: (name: string) => collectionRef(`${path}/${name}`),
@@ -42,12 +52,6 @@ const h = vi.hoisted(() => {
   function collectionRef(path: string): Record<string, unknown> {
     return {
       doc: (id: string) => docRef(`${path}/${id}`),
-      get: async () => {
-        const docs = Array.from(store.entries())
-          .filter(([p]) => p.startsWith(`${path}/`) && !p.slice(path.length + 1).includes('/'))
-          .map(([p, data]) => ({ id: p.split('/').pop(), data: () => data }))
-        return { docs }
-      },
     }
   }
 
@@ -93,7 +97,7 @@ describe('toggleNodeReaction', () => {
     expect(result.counts['👏'] ?? 0).toBe(0)
   })
 
-  it('sums correctly across many distinct users (spread across shards)', async () => {
+  it('sums correctly across many distinct users', async () => {
     for (let i = 0; i < 25; i++) {
       await toggleNodeReaction(`user-${i}`, 's1', 'n1', '✨')
     }
@@ -101,15 +105,15 @@ describe('toggleNodeReaction', () => {
     expect(result.counts['✨']).toBe(25)
   })
 
-  it('keeps totalReactions on the node doc in sync with the delta', async () => {
+  it('keeps the node reactions map in sync with the delta', async () => {
     await toggleNodeReaction('u1', 's1', 'n1', '👏')
     await toggleNodeReaction('u2', 's1', 'n1', '👏')
-    expect(h.store.get('stories/s1/nodes/n1')?.totalReactions).toBe(2)
+    expect((h.store.get('stories/s1/nodes/n1')?.reactions as Record<string, number>)['👏']).toBe(2)
     await toggleNodeReaction('u1', 's1', 'n1', '👏')
-    expect(h.store.get('stories/s1/nodes/n1')?.totalReactions).toBe(1)
+    expect((h.store.get('stories/s1/nodes/n1')?.reactions as Record<string, number>)['👏']).toBe(1)
   })
 
-  it('folds in a legacy (pre-sharding) reactions map as a frozen baseline', async () => {
+  it('reads and increments a pre-existing reactions map in place', async () => {
     h.store.set('stories/s1/nodes/n1', { content: 'hi', reactions: { '👏': 5 } })
     const result = await getNodeReactions(null, 's1', 'n1')
     expect(result.counts['👏']).toBe(5)

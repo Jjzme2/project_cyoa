@@ -94,12 +94,22 @@ export function ChoiceSlots({
     0,
   )
 
-  // Best-effort popularity counter; never blocks navigation.
-  function recordTraversal(slot: ChoiceSlot) {
+  // Best-effort popularity counter; never blocks navigation. Sends the reader's
+  // token when signed in so a genuine read can count toward the path author's
+  // Path Pioneer milestone (the server dedupes and excludes self-traversal).
+  async function recordTraversal(slot: ChoiceSlot) {
     if (!slot.childNodeId) return
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (user) {
+      try {
+        headers.Authorization = `Bearer ${await user.getIdToken()}`
+      } catch {
+        // fall through as an anonymous (popularity-only) traversal
+      }
+    }
     fetch(`/api/stories/${storyId}/nodes/${nodeId}/slots/${slot.id}/traverse`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ childNodeId: slot.childNodeId }),
     }).catch(() => {})
   }

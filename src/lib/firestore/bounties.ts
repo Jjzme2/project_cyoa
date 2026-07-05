@@ -52,9 +52,17 @@ export async function listOpenBounties(limit = 30): Promise<OpenBountyListing[]>
 
   const storyIds = Array.from(new Set(raw.map((r) => r.storyId)))
   const stories = await Promise.all(storyIds.map((id) => getStory(id).catch(() => null)))
-  const titleById = new Map(storyIds.map((id, i) => [id, stories[i]?.title ?? 'Unknown story']))
+  const storyById = new Map(storyIds.map((id, i) => [id, stories[i]]))
 
-  return raw.map((r) => ({ ...r, storyTitle: titleById.get(r.storyId) ?? 'Unknown story' }))
+  // Unlisted stories are hidden from public listings (reachable only by direct
+  // link). Drop their bounties — and any whose story can't be resolved — so the
+  // public board never leaks a private story's title or a working link to it.
+  return raw
+    .filter((r) => {
+      const s = storyById.get(r.storyId)
+      return s && !s.unlisted
+    })
+    .map((r) => ({ ...r, storyTitle: storyById.get(r.storyId)!.title }))
 }
 
 export async function postBounty(

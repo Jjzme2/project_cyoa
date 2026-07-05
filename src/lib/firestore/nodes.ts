@@ -7,6 +7,16 @@ import { storyRef, nodesRef, nodeRef, slotsRef } from './refs'
 
 // ─── Story Nodes ──────────────────────────────────────────────────────────────
 
+/**
+ * Cheap existence check for a node — used to validate reader-supplied progress
+ * before it can earn a reward, without paying `getStoryNode`'s slot/child
+ * fan-out. Not cached: it gates credit grants, so it must reflect live state.
+ */
+export async function storyNodeExists(storyId: string, nodeId: string): Promise<boolean> {
+  const doc = await nodeRef(storyId, nodeId).get()
+  return doc.exists
+}
+
 export async function getStoryNode(
   storyId: string,
   nodeId: string,

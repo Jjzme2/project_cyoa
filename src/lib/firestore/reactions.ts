@@ -5,35 +5,27 @@ import { nodeRef } from './refs'
 
 // ─── Node Reactions ───────────────────────────────────────────────────────────
 /**
- * Per-type reaction counts are sharded across NUM_SHARDS documents per node so
- * that a popular chapter's many concurrent reactors don't all serialize on a
- * single document (Firestore's practical ceiling is ~1 sustained write/sec on
- * one doc). Each toggle picks a random shard and applies an atomic increment —
- * no read-modify-write, so concurrent toggles never contend with each other.
- * Nodes reacted to before this field existed keep their old `reactions` map as
- * a frozen baseline that shard sums are added on top of; no backfill needed.
+ * Per-type reaction counts live in a single `reactions` map on the node doc,
+ * mutated with atomic per-field increments (`reactions.<type>` += ±1) — no
+ * read-modify-write, so concurrent reactors never contend or lose updates.
+ * A chapter view therefore costs one node read (plus the viewer's own
+ * reaction doc), and "most loved" rollups sum this map straight off the node.
+ *
+ * (An earlier revision sharded these counts across sub-docs to lift the
+ * single-doc write ceiling, but at this app's scale no chapter sustains the
+ * >1 write/sec that would justify it, and the shard fan-out multiplied the
+ * per-view read cost with no real contention to relieve.)
  */
-const NUM_SHARDS = 10
 
 function userReactionRef(userId: string, storyId: string, nodeId: string) {
   return adminDb.collection('userReactions').doc(`${userId}_${storyId}_${nodeId}`)
 }
 
-function reactionShardsRef(storyId: string, nodeId: string) {
-  return nodeRef(storyId, nodeId).collection('reactionShards')
-}
-
-async function sumReactionCounts(storyId: string, nodeId: string): Promise<Record<string, number>> {
-  const [nodeDoc, shardSnap] = await Promise.all([
-    nodeRef(storyId, nodeId).get(),
-    reactionShardsRef(storyId, nodeId).get(),
-  ])
-
-  const counts: Record<string, number> = { ...((nodeDoc.data()?.reactions as Record<string, number>) ?? {}) }
-  for (const doc of shardSnap.docs) {
-    for (const [reaction, n] of Object.entries(doc.data() ?? {})) {
-      if (typeof n === 'number') counts[reaction] = (counts[reaction] ?? 0) + n
-    }
+function readCounts(data: FirebaseFirestore.DocumentData | undefined): Record<string, number> {
+  const raw = (data?.reactions as Record<string, number>) ?? {}
+  const counts: Record<string, number> = {}
+  for (const [reaction, n] of Object.entries(raw)) {
+    if (typeof n === 'number' && n > 0) counts[reaction] = n
   }
   return counts
 }
@@ -45,7 +37,10 @@ export async function toggleNodeReaction(
   reaction: ReactionType,
 ): Promise<{ counts: Record<string, number>; userReactions: string[] }> {
   const userRef = userReactionRef(userId, storyId, nodeId)
+  const node = nodeRef(storyId, nodeId)
 
+  // The user's own set of reactions is a genuine read-modify-write (toggle), so
+  // it stays in a transaction; the aggregate count is a blind atomic increment.
   const { delta, finalUserReactions } = await adminDb.runTransaction(async (txn) => {
     const userDoc = await txn.get(userRef)
     const userReactions: string[] = userDoc.exists ? (userDoc.data()?.reactions ?? []) : []
@@ -57,14 +52,10 @@ export async function toggleNodeReaction(
     return { delta: alreadyReacted ? -1 : 1, finalUserReactions }
   })
 
-  const shardId = String(Math.floor(Math.random() * NUM_SHARDS))
-  await Promise.all([
-    reactionShardsRef(storyId, nodeId).doc(shardId).set({ [reaction]: FieldValue.increment(delta) }, { merge: true }),
-    nodeRef(storyId, nodeId).update({ totalReactions: FieldValue.increment(delta) }),
-  ])
+  await node.update({ [`reactions.${reaction}`]: FieldValue.increment(delta) })
 
-  const counts = await sumReactionCounts(storyId, nodeId)
-  return { counts, userReactions: finalUserReactions }
+  const nodeDoc = await node.get()
+  return { counts: readCounts(nodeDoc.data()), userReactions: finalUserReactions }
 }
 
 export async function getNodeReactions(
@@ -72,10 +63,10 @@ export async function getNodeReactions(
   storyId: string,
   nodeId: string,
 ): Promise<{ counts: Record<string, number>; userReactions: string[] }> {
-  const [counts, userDoc] = await Promise.all([
-    sumReactionCounts(storyId, nodeId),
+  const [nodeDoc, userDoc] = await Promise.all([
+    nodeRef(storyId, nodeId).get(),
     userId ? userReactionRef(userId, storyId, nodeId).get() : Promise.resolve(null),
   ])
   const userReactions: string[] = userDoc?.exists ? (userDoc.data()?.reactions ?? []) : []
-  return { counts, userReactions }
+  return { counts: readCounts(nodeDoc.data()), userReactions }
 }

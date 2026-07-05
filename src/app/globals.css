@@ -347,3 +347,19 @@
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
+
+/* Readers who ask their OS for less motion get it everywhere: the ambient
+   weather effects, the shimmer, and — most importantly — the full-viewport
+   `lightning-flash` strobe collapse to a single instantaneous, non-repeating
+   step, so the core reading surface never pulses or flickers. JS-driven motion
+   (framer-motion) additionally checks `useReducedMotion()` at its call sites. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

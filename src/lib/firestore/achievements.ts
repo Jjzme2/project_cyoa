@@ -126,6 +126,14 @@ export async function checkAndAwardAchievements(
     // Capstone — checked last so it sees everything earned this same round.
     check('completionist', earned.length >= ACHIEVEMENT_DEFS.length - 1)
 
+    // Every page turn re-fires `story_read`; when the story's already counted
+    // nothing here changes, so skip the (multi-KB, growing) doc rewrite entirely.
+    const unchanged =
+      doc.exists &&
+      newlyEarned.length === 0 &&
+      JSON.stringify(data.counts) === JSON.stringify(counts)
+    if (unchanged) return
+
     txn.set(ref, { earned, counts, updatedAt: new Date().toISOString() })
 
     for (const id of newlyEarned) {
