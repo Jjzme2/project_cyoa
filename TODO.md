@@ -121,8 +121,12 @@ Remaining (P2/P3 — from the same review):
   listing's story and drop unlisted (and unresolvable) ones, so a private
   story's title / link never surfaces publicly. Covered by
   `unlisted-listings.test.ts`.
-- [ ] **Character votes stored as a growing `voterIds` array** on the character
-  doc — move to a `votes/{uid}` subcollection or `arrayUnion` + counter.
+- [x] **Character votes stored as a growing `voterIds` array** on the character
+  doc — votes now live in a `votes/{uid}` marker subcollection (one doc per
+  voter, so the character doc no longer grows or gets rewritten per vote), with
+  `voteCount` denormalized for the "loved" sort. Legacy `voterIds` entries are
+  still honored and removed on un-vote (array only shrinks; no backfill).
+  Covered by the expanded `characters-fold2d.test.ts`.
 - [~] **Polish** (partly done): `ProfileAvatar` circle now has `relative` (fill
   Image); `aria-label`s added to the frame, Reader Pal, and API-key/menu
   icon-only buttons; CSV export prefix-guards `=/+/-/@`/tab/CR (shared

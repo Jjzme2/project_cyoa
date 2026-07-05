@@ -20,6 +20,10 @@ const h = vi.hoisted(() => {
       update: async (data: Record<string, unknown>) => {
         store.set(path, { ...(store.get(path) ?? {}), ...data })
       },
+      delete: async () => {
+        store.delete(path)
+      },
+      collection: (name: string) => collectionRef(`${path}/${name}`),
     }
   }
 
@@ -63,6 +67,9 @@ const h = vi.hoisted(() => {
         set: (ref: { path: string }, data: Record<string, unknown>, opts?: { merge?: boolean }) => {
           store.set(ref.path, opts?.merge ? { ...(store.get(ref.path) ?? {}), ...data } : data)
         },
+        delete: (ref: { path: string }) => {
+          store.delete(ref.path)
+        },
       }
       return fn(txn)
     },
@@ -74,7 +81,7 @@ const h = vi.hoisted(() => {
 vi.mock('@/lib/firebase-admin', () => ({ adminDb: h.adminDb }))
 vi.mock('next/cache', () => ({ cacheLife: () => {}, cacheTag: () => {} }))
 
-import { getCharacter, listCharacters, getCharactersByWorld, toggleCharacterVote } from '@/lib/firestore/characters'
+import { getCharacter, listCharacters, getCharactersByWorld, toggleCharacterVote, hasCharacterVote } from '@/lib/firestore/characters'
 import { getGuestStarCameos } from '@/lib/firestore/multiverse'
 
 function seedCharacter(id: string, data: Record<string, unknown>) {
@@ -105,13 +112,39 @@ describe('toggleCharacterVote', () => {
     expect(result.count).toBe(0)
   })
 
-  it('multiple distinct voters each count once', async () => {
-    seedCharacter('c1', { voteCount: 0, voterIds: [] })
+  it('multiple distinct voters each count once, stored as marker docs (not a growing array)', async () => {
+    seedCharacter('c1', { voteCount: 0 })
     await toggleCharacterVote('c1', 'u1')
     await toggleCharacterVote('c1', 'u2')
     const char = await getCharacter('c1')
     expect(char?.voteCount).toBe(2)
-    expect(char?.voterIds).toEqual(['u1', 'u2'])
+    // New votes live in the votes/{uid} subcollection, never the character doc.
+    expect(char?.voterIds).toBeUndefined()
+    expect(h.store.has('characters/c1/votes/u1')).toBe(true)
+    expect(h.store.has('characters/c1/votes/u2')).toBe(true)
+  })
+
+  it('a legacy voterIds entry still counts and is removed on un-vote (no backfill)', async () => {
+    seedCharacter('c1', { voteCount: 3, voterIds: ['legacyUser', 'x', 'y'] })
+    const res = await toggleCharacterVote('c1', 'legacyUser')
+    expect(res).toEqual({ voted: false, count: 2 })
+    const char = await getCharacter('c1')
+    expect(char?.voterIds).toEqual(['x', 'y']) // shrinks, never grows
+  })
+})
+
+describe('hasCharacterVote', () => {
+  it('reflects a fresh (subcollection) vote', async () => {
+    seedCharacter('c1', { voteCount: 0 })
+    expect(await hasCharacterVote('c1', 'u1')).toBe(false)
+    await toggleCharacterVote('c1', 'u1')
+    expect(await hasCharacterVote('c1', 'u1')).toBe(true)
+  })
+
+  it('honors a legacy voterIds entry', async () => {
+    seedCharacter('c1', { voteCount: 1, voterIds: ['legacyUser'] })
+    expect(await hasCharacterVote('c1', 'legacyUser')).toBe(true)
+    expect(await hasCharacterVote('c1', 'someoneElse')).toBe(false)
   })
 })
 
