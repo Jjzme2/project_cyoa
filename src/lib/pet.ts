@@ -11,7 +11,7 @@
 
 // ─── Species ──────────────────────────────────────────────────────────────────
 
-export type PetSpecies = 'bird' | 'dragon' | 'sprout' | 'cat' | 'wisp' | 'leviathan'
+export type PetSpecies = 'bird' | 'dragon' | 'sprout' | 'cat' | 'wisp' | 'leviathan' | 'dog' | 'bunny'
 
 export interface PetSpeciesDef {
   id: PetSpecies
@@ -27,6 +27,8 @@ export const PET_SPECIES: PetSpeciesDef[] = [
   { id: 'cat', label: 'Cat', requires: { achievementId: 'bookworm', hint: 'Read 10 different stories' } },
   { id: 'wisp', label: 'Wisp', requires: { achievementId: 'secret_keeper', hint: 'Discover a secret ending' } },
   { id: 'leviathan', label: 'Leviathan', requires: { achievementId: 'chronicler', hint: 'Contribute 50 story paths' } },
+  { id: 'dog', label: 'Dog' },
+  { id: 'bunny', label: 'Bunny', requires: { achievementId: 'trailblazer', hint: 'Discover 25 unique paths' } },
 ]
 
 export function isSpeciesUnlocked(species: PetSpecies, earnedAchievements: string[]): boolean {
@@ -147,6 +149,8 @@ const STAGE_EMOJI: Record<PetSpecies, string[]> = {
   cat: ['🐾', '🐱', '🐈', '🐈‍⬛', '🐆', '🐯', '🦁'],
   wisp: ['✨', '💫', '🔮', '🌟', '☄️', '🌠', '🌌'],
   leviathan: ['🫧', '🐟', '🐠', '🐬', '🐳', '🐋', '🌊'],
+  dog: ['🐾', '🐶', '🐕', '🦮', '🐕‍🦺', '🐺', '🌟'],
+  bunny: ['🥚', '🐇', '🐰', '🐇', '🐰', '🐇', '🌙'],
 }
 
 function stageBands(species: PetSpecies): PetStage[] {

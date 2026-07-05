@@ -22,7 +22,7 @@ Life stages (same arc for every species — it hatches, then grows up):
 | 9     | Elder       |
 | 10    | Legendary   |
 
-Species ids today: `bird`, `dragon`, `sprout`, `cat`, `wisp`, `leviathan`
+Species ids today: `bird`, `dragon`, `sprout`, `cat`, `wisp`, `leviathan`, `dog`, `bunny`
 (see `src/lib/pet.ts` — a new species there + a PNG here is all it takes).
 
 Lookup order at runtime: the current stage's sheet → each earlier stage's
