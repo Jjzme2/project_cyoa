@@ -5,16 +5,7 @@ import { Trophy } from 'lucide-react'
 import { useAuth } from '@/components/Providers'
 import { ShareImageButton } from '@/components/share/ShareImageButton'
 import { ACHIEVEMENT_DEFS } from '@/types'
-
-interface EnrichedAchievement {
-  id: string
-  name: string
-  description: string
-  icon: string
-  reward?: number
-  earned: boolean
-  earnedAt?: string
-}
+import { fetchProfileState, type EnrichedAchievement } from '@/lib/profile-state-client'
 
 function tooltip(a: EnrichedAchievement): string {
   return a.reward ? `${a.name}: ${a.description} (+${a.reward} credits)` : `${a.name}: ${a.description}`
@@ -28,20 +19,16 @@ export function AchievementDisplay() {
 
   useEffect(() => {
     if (!user) return
-    user.getIdToken().then(async (token) => {
-      try {
-        const res = await fetch('/api/achievements', {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        if (res.ok) {
-          const data = await res.json()
-          setAchievements(data.achievements)
-          setCounts(data.counts)
-        }
-      } finally {
-        setLoading(false)
-      }
-    })
+    let alive = true
+    fetchProfileState(user.uid, () => user.getIdToken())
+      .then((state) => {
+        if (!alive) return
+        setAchievements(state.achievements.achievements)
+        setCounts(state.achievements.counts)
+      })
+      .catch(() => {})
+      .finally(() => alive && setLoading(false))
+    return () => { alive = false }
   }, [user])
 
   if (!user) return null

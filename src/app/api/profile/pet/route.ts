@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { parseJson } from '@/lib/api-validation'
 import { adminAuth, adminDb } from '@/lib/firebase-admin'
-import { getUserAchievements } from '@/lib/firestore-helpers'
-import { stageFor, moodFor, quipFor, daySeed, PET_SPECIES, type PetSpecies } from '@/lib/pet'
 
 async function resolveUser(req: NextRequest): Promise<string | null> {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
@@ -15,35 +13,8 @@ async function resolveUser(req: NextRequest): Promise<string | null> {
   }
 }
 
-function normalizeSpecies(value: unknown): PetSpecies {
-  return PET_SPECIES.some((s) => s.id === value) ? (value as PetSpecies) : 'bird'
-}
-
-/** The reader's Reader Pal state — species, level, mood, and a canned flavor line. Rule-based, not AI. */
-export async function GET(req: NextRequest) {
-  const uid = await resolveUser(req)
-  if (!uid) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const [settingsDoc, achievements] = await Promise.all([
-    adminDb.collection('userSettings').doc(uid).get(),
-    getUserAchievements(uid),
-  ])
-  const settings = settingsDoc.data()
-  const name = (settings?.petName as string | undefined) ?? 'Inkling'
-  const species = normalizeSpecies(settings?.petSpecies)
-  const stage = stageFor(species, achievements.earned.length)
-  const mood = moodFor(achievements.updatedAt)
-  const quip = quipFor(mood, daySeed())
-
-  return NextResponse.json({
-    name,
-    species,
-    stage,
-    mood,
-    quip,
-    achievementsEarned: achievements.earned.length,
-  })
-}
+// The reader's Reader Pal state is served by the consolidated GET
+// /api/profile/state; this route keeps only the rename/reskin mutation.
 
 const UpdateSchema = z.object({
   name: z.string().trim().min(1).max(24).optional(),

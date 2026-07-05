@@ -6,6 +6,7 @@ import { Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/components/Providers'
 import { FRAME_SKINS, findFrame, isFrameUnlocked } from '@/lib/cosmetics'
+import { fetchProfileState, invalidateProfileState } from '@/lib/profile-state-client'
 
 /**
  * The profile avatar plus its cosmetic frame picker — self-contained (fetches
@@ -20,18 +21,16 @@ export function ProfileAvatar({ photoURL, initials }: { photoURL?: string | null
 
   useEffect(() => {
     if (!user) return
-    user.getIdToken().then(async (token) => {
-      try {
-        const res = await fetch('/api/profile/frame', { headers: { Authorization: `Bearer ${token}` } })
-        if (res.ok) {
-          const data = await res.json()
-          setEquipped(data.equipped)
-          setEarned(data.earned ?? [])
-        }
-      } finally {
-        setLoaded(true)
-      }
-    })
+    let alive = true
+    fetchProfileState(user.uid, () => user.getIdToken())
+      .then((state) => {
+        if (!alive) return
+        setEquipped(state.frame.equipped)
+        setEarned(state.frame.earned)
+      })
+      .catch(() => {})
+      .finally(() => alive && setLoaded(true))
+    return () => { alive = false }
   }, [user])
 
   async function equip(frameId: string) {
@@ -48,6 +47,7 @@ export function ProfileAvatar({ photoURL, initials }: { photoURL?: string | null
         body: JSON.stringify({ frameId }),
       })
       if (!res.ok) throw new Error()
+      invalidateProfileState() // equipped frame changed — next read should be fresh
     } catch {
       setEquipped(prev)
       toast.error('Could not equip that frame — try again.')
