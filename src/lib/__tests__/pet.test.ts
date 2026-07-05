@@ -19,16 +19,29 @@ import {
   quipForEvent,
   palStats,
 } from '@/lib/pet'
+import { ACHIEVEMENT_DEFS } from '@/types'
 
 describe('species & unlock gating', () => {
-  it('offers six species: three free, three achievement-gated', () => {
-    expect(PET_SPECIES).toHaveLength(6)
-    expect(PET_SPECIES.filter((s) => !s.requires).map((s) => s.id)).toEqual(['bird', 'dragon', 'sprout'])
-    expect(PET_SPECIES.filter((s) => s.requires).map((s) => s.id)).toEqual(['cat', 'wisp', 'leviathan'])
+  it('offers eight species: four free, four achievement-gated', () => {
+    expect(PET_SPECIES).toHaveLength(8)
+    expect(PET_SPECIES.filter((s) => !s.requires).map((s) => s.id)).toEqual(['bird', 'dragon', 'sprout', 'dog'])
+    expect(PET_SPECIES.filter((s) => s.requires).map((s) => s.id)).toEqual(['cat', 'wisp', 'leviathan', 'bunny'])
+  })
+
+  it('every achievement-gated species points at a REAL achievement id', () => {
+    // Regression guard: a species whose `requires.achievementId` doesn't match
+    // any ACHIEVEMENT_DEFS entry can never be earned by anyone — permanently
+    // unobtainable. Would have caught bunny's dangling 'trailblazer' gate.
+    const validIds = new Set(ACHIEVEMENT_DEFS.map((a) => a.id))
+    for (const s of PET_SPECIES) {
+      if (!s.requires) continue
+      expect(validIds.has(s.requires.achievementId), `${s.id} gates on unknown achievement '${s.requires.achievementId}'`).toBe(true)
+    }
   })
 
   it('free species are always unlocked; gated ones need their achievement', () => {
     expect(isSpeciesUnlocked('bird', [])).toBe(true)
+    expect(isSpeciesUnlocked('dog', [])).toBe(true)
     expect(isSpeciesUnlocked('cat', [])).toBe(false)
     expect(isSpeciesUnlocked('cat', ['bookworm'])).toBe(true)
     expect(isSpeciesUnlocked('wisp', ['secret_keeper'])).toBe(true)
@@ -36,8 +49,8 @@ describe('species & unlock gating', () => {
   })
 
   it('unlockedSpecies lists exactly what the earned set qualifies for', () => {
-    expect(unlockedSpecies([])).toEqual(['bird', 'dragon', 'sprout'])
-    expect(unlockedSpecies(['bookworm', 'secret_keeper'])).toEqual(['bird', 'dragon', 'sprout', 'cat', 'wisp'])
+    expect(unlockedSpecies([])).toEqual(['bird', 'dragon', 'sprout', 'dog'])
+    expect(unlockedSpecies(['bookworm', 'secret_keeper'])).toEqual(['bird', 'dragon', 'sprout', 'cat', 'wisp', 'dog'])
   })
 })
 
