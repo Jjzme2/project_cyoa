@@ -42,11 +42,21 @@ export function TwoFactorSetup() {
     [user],
   )
 
-  const refresh = useCallback(() => {
-    api('status').then((d) => setEnabled(!!d.enabled)).catch(() => setEnabled(false))
+  const refresh = useCallback(async () => {
+    try {
+      const d = await api('status')
+      setEnabled(!!d.enabled)
+      return !!d.enabled
+    } catch {
+      setEnabled(false)
+      return false
+    }
   }, [api])
   useEffect(() => {
-    if (user) refresh()
+    // refresh() only setStates after an awaited /status fetch, never
+    // synchronously — this one-shot mount sync is exactly what the effect is for.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (user) void refresh()
   }, [user, refresh])
 
   async function beginSetup() {
@@ -58,7 +68,16 @@ export function TwoFactorSetup() {
       setCode('')
       setPhase('setup')
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not start setup')
+      // The server is the source of truth. Setup rejects if 2FA is already
+      // enabled (e.g. enrolled in another tab/session since this page loaded),
+      // so re-sync from /status: the UI flips to the manage view instead of
+      // stranding the user on "Enable" with a confusing error.
+      const nowEnabled = await refresh()
+      toast.error(
+        nowEnabled
+          ? 'Two-factor authentication is already enabled on your account.'
+          : e instanceof Error ? e.message : 'Could not start setup',
+      )
     } finally {
       setBusy(false)
     }
@@ -75,6 +94,9 @@ export function TwoFactorSetup() {
       if (user) sessionStorage.setItem(`2fa_ok_${user.uid}`, '1')
       setEnabled(true)
     } catch (e) {
+      // If enable actually persisted server-side but the client saw a
+      // network/parse error, reconcile so the UI reflects the true state.
+      await refresh()
       toast.error(e instanceof Error ? e.message : 'Could not enable 2FA')
     } finally {
       setBusy(false)
@@ -90,6 +112,7 @@ export function TwoFactorSetup() {
       setCode('')
       setEnabled(false)
     } catch (e) {
+      await refresh()
       toast.error(e instanceof Error ? e.message : 'Could not disable 2FA')
     } finally {
       setBusy(false)

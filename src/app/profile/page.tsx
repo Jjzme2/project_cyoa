@@ -18,7 +18,6 @@ import {
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/components/Providers'
-import { ApiKeySettings } from '@/components/profile/ApiKeySettings'
 import { ProfileAvatar } from '@/components/profile/ProfileAvatar'
 import { APP_CONFIG } from '@/lib/config'
 import { AchievementDisplay } from '@/components/achievements/AchievementDisplay'
@@ -502,9 +501,6 @@ function ProfileContent() {
 
       {/* Achievements */}
       <AchievementDisplay />
-
-      {/* Personal model provisioning (self-contained) */}
-      <ApiKeySettings />
 
       {/* Authored Creations dashboard list */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-6">

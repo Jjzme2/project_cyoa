@@ -30,12 +30,8 @@ export async function generateStoryImage(
   storyContent: string,
   choiceText: string,
   nodeId: string,
-  userApiKey?: string,
 ): Promise<{ url: string | null; error?: string }> {
-  // If the user's API key is a Google Gemini key, we should NOT use it for OpenRouter image generation.
-  // We should fall back to our system OpenRouter key instead.
-  const isGeminiKey = userApiKey?.startsWith('AIzaSy')
-  const apiKey = (userApiKey && !isGeminiKey) ? userApiKey : process.env.OPENROUTER_API_KEY
+  const apiKey = process.env.OPENROUTER_API_KEY
   if (!apiKey) return { url: null, error: 'No OpenRouter API key configured on server.' }
 
   const prompt = buildImagePrompt(world, storyContent, choiceText)

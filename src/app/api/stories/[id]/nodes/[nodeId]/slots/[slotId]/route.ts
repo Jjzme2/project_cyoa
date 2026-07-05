@@ -14,7 +14,6 @@ import {
   incrementStoryNodeCount,
   lockChoiceSlot,
   releaseChoiceSlot,
-  getDecryptedUserApiKey,
   getStoryPath,
   createNotification,
   checkAndAwardAchievements,
@@ -344,12 +343,11 @@ export async function POST(
     }
 
     // Generate image concurrently with Firestore work if requested
-    const userApiKey = includeImage ? await getDecryptedUserApiKey(uid) : null
     const imagePlaceholder = `${storyId}-${slotId}-${Date.now()}`
 
     const [imageResult, newNodeId] = await Promise.all([
       includeImage
-        ? generateStoryImage(worldCtx, content, editedPrompt, imagePlaceholder, userApiKey ?? undefined)
+        ? generateStoryImage(worldCtx, content, editedPrompt, imagePlaceholder)
         : Promise.resolve({ url: null, error: undefined }),
       createStoryNode(
         {
