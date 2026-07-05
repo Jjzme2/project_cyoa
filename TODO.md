@@ -117,9 +117,14 @@ Remaining (P2/P3 — from the same review):
   `aria-label`s to new icon-only buttons (frames, Reader Pal, guest-star);
   prefix-guard `=/+/-/@` in the CSV export; swap the achievement toast's
   ad-hoc `bg-[#1a1420]` for `glass-card` tokens.
-- [ ] **Residual**: an author can still farm Path Pioneer (~15 credits/slot,
-  one-time) by scripting 25 traversals of their own authored slot — bounded,
-  but worth a guard if traversal abuse shows up.
+- [x] **Residual — Path Pioneer self-farm** — the traverse endpoint was
+  unauthenticated, so an author could script 25 hits on their own slot to mint
+  the one-time 15-credit reward. Now: the public `traversals` popularity counter
+  still counts every (incl. anonymous) read, but the credit-bearing MILESTONE
+  counts only a distinct, registered, non-author reader, deduped once per
+  (reader, slot) via a `slotTraversers` marker doc. Self-traversal and repeat
+  hits from one account no longer move it, so "chosen by 25 readers" means 25
+  genuinely different readers. Covered by `traversal-milestone.test.ts`.
 
 ## P1
 

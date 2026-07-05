@@ -19,3 +19,12 @@ export function slotsRef(storyId: string, nodeId: string) {
 export function slotRef(storyId: string, nodeId: string, slotId: string) {
   return slotsRef(storyId, nodeId).doc(slotId)
 }
+
+/**
+ * Marker doc proving one reader traversed one slot — dedupes the Path Pioneer
+ * milestone so it counts distinct registered readers, not raw (farmable) hits.
+ * Top-level with a composite id, mirroring the `userReactions` pattern.
+ */
+export function slotTraverserRef(storyId: string, nodeId: string, slotId: string, uid: string) {
+  return adminDb.collection('slotTraversers').doc(`${uid}_${storyId}_${nodeId}_${slotId}`)
+}

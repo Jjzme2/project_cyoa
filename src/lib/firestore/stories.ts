@@ -2,7 +2,7 @@ import { adminDb } from '../firebase-admin'
 import { FieldValue } from 'firebase-admin/firestore'
 import { cacheLife, cacheTag } from 'next/cache'
 import type { Story, StoryCharacter, ContentRating } from '@/types'
-import { storyRef, nodesRef, nodeRef, slotRef } from './refs'
+import { storyRef, nodesRef, nodeRef, slotRef, slotTraverserRef } from './refs'
 
 // ─── Stories ─────────────────────────────────────────────────────────────────
 
@@ -117,7 +117,8 @@ export async function incrementTraversal(
   nodeId: string,
   slotId: string,
   childNodeId: string,
-): Promise<{ slotTraversals: number; submittedBy: string | null }> {
+  traverserUid?: string | null,
+): Promise<{ slotTraversals: number; submittedBy: string | null; milestoneTraversals: number | null }> {
   const sRef = slotRef(storyId, nodeId, slotId)
   const cRef = nodeRef(storyId, childNodeId)
   // A transaction (not a blind batch) so we learn the exact resulting count and
@@ -128,9 +129,30 @@ export async function incrementTraversal(
     const slotDoc = await txn.get(sRef)
     const prev = (slotDoc.data()?.traversals as number) ?? 0
     const submittedBy = (slotDoc.data()?.submittedBy as string | undefined) ?? null
-    txn.update(sRef, { traversals: FieldValue.increment(1) })
+
+    // The public `traversals` counter counts EVERY read (including anonymous) —
+    // it drives "% went here". The Path Pioneer MILESTONE is separate and must
+    // not be farmable: it counts only a distinct, registered reader who is NOT
+    // the path's own author, deduped once per (reader, slot) via a marker doc.
+    // So the reward can't be self-minted by scripting traversals of one's own
+    // slot, and "chosen by 25 readers" means 25 genuinely different readers.
+    let milestoneTraversals: number | null = null
+    const eligible = !!traverserUid && traverserUid !== submittedBy
+    const markerRef = eligible ? slotTraverserRef(storyId, nodeId, slotId, traverserUid!) : null
+    const markerFresh = markerRef ? !(await txn.get(markerRef)).exists : false
+    if (eligible) {
+      const prevMilestone = (slotDoc.data()?.milestoneTraversals as number) ?? 0
+      milestoneTraversals = markerFresh ? prevMilestone + 1 : prevMilestone
+    }
+
+    txn.update(sRef, {
+      traversals: FieldValue.increment(1),
+      ...(markerFresh ? { milestoneTraversals: FieldValue.increment(1) } : {}),
+    })
     txn.update(cRef, { traversals: FieldValue.increment(1) })
-    return { slotTraversals: prev + 1, submittedBy }
+    if (markerFresh && markerRef) txn.set(markerRef, { at: new Date().toISOString() })
+
+    return { slotTraversals: prev + 1, submittedBy, milestoneTraversals }
   })
 }
 
