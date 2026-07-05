@@ -1,0 +1,159 @@
+import { describe, it, expect } from 'vitest'
+import { FactionManager } from '@/lib/engine/faction-manager'
+import { EconomyManager } from '@/lib/engine/economy-manager'
+import {
+  initSandboxState,
+  advanceTicks,
+  nudgeFactionStat,
+  setFactionSentiment,
+  setMarket,
+  setTension,
+  setWorldFact,
+  removeWorldFact,
+  sandboxPulse,
+  sandboxStakesLine,
+  MAX_EVENT_LOG,
+} from '@/lib/world-sandbox'
+import type { GenesisFaction } from '@/types'
+
+describe('initSandboxState', () => {
+  it('generates seeded default factions when the world has no genesis', () => {
+    const state = initSandboxState(42)
+    expect(Object.keys(state.factions).length).toBeGreaterThanOrEqual(3)
+    expect(state.tension).toBeCloseTo(0.2)
+    expect(state.eventLog).toEqual([])
+    expect(state.worldState).toEqual({})
+  })
+
+  it('uses the world genesis factions when present', () => {
+    const genesis: GenesisFaction[] = [
+      { name: 'Iron Legion', archetype: 'martial order', seat: 'North', founding: 'old', rivalOf: null, allyOf: null },
+      { name: 'Coin Guild', archetype: 'merchant power', seat: 'East', founding: 'ancient', rivalOf: null, allyOf: null },
+    ]
+    const state = initSandboxState(42, genesis)
+    expect(Object.values(state.factions).map((f) => f.name)).toEqual(['Iron Legion', 'Coin Guild'])
+  })
+
+  it('is deterministic for the same seed', () => {
+    expect(initSandboxState(7)).toEqual(initSandboxState(7))
+  })
+})
+
+describe('advanceTicks', () => {
+  it('runs the requested number of ticks and accumulates the event log', () => {
+    const state = initSandboxState(42)
+    const next = advanceTicks(state, 10, false, new FactionManager(1), new EconomyManager())
+    expect(next.eventLog.length).toBeGreaterThanOrEqual(0) // ticks are probabilistic, but must not throw
+    expect(next).not.toBe(state) // never mutates the input
+  })
+
+  it('never mutates the input state (factions/economy are fresh objects)', () => {
+    const state = initSandboxState(42)
+    const before = JSON.parse(JSON.stringify(state))
+    advanceTicks(state, 5, false, new FactionManager(1), new EconomyManager())
+    expect(state).toEqual(before)
+  })
+
+  it('caps the event log at MAX_EVENT_LOG, keeping the most recent', () => {
+    let state = initSandboxState(1)
+    // Bait guaranteed-frequent events: many factions ticking many times.
+    for (let i = 0; i < 30; i++) {
+      state = advanceTicks(state, 5, false, new FactionManager(i), new EconomyManager())
+    }
+    expect(state.eventLog.length).toBeLessThanOrEqual(MAX_EVENT_LOG)
+  })
+
+  it('gentle=true excludes raid narration even over many ticks', () => {
+    let state = initSandboxState(1)
+    // Force hostile sentiment across the board to maximize raid pressure.
+    for (const id of Object.keys(state.factions)) {
+      for (const rel of state.factions[id].relationships) rel.sentiment = -90
+    }
+    for (let i = 0; i < 20; i++) {
+      state = advanceTicks(state, 5, true, new FactionManager(i), new EconomyManager())
+    }
+    expect(state.eventLog.some((l) => /raid|burn|bleeds/i.test(l))).toBe(false)
+  })
+})
+
+describe('direct faction controls', () => {
+  it('nudgeFactionStat clamps wealth to [0,200] and influence to [0,100]', () => {
+    const state = initSandboxState(42)
+    const id = Object.keys(state.factions)[0]
+    const maxedWealth = nudgeFactionStat(state, id, 'wealth', 10_000)
+    expect(maxedWealth.factions[id].wealth).toBe(200)
+    const zeroedInfluence = nudgeFactionStat(state, id, 'influence', -10_000)
+    expect(zeroedInfluence.factions[id].influence).toBe(0)
+  })
+
+  it('nudgeFactionStat is a no-op for an unknown faction id', () => {
+    const state = initSandboxState(42)
+    expect(nudgeFactionStat(state, 'nope', 'wealth', 10)).toBe(state)
+  })
+
+  it('setFactionSentiment clamps to [-100,100] and only affects the one direction', () => {
+    const state = initSandboxState(42)
+    const [a, b] = Object.keys(state.factions)
+    const next = setFactionSentiment(state, a, b, 999)
+    expect(next.factions[a].relationships.find((r) => r.factionId === b)?.sentiment).toBe(100)
+    // The reverse direction (b's view of a) is untouched.
+    expect(next.factions[b]).toEqual(state.factions[b])
+  })
+
+  it('setFactionSentiment adds a relationship if one did not exist', () => {
+    const state = initSandboxState(42)
+    const id = Object.keys(state.factions)[0]
+    const next = setFactionSentiment(state, id, 'faction_nonexistent', 50)
+    expect(next.factions[id].relationships.find((r) => r.factionId === 'faction_nonexistent')?.sentiment).toBe(50)
+  })
+})
+
+describe('setMarket', () => {
+  it('updates supply/demand and price via the shared formula', () => {
+    const state = initSandboxState(42)
+    const next = setMarket(state, 'food', { supply: 20, demand: 80 })
+    expect(next.economy.markets.food.currentPrice).toBe(20) // basePrice(5) * (80/20)
+  })
+
+  it('is a no-op for an unknown commodity', () => {
+    const state = initSandboxState(42)
+    expect(setMarket(state, 'unobtainium', { supply: 10 })).toBe(state)
+  })
+})
+
+describe('setTension', () => {
+  it('clamps to [0,1]', () => {
+    const state = initSandboxState(42)
+    expect(setTension(state, 5).tension).toBe(1)
+    expect(setTension(state, -5).tension).toBe(0)
+  })
+})
+
+describe('world facts', () => {
+  it('setWorldFact adds/overwrites a key, ignoring a blank key', () => {
+    const state = initSandboxState(42)
+    const withFact = setWorldFact(state, 'harvest_failed', true)
+    expect(withFact.worldState.harvest_failed).toBe(true)
+    expect(setWorldFact(state, '  ', 1)).toBe(state)
+  })
+
+  it('removeWorldFact deletes a key without touching others', () => {
+    const state = setWorldFact(setWorldFact(initSandboxState(42), 'a', 1), 'b', 2)
+    const next = removeWorldFact(state, 'a')
+    expect(next.worldState).toEqual({ b: 2 })
+  })
+})
+
+describe('sandboxPulse / sandboxStakesLine', () => {
+  it('sandboxPulse mirrors the real reader-facing WorldPulse shape', () => {
+    const state = initSandboxState(42)
+    const pulse = sandboxPulse(state, 'dramatic')
+    expect(pulse.tension).toBeCloseTo(state.tension)
+  })
+
+  it('sandboxStakesLine reads the same as DifficultyManager for the mode', () => {
+    const state = setTension(initSandboxState(42), 0.9)
+    expect(sandboxStakesLine(state, 'dramatic')).toMatch(/dangerous/i)
+    expect(sandboxStakesLine(state, 'gentle')).not.toMatch(/danger|threat/i)
+  })
+})

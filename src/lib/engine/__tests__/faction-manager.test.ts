@@ -143,4 +143,40 @@ describe('FactionManager.tick', () => {
     expect(result.updatedFactions).toBe(factions)
     expect(Array.isArray(result.narrativeEvents)).toBe(true)
   })
+
+  // Two factions primed for exactly what raid_neighbor wants: a strong enemy
+  // sentiment and low food (see faction-manager.ts's evaluateUtility for that action).
+  function raidBaitFactions(): Record<string, Faction> {
+    return {
+      faction_0: {
+        id: 'faction_0', name: 'Alpha', description: '', alignment: 'true_neutral',
+        wealth: 80, influence: 50, traits: [],
+        resources: [{ commodityId: 'food', amount: 5 }],
+        relationships: [{ factionId: 'faction_1', sentiment: -90 }],
+      },
+      faction_1: {
+        id: 'faction_1', name: 'Beta', description: '', alignment: 'true_neutral',
+        wealth: 80, influence: 50, traits: [],
+        resources: [{ commodityId: 'food', amount: 5 }],
+        relationships: [{ factionId: 'faction_0', sentiment: -90 }],
+      },
+    }
+  }
+  const isRaidNarration = (line: string) => /raid|burn|bleeds/i.test(line)
+
+  it('excludeHostile=true never lets a raid happen, even set up to be irresistible', () => {
+    for (let seed = 0; seed < 40; seed++) {
+      const result = new FactionManager(seed).tick(raidBaitFactions(), makeEconomy(), true)
+      expect(result.narrativeEvents.some(isRaidNarration)).toBe(false)
+    }
+  })
+
+  it('without excludeHostile, the same bait CAN raid (sanity check the setup is meaningful)', () => {
+    let sawRaid = false
+    for (let seed = 0; seed < 40 && !sawRaid; seed++) {
+      const result = new FactionManager(seed).tick(raidBaitFactions(), makeEconomy(), false)
+      if (result.narrativeEvents.some(isRaidNarration)) sawRaid = true
+    }
+    expect(sawRaid).toBe(true)
+  })
 })
