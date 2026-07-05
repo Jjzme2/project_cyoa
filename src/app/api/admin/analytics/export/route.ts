@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthContext } from '@/lib/auth'
 import { getDailyBuckets, type DailyBucket } from '@/lib/telemetry'
-
-function csvEscape(value: string): string {
-  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
-}
+import { csvEscape } from '@/lib/csv'
 
 function toCsv(buckets: DailyBucket[]): string {
   const rows = ['date,event,count']

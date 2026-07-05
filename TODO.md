@@ -103,12 +103,19 @@ Remaining (P2/P3 — from the same review):
 
 - [ ] **Ambient "None" can't override a world default** — `resolveAmbientVisual`
   treats explicit `'none'` as unset; distinguish `undefined` (inherit) from off.
-- [ ] **Header nav overflows at tablet widths** (Rooms + Bounties pushed it to
-  ~10 links from `sm:`) — raise breakpoint to `lg:` or fold into a dropdown.
+  _Deferred: `ReadingTheme.ambientEffect` is a required field defaulting to
+  `'none'`, so "off" and "untouched" are indistinguishable — a proper fix makes
+  the field optional and migrates existing content (behavioral change), not a
+  safe drive-by._
+- [x] **Header nav overflows at tablet widths** (Rooms + Bounties pushed it to
+  ~10 links from `sm:`) — desktop nav now shows at `lg:`; the hamburger sheet
+  holds the links below that, so they no longer cram at tablet widths.
 - [ ] **Profile page makes 3 API calls** (frame/pet/achievements re-read the
   same docs) — consolidate into one profile-state endpoint.
-- [ ] **Chapter unfurl stagger unbounded** — cap total stagger so a 20-paragraph
-  chapter doesn't hide its last text ~2s per page turn.
+- [x] **Chapter unfurl stagger unbounded** — the per-child stagger now scales
+  down with child count so the whole reveal fits a fixed ~0.9s budget; a long
+  chapter no longer hides its last line ~2s behind the page turn, while short
+  chapters keep the full beat.
 - [x] **Unlisted-story titles leak** through the public bounty board / rooms
   lobby — both `listOpenBounties` and `listActiveRooms` now resolve each
   listing's story and drop unlisted (and unresolvable) ones, so a private
@@ -116,10 +123,11 @@ Remaining (P2/P3 — from the same review):
   `unlisted-listings.test.ts`.
 - [ ] **Character votes stored as a growing `voterIds` array** on the character
   doc — move to a `votes/{uid}` subcollection or `arrayUnion` + counter.
-- [ ] **Polish**: `ProfileAvatar` circle needs `relative` (fill Image); add
-  `aria-label`s to new icon-only buttons (frames, Reader Pal, guest-star);
-  prefix-guard `=/+/-/@` in the CSV export; swap the achievement toast's
-  ad-hoc `bg-[#1a1420]` for `glass-card` tokens.
+- [~] **Polish** (partly done): `ProfileAvatar` circle now has `relative` (fill
+  Image); `aria-label`s added to the frame, Reader Pal, and API-key/menu
+  icon-only buttons; CSV export prefix-guards `=/+/-/@`/tab/CR (shared
+  `lib/csv.ts`, unit-tested). _Remaining: guest-star buttons' labels; swap the
+  achievement toast's ad-hoc `bg-[#1a1420]` for `glass-card` tokens._
 - [x] **Residual — Path Pioneer self-farm** — the traverse endpoint was
   unauthenticated, so an author could script 25 hits on their own slot to mint
   the one-time 15-credit reward. Now: the public `traversals` popularity counter

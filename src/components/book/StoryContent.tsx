@@ -147,12 +147,14 @@ function ListenControl({ text }: { text: string }) {
   )
 }
 
-// Staggers each paragraph's own reveal rather than fading the whole chapter
-// in as one flat block — the text unfurls, beat by beat.
-const paragraphContainer: Variants = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.09, delayChildren: 0.12 } },
-}
+// Staggers each child's own reveal rather than fading the whole chapter in as
+// one flat block — the text unfurls, beat by beat.
+const PER_CHILD_STAGGER = 0.09
+// …but cap the TOTAL stagger so a long (e.g. 20-paragraph) chapter doesn't hide
+// its last line ~2s behind the page turn. Past this budget the per-child step
+// shrinks to fit; short chapters keep the full, unhurried beat.
+const TOTAL_STAGGER_BUDGET = 0.9
+
 const paragraphReveal: Variants = {
   hidden: { opacity: 0, y: 10 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: 'easeOut' } },
@@ -160,6 +162,15 @@ const paragraphReveal: Variants = {
 
 export function StoryContent({ content, depth, choiceText, imageUrl }: Props) {
   const paragraphs = content.split('\n').filter((p) => p.trim())
+
+  // Every direct child carrying `paragraphReveal` is staggered: the quote, the
+  // header row, the optional image, then each paragraph.
+  const childCount = (choiceText ? 1 : 0) + 1 + (imageUrl ? 1 : 0) + paragraphs.length
+  const staggerChildren = Math.min(PER_CHILD_STAGGER, TOTAL_STAGGER_BUDGET / Math.max(1, childCount))
+  const paragraphContainer: Variants = {
+    hidden: {},
+    visible: { transition: { staggerChildren, delayChildren: 0.12 } },
+  }
 
   return (
     <motion.div
