@@ -106,7 +106,10 @@ export function PalCompanion({
   }, [pet, hidden, say])
 
   // Doze off when the page hasn't turned in a while; any turn (or pat) wakes.
+  // Resetting synchronously here (not in a callback) is exactly the point: the
+  // wake must be immediate on the same render as the triggering turn/pat.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setInactive(false)
     if (idleTimer.current) clearTimeout(idleTimer.current)
     idleTimer.current = setTimeout(() => setInactive(true), INACTIVITY_MS)
