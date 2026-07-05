@@ -28,7 +28,11 @@ export const PET_SPECIES: PetSpeciesDef[] = [
   { id: 'wisp', label: 'Wisp', requires: { achievementId: 'secret_keeper', hint: 'Discover a secret ending' } },
   { id: 'leviathan', label: 'Leviathan', requires: { achievementId: 'chronicler', hint: 'Contribute 50 story paths' } },
   { id: 'dog', label: 'Dog' },
-  { id: 'bunny', label: 'Bunny', requires: { achievementId: 'trailblazer', hint: 'Discover 25 unique paths' } },
+  // PLACEHOLDER GATE: originally referenced a 'trailblazer' achievement that
+  // doesn't exist anywhere in ACHIEVEMENT_DEFS, so bunny could never actually
+  // be unlocked. Wired to an existing, unused-by-other-pets achievement so it
+  // stays obtainable — swap to whatever was actually intended.
+  { id: 'bunny', label: 'Bunny', requires: { achievementId: 'explorer', hint: 'Read 5 different stories' } },
 ]
 
 export function isSpeciesUnlocked(species: PetSpecies, earnedAchievements: string[]): boolean {
@@ -150,7 +154,7 @@ const STAGE_EMOJI: Record<PetSpecies, string[]> = {
   wisp: ['✨', '💫', '🔮', '🌟', '☄️', '🌠', '🌌'],
   leviathan: ['🫧', '🐟', '🐠', '🐬', '🐳', '🐋', '🌊'],
   dog: ['🐾', '🐶', '🐕', '🦮', '🐕‍🦺', '🐺', '🌟'],
-  bunny: ['🥚', '🐇', '🐰', '🐇', '🐰', '🐇', '🌙'],
+  bunny: ['🥚', '🐇', '🐰', '🦔', '🦌', '🦄', '🌙'],
 }
 
 function stageBands(species: PetSpecies): PetStage[] {

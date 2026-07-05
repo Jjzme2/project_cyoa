@@ -19,9 +19,13 @@ interface SheetInfo {
   frames: number
 }
 
-// Resolved (or definitively missing) sheets, cached for the session so every
-// mount doesn't re-probe the same URLs. Key: `${species}:${stageMinLevel}`.
-const sheetCache = new Map<string, SheetInfo | null>()
+// Resolved sheets, cached for the session so a once-found sheet is never
+// re-probed. Deliberately NOT negative-cached: art is added over time (an
+// author drops a new PNG in `public/pals/`), so a "not found yet" result must
+// be retried on the next mount rather than remembered for the rest of the
+// browser session — otherwise newly-added art wouldn't appear without a hard
+// reload. Key: `${species}:${stageMinLevel}`.
+const sheetCache = new Map<string, SheetInfo>()
 
 function probe(url: string): Promise<SheetInfo | null> {
   return new Promise((resolve) => {
@@ -36,9 +40,11 @@ function probe(url: string): Promise<SheetInfo | null> {
   })
 }
 
-async function resolveSheet(species: PetSpecies, stageMinLevel: number): Promise<SheetInfo | null> {
+/** Exported for testing the no-negative-cache contract; not part of the public API. */
+export async function resolveSheet(species: PetSpecies, stageMinLevel: number): Promise<SheetInfo | null> {
   const key = `${species}:${stageMinLevel}`
-  if (sheetCache.has(key)) return sheetCache.get(key) ?? null
+  const cached = sheetCache.get(key)
+  if (cached) return cached
   for (const url of spriteSheetCandidates(species, stageMinLevel)) {
     const info = await probe(url)
     if (info) {
@@ -46,7 +52,6 @@ async function resolveSheet(species: PetSpecies, stageMinLevel: number): Promise
       return info
     }
   }
-  sheetCache.set(key, null)
   return null
 }
 
