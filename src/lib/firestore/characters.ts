@@ -41,38 +41,57 @@ export async function listCharacters(limit = 60, sort: 'recent' | 'loved' = 'rec
   return chars.sort((a, b) => (b.voteCount ?? 0) - (a.voteCount ?? 0)).slice(0, limit)
 }
 
-const VOTE_CAP = 2000
+function characterVoteRef(id: string, userId: string) {
+  return charactersCollection().doc(id).collection('votes').doc(userId)
+}
+
+/** Whether `userId` has voted for character `id`. Honors both the marker
+ * subcollection (current) and the legacy `voterIds` array (pre-migration). */
+export async function hasCharacterVote(id: string, userId: string): Promise<boolean> {
+  const [voteDoc, charDoc] = await Promise.all([
+    characterVoteRef(id, userId).get(),
+    charactersCollection().doc(id).get(),
+  ])
+  if (voteDoc.exists) return true
+  return ((charDoc.data()?.voterIds as string[] | undefined) ?? []).includes(userId)
+}
 
 /**
  * Toggle the caller's "best character" vote — community curation for the
- * directory's "most loved" sort. Capped like `endingKeys`: past the cap, votes
- * stop deduping (harmless at that popularity) rather than growing unboundedly.
+ * directory's "most loved" sort. Each voter is a `votes/{uid}` marker doc so
+ * one reader counts at most once without a per-character voter list to grow or
+ * rewrite; `voteCount` stays denormalized on the character for the sort.
+ * Legacy `voterIds` entries (from before this subcollection existed) still count
+ * as a vote and are removed on un-vote, so no backfill is needed and that array
+ * only ever shrinks.
  */
 export async function toggleCharacterVote(id: string, userId: string): Promise<{ voted: boolean; count: number }> {
   const ref = charactersCollection().doc(id)
+  const voteRef = characterVoteRef(id, userId)
   let voted = false
   let count = 0
 
   await adminDb.runTransaction(async (txn) => {
-    const doc = await txn.get(ref)
+    // All reads before any writes (Firestore transaction rule).
+    const [doc, voteDoc] = await Promise.all([txn.get(ref), txn.get(voteRef)])
     if (!doc.exists) return
     const data = doc.data() as Character
-    const voterIds = data.voterIds ?? []
-    const hasVoted = voterIds.includes(userId)
+    const legacyVoterIds = data.voterIds ?? []
+    const inLegacy = legacyVoterIds.includes(userId)
+    const curCount = data.voteCount ?? 0
 
-    if (hasVoted) {
-      txn.update(ref, {
-        voterIds: voterIds.filter((v) => v !== userId),
-        voteCount: Math.max(0, (data.voteCount ?? 1) - 1),
-      })
+    if (voteDoc.exists || inLegacy) {
+      if (voteDoc.exists) txn.delete(voteRef)
+      const update: Record<string, unknown> = { voteCount: Math.max(0, curCount - 1) }
+      if (inLegacy) update.voterIds = legacyVoterIds.filter((v) => v !== userId)
+      txn.update(ref, update)
       voted = false
-      count = Math.max(0, (data.voteCount ?? 1) - 1)
+      count = Math.max(0, curCount - 1)
     } else {
-      const nextVoterIds = voterIds.length < VOTE_CAP ? [...voterIds, userId] : voterIds
-      const nextCount = (data.voteCount ?? 0) + 1
-      txn.update(ref, { voterIds: nextVoterIds, voteCount: nextCount })
+      txn.set(voteRef, { at: new Date().toISOString() })
+      txn.update(ref, { voteCount: curCount + 1 })
       voted = true
-      count = nextCount
+      count = curCount + 1
     }
   })
 
@@ -135,7 +154,6 @@ export async function registerCharacterAppearance(params: RegisterCharacterParam
         storyCount: 1,
         appearances: [appearance],
         voteCount: 0,
-        voterIds: [],
         firstSeenAt: now,
         updatedAt: now,
       })

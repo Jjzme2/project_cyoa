@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthContext } from '@/lib/auth'
-import { getCharacter, toggleCharacterVote } from '@/lib/firestore-helpers'
+import { getCharacter, hasCharacterVote, toggleCharacterVote } from '@/lib/firestore-helpers'
 
 /** Whether the caller has voted for this character, and the public count. Auth optional. */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -9,7 +9,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!character) return NextResponse.json({ error: 'Character not found' }, { status: 404 })
 
   const auth = await getAuthContext(req).catch(() => null)
-  const voted = auth ? (character.voterIds ?? []).includes(auth.uid) : false
+  const voted = auth ? await hasCharacterVote(id, auth.uid) : false
   return NextResponse.json({ voted, count: character.voteCount ?? 0 })
 }
 

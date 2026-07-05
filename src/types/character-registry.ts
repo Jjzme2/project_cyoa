@@ -36,10 +36,12 @@ export interface Character {
   storyCount: number
   /** Recent appearances, capped to keep the doc bounded. */
   appearances: CharacterAppearance[]
-  /** Community "best character" votes — surfaces favorites in the directory. */
+  /** Community "best character" votes — surfaces favorites in the directory.
+   * Denormalized from the `votes/{uid}` marker subcollection for the sort. */
   voteCount?: number
-  /** Voter uids, capped (like `endingKeys`) — stops deduping past the cap rather
-   * than growing unboundedly; harmless at that point for a popularity signal. */
+  /** LEGACY voter uids from before votes moved to the `votes/{uid}`
+   * subcollection. Still honored as votes and removed on un-vote (so it only
+   * shrinks); new votes never touch it. Absent on characters created since. */
   voterIds?: string[]
   firstSeenAt: string
   updatedAt: string
