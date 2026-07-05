@@ -1,4 +1,4 @@
-import type { PetSpecies, PetStage, PetMood } from '@/lib/pet'
+import type { PetSpecies, PetStage, PetMood, XpProgress, PalStats } from '@/lib/pet'
 
 /**
  * Client-side fetch for the consolidated `/api/profile/state` endpoint, with
@@ -17,9 +17,13 @@ export interface ProfilePetState {
   name: string
   species: PetSpecies
   stage: PetStage
+  level: number
+  xp: XpProgress
   mood: PetMood
   quip: string
   achievementsEarned: number
+  unlockedSpecies: PetSpecies[]
+  stats: PalStats
 }
 
 export interface EnrichedAchievement {

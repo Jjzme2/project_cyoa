@@ -216,10 +216,13 @@ Remaining (P2/P3 — from the same review):
   write-race errors.
 - [ ] Global leaderboards (denormalized aggregate counters).
 - [ ] Global bounty board (collection-group query + index).
-- [ ] **Reader Pal** — a visual companion (no AI) that shows up across the app
-  (reader, profile, library), tracks its own stats, and levels up as the
-  reader/writer plays; progression ties into the existing achievement system
-  (Tier 2 #9 in `docs/EXECUTION-PLAN.md`; richer triggers need 9b first).
+- [x] **Reader Pal** — v2 shipped: bond XP (10 levels) derived entirely from
+  already-tracked achievement counts (zero new writes), 6 species with 3
+  achievement-gated (cat/wisp/leviathan), 6 evolution stages each, 4 time-based
+  moods, event-aware deterministic quips, level-up celebration + stat row on
+  the profile panel, and a dismissible in-reader companion (`PalCompanion`)
+  that reacts to chapter turns and endings. Still rule-based, never AI.
+  Covered by the expanded `pet.test.ts`.
 - [ ] **Custom AI-generated narrative shapes** — an author spends credits to
   have the AI generate a wholly custom narrative shape for their world (its
   own arc pool, pacing/stakes flavor, climax types), instead of picking from a

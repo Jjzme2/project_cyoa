@@ -19,6 +19,7 @@ import { BookmarkButton } from './BookmarkButton'
 import { GalleryButton } from './GalleryButton'
 import { AmbientBackground } from './AmbientBackground'
 import { JourneyMap } from './JourneyMap'
+import { PalCompanion } from './PalCompanion'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/components/Providers'
 import { trackEvent } from '@/lib/track-client'
@@ -928,6 +929,9 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
       />
 
       <EndingsDialog open={endingsOpen} onOpenChange={setEndingsOpen} discoveredEndings={discoveredEndings} endingCount={endingCount} />
+
+      {/* Reader Pal, along for the read (signed-in only; dismissible; profile toggle) */}
+      <PalCompanion depth={node.depth} isEnding={!!node.isEnding} />
     </div>
   )
 }
