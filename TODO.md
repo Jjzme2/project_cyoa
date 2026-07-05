@@ -109,8 +109,11 @@ Remaining (P2/P3 — from the same review):
   same docs) — consolidate into one profile-state endpoint.
 - [ ] **Chapter unfurl stagger unbounded** — cap total stagger so a 20-paragraph
   chapter doesn't hide its last text ~2s per page turn.
-- [ ] **Unlisted-story titles leak** through the public bounty board / rooms
-  lobby — filter listings by story visibility.
+- [x] **Unlisted-story titles leak** through the public bounty board / rooms
+  lobby — both `listOpenBounties` and `listActiveRooms` now resolve each
+  listing's story and drop unlisted (and unresolvable) ones, so a private
+  story's title / link never surfaces publicly. Covered by
+  `unlisted-listings.test.ts`.
 - [ ] **Character votes stored as a growing `voterIds` array** on the character
   doc — move to a `votes/{uid}` subcollection or `arrayUnion` + counter.
 - [ ] **Polish**: `ProfileAvatar` circle needs `relative` (fill Image); add

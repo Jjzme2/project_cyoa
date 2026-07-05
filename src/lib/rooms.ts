@@ -482,9 +482,18 @@ export interface ActiveRoomListing {
  */
 export async function listActiveRooms(limit = 30): Promise<ActiveRoomListing[]> {
   const snap = await adminDb.collection('rooms').orderBy('lastActivity', 'desc').limit(limit * 2).get()
-  return snap.docs
+  const active = snap.docs
     .map((d) => ({ id: d.id, ...(d.data() as Omit<Room, 'id'>) }))
     .filter((r) => r.status !== 'ended')
+
+  // Unlisted stories are hidden from public listings — their rooms stay reachable
+  // by direct link but must not surface (title or existence) in the public lobby.
+  const storyIds = Array.from(new Set(active.map((r) => r.storyId)))
+  const stories = await Promise.all(storyIds.map((id) => getStory(id).catch(() => null)))
+  const listable = new Set(storyIds.filter((id, i) => stories[i] && !stories[i]!.unlisted))
+
+  return active
+    .filter((r) => listable.has(r.storyId))
     .slice(0, limit)
     .map((r) => ({
       id: r.id,
