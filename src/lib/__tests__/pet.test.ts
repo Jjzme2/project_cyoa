@@ -133,6 +133,12 @@ describe('flavor lines', () => {
     expect(quipForEvent('ending', 7)).not.toBe(quipForEvent('chapter', 7))
     expect(quipForEvent('levelup', 3)).toBe(quipForEvent('levelup', 3))
   })
+
+  it('the companion has scared and pat reactions of its own', () => {
+    expect(quipForEvent('scared', 2)).toBe(quipForEvent('scared', 2))
+    expect(quipForEvent('pat', 2)).toBe(quipForEvent('pat', 2))
+    expect(quipForEvent('scared', 2)).not.toBe(quipForEvent('pat', 2))
+  })
 })
 
 describe('companion stats', () => {

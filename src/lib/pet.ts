@@ -120,8 +120,9 @@ export interface PetStage {
   minLevel: number
 }
 
-/** Six visual stages per species, unlocking at levels 1 / 2 / 4 / 6 / 8 / 10. */
-const STAGE_LEVELS = [1, 2, 4, 6, 8, 10] as const
+/** Six visual stages per species, unlocking at levels 1 / 2 / 4 / 6 / 8 / 10.
+ * Exported for the sprite system: per-stage sheets are named by these levels. */
+export const STAGE_LEVELS = [1, 2, 4, 6, 8, 10] as const
 
 const STAGES: Record<PetSpecies, { name: string; emoji: string }[]> = {
   bird: [
@@ -264,7 +265,7 @@ export function quipFor(mood: PetMood, daySeedValue: number): string {
 }
 
 /** In-reader moments the companion reacts to. */
-export type PalEvent = 'chapter' | 'ending' | 'levelup'
+export type PalEvent = 'chapter' | 'ending' | 'levelup' | 'scared' | 'pat'
 
 const EVENT_QUIPS: Record<PalEvent, string[]> = {
   chapter: [
@@ -287,6 +288,20 @@ const EVENT_QUIPS: Record<PalEvent, string[]> = {
     'Our bond grew — look at me now!',
     'Evolution complete. Please admire me.',
     'All those stories… they changed me.',
+  ],
+  scared: [
+    'D-did you hear that?! …I’ll be right behind you.',
+    'Hold the page closer, please.',
+    'I’m not scared. YOU’RE scared.',
+    'We survive this chapter together. Agreed?',
+    '*peeks through paws* …tell me when it’s over.',
+  ],
+  pat: [
+    '!! …do that again?',
+    '*happy wiggle*',
+    'Bond strengthened. I felt it.',
+    'Best. Reader. Ever.',
+    'Okay okay — NOW we can face anything.',
   ],
 }
 

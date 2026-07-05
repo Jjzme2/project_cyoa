@@ -19,6 +19,9 @@ import {
   invalidateProfileState,
   type ProfilePetState,
 } from '@/lib/profile-state-client'
+import { animationForMood } from '@/lib/pal-sprites'
+import { PalSprite } from '@/components/pal/PalSprite'
+import { chaptersTogether } from '@/components/book/PalCompanion'
 import { COMPANION_HIDDEN_KEY } from '@/components/book/pal-companion-prefs'
 
 const LAST_LEVEL_KEY = (uid: string) => `pal_lvl_${uid}`
@@ -42,14 +45,16 @@ export function ReaderPal() {
   const [draftName, setDraftName] = useState('')
   const [saving, setSaving] = useState(false)
   const [companionOn, setCompanionOn] = useState(true)
+  const [chaptersSide, setChaptersSide] = useState(0)
 
   useEffect(() => {
-    // Hydration-safe localStorage read (same justified pattern as PalCompanion).
+    // Hydration-safe localStorage reads (same justified pattern as PalCompanion).
     try {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setCompanionOn(localStorage.getItem(COMPANION_HIDDEN_KEY) !== '1')
     } catch {}
-  }, [])
+    if (user) setChaptersSide(chaptersTogether(user.uid))
+  }, [user])
 
   useEffect(() => {
     if (!user) return
@@ -140,13 +145,21 @@ export function ReaderPal() {
     { label: 'paths written', value: pet.stats.pathsWritten },
     { label: 'endings witnessed', value: pet.stats.endingsWitnessed },
     { label: 'friends made', value: pet.stats.deepBonds },
+    // A keepsake, not telemetry — counted on this device only.
+    ...(chaptersSide > 0 ? [{ label: 'chapters at your side', value: chaptersSide }] : []),
   ]
 
   return (
     <section className="glass border-white/10 p-5 rounded-xl space-y-4">
       <div className="flex items-center gap-4">
-        <div className="relative text-5xl leading-none" title={pet.stage.name}>
-          {pet.stage.emoji}
+        <div className="relative leading-none" title={pet.stage.name}>
+          <PalSprite
+            species={pet.species}
+            stageMinLevel={pet.stage.minLevel}
+            fallbackEmoji={pet.stage.emoji}
+            animation={animationForMood(pet.mood)}
+            size={60}
+          />
           <span
             className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-background ${MOOD_DOT[pet.mood] ?? 'bg-sky-400/70'}`}
             title={MOOD_LABELS[pet.mood]}

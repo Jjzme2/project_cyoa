@@ -930,8 +930,9 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
 
       <EndingsDialog open={endingsOpen} onOpenChange={setEndingsOpen} discoveredEndings={discoveredEndings} endingCount={endingCount} />
 
-      {/* Reader Pal, along for the read (signed-in only; dismissible; profile toggle) */}
-      <PalCompanion depth={node.depth} isEnding={!!node.isEnding} />
+      {/* Reader Pal, along for the read (signed-in only; dismissible; profile toggle).
+          It feels the story too — high Living World tension frightens it. */}
+      <PalCompanion depth={node.depth} isEnding={!!node.isEnding} tension={node.worldPulse?.tension} />
     </div>
   )
 }
