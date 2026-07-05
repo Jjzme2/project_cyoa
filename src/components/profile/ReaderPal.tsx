@@ -1,38 +1,82 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Pencil, Check, X } from 'lucide-react'
+import { Pencil, Check, X, Lock, BookOpen, Coins } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/components/Providers'
-import { achievementsToNextStage, speciesPreviewEmoji, stageFor, PET_SPECIES, type PetStage, type PetMood, type PetSpecies } from '@/lib/pet'
-import { fetchProfileState, invalidateProfileState } from '@/lib/profile-state-client'
+import {
+  stageFor,
+  levelsToNextStage,
+  speciesPreviewEmoji,
+  quipForEvent,
+  PET_SPECIES,
+  MOOD_LABELS,
+  MAX_LEVEL,
+} from '@/lib/pet'
+import type { PetSpecies } from '@/lib/pet'
+import {
+  fetchProfileState,
+  invalidateProfileState,
+  type ProfilePetState,
+} from '@/lib/profile-state-client'
+import { animationForMood } from '@/lib/pal-sprites'
+import { PalSprite } from '@/components/pal/PalSprite'
+import { chaptersTogether } from '@/components/book/PalCompanion'
+import { COMPANION_HIDDEN_KEY } from '@/components/book/pal-companion-prefs'
 
-interface PetData {
-  name: string
-  species: PetSpecies
-  stage: PetStage
-  mood: PetMood
-  quip: string
-  achievementsEarned: number
+const LAST_LEVEL_KEY = (uid: string) => `pal_lvl_${uid}`
+
+const MOOD_DOT: Record<string, string> = {
+  thrilled: 'bg-amber-400',
+  active: 'bg-emerald-400',
+  idle: 'bg-sky-400/70',
+  dozing: 'bg-slate-400/60',
 }
 
 /**
- * Reader Pal — a small, rule-based (never AI) companion that levels up purely
- * from the reader's total earned achievements. Self-contained: fetches its own
- * state, so it drops into the profile with no plumbing from the page.
+ * Reader Pal — a rule-based (never AI) companion that grows from a bond XP
+ * score derived from everything the reader has already done. Self-contained:
+ * fetches its own state via the shared profile-state client.
  */
 export function ReaderPal() {
   const { user } = useAuth()
-  const [pet, setPet] = useState<PetData | null>(null)
+  const [pet, setPet] = useState<ProfilePetState | null>(null)
   const [renaming, setRenaming] = useState(false)
   const [draftName, setDraftName] = useState('')
   const [saving, setSaving] = useState(false)
+  const [companionOn, setCompanionOn] = useState(true)
+  const [chaptersSide, setChaptersSide] = useState(0)
+  const [pendingAdopt, setPendingAdopt] = useState<PetSpecies | null>(null)
+
+  useEffect(() => {
+    // Hydration-safe localStorage reads (same justified pattern as PalCompanion).
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCompanionOn(localStorage.getItem(COMPANION_HIDDEN_KEY) !== '1')
+    } catch {}
+    if (user) setChaptersSide(chaptersTogether(user.uid))
+  }, [user])
 
   useEffect(() => {
     if (!user) return
     let alive = true
     fetchProfileState(user.uid, () => user.getIdToken())
-      .then((state) => { if (alive) setPet(state.pet) })
+      .then((state) => {
+        if (!alive) return
+        setPet(state.pet)
+        // Level-up celebration: compare against the last level seen on this
+        // device; first visit just records a baseline.
+        try {
+          const key = LAST_LEVEL_KEY(user.uid)
+          const last = Number(localStorage.getItem(key))
+          if (Number.isFinite(last) && last > 0 && state.pet.level > last) {
+            toast.success(`${state.pet.name} evolved to level ${state.pet.level}!`, {
+              description: quipForEvent('levelup', state.pet.level),
+            })
+          }
+          localStorage.setItem(key, String(state.pet.level))
+        } catch {}
+      })
       .catch(() => {})
     return () => { alive = false }
   }, [user])
@@ -58,91 +102,252 @@ export function ReaderPal() {
     }
   }
 
-  async function reskin(species: PetSpecies) {
+  async function postSpecies(species: PetSpecies): Promise<{ ok: boolean; error?: string }> {
+    if (!user) return { ok: false }
+    const token = await user.getIdToken()
+    const res = await fetch('/api/profile/pet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ species }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      return { ok: false, error: data.error }
+    }
+    return { ok: true }
+  }
+
+  /** Bring an OWNED pal along — free, optimistic. */
+  async function switchPal(species: PetSpecies) {
     if (!user || !pet || species === pet.species) return
     const prev = pet
-    // Optimistic — the level (achievement count) doesn't change, just the species.
-    setPet({ ...pet, species })
-    try {
-      const token = await user.getIdToken()
-      const res = await fetch('/api/profile/pet', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ species }),
-      })
-      if (!res.ok) throw new Error()
-      // The stage/emoji depend only on species + the (unchanged) achievement
-      // count, so recompute locally instead of a round-trip.
-      setPet({ ...prev, species, stage: stageFor(species, prev.achievementsEarned) })
+    setPet({ ...pet, species, stage: stageFor(species, pet.level) })
+    const res = await postSpecies(species)
+    if (res.ok) {
       invalidateProfileState()
-    } catch {
+    } else {
       setPet(prev)
-      toast.error('Could not reskin your pal — try again.')
+      toast.error(res.error ?? 'Could not switch pals — try again.')
     }
+  }
+
+  /** Adopt a NEW pal — costs credits, so it's confirmed first and never optimistic. */
+  async function adoptPal(species: PetSpecies) {
+    if (!user || !pet) return
+    setSaving(true)
+    try {
+      const res = await postSpecies(species)
+      if (!res.ok) {
+        toast.error(res.error ?? 'Could not adopt — try again.')
+        return
+      }
+      const def = PET_SPECIES.find((s) => s.id === species)
+      setPet({
+        ...pet,
+        species,
+        stage: stageFor(species, pet.level),
+        ownedSpecies: [...pet.ownedSpecies, species],
+      })
+      invalidateProfileState()
+      toast.success(`You adopted a ${def?.label ?? species}!`, {
+        description: 'A new companion joins your shelf — your bond carries over.',
+      })
+    } finally {
+      setSaving(false)
+      setPendingAdopt(null)
+    }
+  }
+
+  function toggleCompanion() {
+    const next = !companionOn
+    setCompanionOn(next)
+    try {
+      if (next) localStorage.removeItem(COMPANION_HIDDEN_KEY)
+      else localStorage.setItem(COMPANION_HIDDEN_KEY, '1')
+    } catch {}
   }
 
   if (!pet) return null
 
-  const toNext = achievementsToNextStage(pet.species, pet.achievementsEarned)
+  const toNextStage = levelsToNextStage(pet.species, pet.level)
+  const xpPct = pet.xp.needed > 0
+    ? Math.min(100, Math.round((pet.xp.into / (pet.xp.into + pet.xp.needed)) * 100))
+    : 100
+
+  const stats: { label: string; value: number }[] = [
+    { label: 'stories read', value: pet.stats.storiesRead },
+    { label: 'paths written', value: pet.stats.pathsWritten },
+    { label: 'endings witnessed', value: pet.stats.endingsWitnessed },
+    { label: 'friends made', value: pet.stats.deepBonds },
+    // A keepsake, not telemetry — counted on this device only.
+    ...(chaptersSide > 0 ? [{ label: 'chapters at your side', value: chaptersSide }] : []),
+  ]
 
   return (
-    <section className="glass border-white/10 p-5 rounded-xl flex items-center gap-4">
-      <div className="text-4xl leading-none" title={pet.stage.name}>
-        {pet.stage.emoji}
-      </div>
-      <div className="flex-1 min-w-0 space-y-1">
-        {renaming ? (
-          <div className="flex items-center gap-1.5">
-            <input
-              autoFocus
-              value={draftName}
-              onChange={(e) => setDraftName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && saveRename()}
-              maxLength={24}
-              className="text-sm font-semibold bg-white/5 border border-white/10 rounded px-1.5 py-0.5 text-foreground/90 w-32"
-            />
-            <button onClick={saveRename} disabled={saving} aria-label="Save name" className="text-emerald-400/80 hover:text-emerald-300">
-              <Check className="h-3.5 w-3.5" />
-            </button>
-            <button onClick={() => setRenaming(false)} aria-label="Cancel rename" className="text-muted-foreground/50 hover:text-foreground/80">
-              <X className="h-3.5 w-3.5" />
-            </button>
+    <section className="glass border-white/10 p-5 rounded-xl space-y-4">
+      <div className="flex items-center gap-4">
+        <div className="relative leading-none" title={pet.stage.name}>
+          <PalSprite
+            species={pet.species}
+            stageMinLevel={pet.stage.minLevel}
+            fallbackEmoji={pet.stage.emoji}
+            animation={animationForMood(pet.mood)}
+            size={60}
+          />
+          <span
+            className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-background ${MOOD_DOT[pet.mood] ?? 'bg-sky-400/70'}`}
+            title={MOOD_LABELS[pet.mood]}
+          />
+        </div>
+        <div className="flex-1 min-w-0 space-y-1">
+          {renaming ? (
+            <div className="flex items-center gap-1.5">
+              <input
+                autoFocus
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && saveRename()}
+                maxLength={24}
+                className="text-sm font-semibold bg-white/5 border border-white/10 rounded px-1.5 py-0.5 text-foreground/90 w-32"
+              />
+              <button onClick={saveRename} disabled={saving} aria-label="Save name" className="text-emerald-400/80 hover:text-emerald-300">
+                <Check className="h-3.5 w-3.5" />
+              </button>
+              <button onClick={() => setRenaming(false)} aria-label="Cancel rename" className="text-muted-foreground/50 hover:text-foreground/80">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <h3 className="text-sm font-semibold text-foreground/85">{pet.name}</h3>
+              <button
+                onClick={() => { setDraftName(pet.name); setRenaming(true) }}
+                title="Rename your pal"
+                aria-label="Rename your pal"
+                className="text-muted-foreground/40 hover:text-amber-300 transition-colors"
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+              <span className="ml-1 text-[9px] uppercase tracking-wider font-sans text-muted-foreground/45">
+                {MOOD_LABELS[pet.mood]}
+              </span>
+            </div>
+          )}
+          <p className="text-[11px] text-muted-foreground/50">
+            Level {pet.level} · {pet.stage.name}
+            {toNextStage > 0 && ` · evolves in ${toNextStage} level${toNextStage === 1 ? '' : 's'}`}
+          </p>
+          {/* Bond XP toward the next level */}
+          <div className="flex items-center gap-2">
+            <div className="h-1.5 flex-1 max-w-[220px] rounded-full bg-white/[0.06] overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-amber-500/60 to-amber-300/80 transition-[width] duration-700"
+                style={{ width: `${xpPct}%` }}
+              />
+            </div>
+            <span className="text-[9px] font-mono text-muted-foreground/45">
+              {pet.level >= MAX_LEVEL ? 'MAX' : `${pet.xp.into}/${pet.xp.into + pet.xp.needed} xp`}
+            </span>
           </div>
-        ) : (
-          <div className="flex items-center gap-1.5">
-            <h3 className="text-sm font-semibold text-foreground/85">{pet.name}</h3>
-            <button
-              onClick={() => { setDraftName(pet.name); setRenaming(true) }}
-              title="Rename your pal"
-              aria-label="Rename your pal"
-              className="text-muted-foreground/40 hover:text-amber-300 transition-colors"
-            >
-              <Pencil className="h-3 w-3" />
-            </button>
-          </div>
-        )}
-        <p className="text-[11px] text-muted-foreground/50">
-          Level {pet.stage.level} · {pet.stage.name}
-          {toNext > 0 && ` · ${toNext} more achievement${toNext === 1 ? '' : 's'} to evolve`}
-        </p>
-        <p className="text-[11px] italic text-amber-300/60">“{pet.quip}”</p>
+          <p className="text-[11px] italic text-amber-300/60">“{pet.quip}”</p>
+        </div>
       </div>
-      <div className="flex flex-col gap-1 shrink-0">
-        {PET_SPECIES.map((s) => (
-          <button
-            key={s.id}
-            onClick={() => reskin(s.id)}
-            title={`Reskin as ${s.label}`}
-            aria-label={`Reskin as ${s.label}`}
-            aria-pressed={pet.species === s.id}
-            className={`h-6 w-6 rounded-full flex items-center justify-center text-xs transition-all ${
-              pet.species === s.id ? 'bg-amber-500/20 ring-1 ring-amber-400/50' : 'opacity-50 hover:opacity-90'
-            }`}
-          >
-            {speciesPreviewEmoji(s.id)}
-          </button>
+
+      {/* What the pal has witnessed at the reader's side */}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-white/[0.05] pt-3">
+        {stats.map((s) => (
+          <span key={s.label} className="text-[10px] font-sans text-muted-foreground/50">
+            <span className="font-mono font-semibold text-amber-300/70">{s.value}</span> {s.label}
+          </span>
         ))}
       </div>
+
+      {/* Your pals — owned ones switch freely; new ones are adopted for credits
+          (gated species also need their achievement first). */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex gap-1.5">
+          {PET_SPECIES.map((s) => {
+            const unlocked = pet.unlockedSpecies.includes(s.id)
+            const owned = pet.ownedSpecies.includes(s.id)
+            const label = !unlocked
+              ? `${s.label} — locked. ${s.requires?.hint ?? ''}`.trim()
+              : owned
+                ? `Bring your ${s.label} along`
+                : `Adopt a ${s.label} — ${pet.adoptionCost} credits`
+            return (
+              <button
+                key={s.id}
+                onClick={() => {
+                  if (!unlocked) return
+                  if (owned) switchPal(s.id)
+                  else setPendingAdopt((p) => (p === s.id ? null : s.id))
+                }}
+                disabled={!unlocked || saving}
+                title={label}
+                aria-label={label}
+                aria-pressed={pet.species === s.id}
+                className={`relative h-7 w-7 rounded-full flex items-center justify-center text-sm transition-all ${
+                  pet.species === s.id
+                    ? 'bg-amber-500/20 ring-1 ring-amber-400/50'
+                    : pendingAdopt === s.id
+                      ? 'ring-1 ring-amber-400/70 opacity-100'
+                      : owned
+                        ? 'opacity-60 hover:opacity-100'
+                        : unlocked
+                          ? 'opacity-45 hover:opacity-90'
+                          : 'opacity-25 grayscale cursor-not-allowed'
+                }`}
+              >
+                {speciesPreviewEmoji(s.id)}
+                {!unlocked && <Lock className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 text-white/70" />}
+                {unlocked && !owned && (
+                  <Coins className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 text-amber-400/90" />
+                )}
+              </button>
+            )
+          })}
+        </div>
+        <button
+          onClick={toggleCompanion}
+          aria-pressed={companionOn}
+          title="Whether your pal keeps you company in the reader"
+          className={`flex items-center gap-1.5 text-[10px] font-sans px-2 py-1 rounded-md border transition-colors ${
+            companionOn
+              ? 'border-amber-500/30 bg-amber-500/10 text-amber-300/80'
+              : 'border-white/10 text-muted-foreground/50 hover:text-muted-foreground/80'
+          }`}
+        >
+          <BookOpen className="h-3 w-3" />
+          {companionOn ? 'Reads with you' : 'Stays home'}
+        </button>
+      </div>
+
+      {/* Adoption confirm — spending credits is never one accidental tap */}
+      {pendingAdopt && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2">
+          <p className="text-[11px] text-amber-200/80">
+            Adopt a {PET_SPECIES.find((s) => s.id === pendingAdopt)?.label} for{' '}
+            <span className="font-mono font-semibold">{pet.adoptionCost} credits</span>? Your bond and level
+            carry over.
+          </p>
+          <div className="flex gap-1.5 shrink-0">
+            <button
+              onClick={() => adoptPal(pendingAdopt)}
+              disabled={saving}
+              className="text-[11px] font-sans px-2 py-1 rounded-md border border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 transition-colors"
+            >
+              {saving ? 'Adopting…' : 'Adopt'}
+            </button>
+            <button
+              onClick={() => setPendingAdopt(null)}
+              disabled={saving}
+              className="text-[11px] font-sans px-2 py-1 rounded-md border border-white/10 text-muted-foreground/60 hover:text-foreground/80 transition-colors"
+            >
+              Not yet
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   )
 }

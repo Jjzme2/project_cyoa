@@ -1,11 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminAuth, adminDb } from '@/lib/firebase-admin'
 import { getUserAchievements } from '@/lib/firestore-helpers'
-import { stageFor, moodFor, quipFor, daySeed, PET_SPECIES, type PetSpecies } from '@/lib/pet'
+import {
+  bondXp,
+  xpProgress,
+  stageFor,
+  moodFor,
+  quipFor,
+  daySeed,
+  palStats,
+  unlockedSpecies,
+  isSpeciesUnlocked,
+  PAL_ADOPTION_COST,
+  PET_SPECIES,
+  type PetSpecies,
+} from '@/lib/pet'
+import { ownedSpeciesFrom } from '@/lib/pal-adoption'
 import { ACHIEVEMENT_DEFS } from '@/types'
 
-function normalizeSpecies(value: unknown): PetSpecies {
-  return PET_SPECIES.some((s) => s.id === value) ? (value as PetSpecies) : 'bird'
+function normalizeSpecies(value: unknown, earned: string[]): PetSpecies {
+  const valid = PET_SPECIES.some((s) => s.id === value) ? (value as PetSpecies) : 'bird'
+  // A species whose gate the reader no longer satisfies (or never did — e.g. a
+  // hand-edited doc) falls back to the default rather than leaking the skin.
+  return isSpeciesUnlocked(valid, earned) ? valid : 'bird'
 }
 
 /**
@@ -35,15 +52,23 @@ export async function GET(req: NextRequest) {
   // Frame (mirrors GET /api/profile/frame)
   const equipped = (settings?.equippedFrame as string | undefined) ?? 'default'
 
-  // Reader Pal (mirrors GET /api/profile/pet)
-  const species = normalizeSpecies(settings?.petSpecies)
+  // Reader Pal — bond XP/level derived entirely from already-tracked counts.
+  const species = normalizeSpecies(settings?.petSpecies, achievements.earned)
+  const xp = xpProgress(bondXp(achievements.earned.length, achievements.counts))
+  const mood = moodFor(achievements.updatedAt)
   const pet = {
     name: (settings?.petName as string | undefined) ?? 'Inkling',
     species,
-    stage: stageFor(species, achievements.earned.length),
-    mood: moodFor(achievements.updatedAt),
-    quip: quipFor(moodFor(achievements.updatedAt), daySeed()),
+    stage: stageFor(species, xp.level),
+    level: xp.level,
+    xp,
+    mood,
+    quip: quipFor(mood, daySeed()),
     achievementsEarned: achievements.earned.length,
+    unlockedSpecies: unlockedSpecies(achievements.earned),
+    ownedSpecies: ownedSpeciesFrom(settings, species),
+    adoptionCost: PAL_ADOPTION_COST,
+    stats: palStats(achievements.counts),
   }
 
   // Achievements (mirrors GET /api/achievements)
