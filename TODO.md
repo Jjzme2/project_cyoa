@@ -112,8 +112,10 @@ Remaining (P2/P3 — from the same review):
   holds the links below that, so they no longer cram at tablet widths.
 - [ ] **Profile page makes 3 API calls** (frame/pet/achievements re-read the
   same docs) — consolidate into one profile-state endpoint.
-- [ ] **Chapter unfurl stagger unbounded** — cap total stagger so a 20-paragraph
-  chapter doesn't hide its last text ~2s per page turn.
+- [x] **Chapter unfurl stagger unbounded** — the per-child stagger now scales
+  down with child count so the whole reveal fits a fixed ~0.9s budget; a long
+  chapter no longer hides its last line ~2s behind the page turn, while short
+  chapters keep the full beat.
 - [x] **Unlisted-story titles leak** through the public bounty board / rooms
   lobby — both `listOpenBounties` and `listActiveRooms` now resolve each
   listing's story and drop unlisted (and unresolvable) ones, so a private
