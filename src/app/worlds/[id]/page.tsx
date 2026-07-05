@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { Feather, BookOpen, Plus, ArrowLeft, ScrollText, Map } from 'lucide-react'
+import { Feather, BookOpen, Plus, ArrowLeft, ScrollText, Map, FlaskConical } from 'lucide-react'
 import { WorldMap } from '@/components/world/WorldMap'
 import { Button } from '@/components/ui/button'
 import { AgeFilteredStoryGrid } from '@/components/library/AgeFilteredStoryGrid'
@@ -177,6 +177,12 @@ async function WorldDetail({ params }: { params: Promise<{ id: string }> }) {
             <Button className="gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300">
               <Plus className="h-4 w-4" />
               Start a story here
+            </Button>
+          </Link>
+          <Link href={`/worlds/${world.id}/sandbox`}>
+            <Button variant="outline" className="gap-2 text-muted-foreground/70 hover:text-foreground">
+              <FlaskConical className="h-4 w-4" />
+              Sandbox
             </Button>
           </Link>
           <ShareImageButton

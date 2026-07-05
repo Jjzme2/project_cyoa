@@ -1,0 +1,152 @@
+import { FactionManager } from './engine/faction-manager'
+import { EconomyManager, createDefaultEconomy, setMarketLevels, DEFAULT_COMMODITIES } from './engine/economy-manager'
+import { DifficultyManager } from './engine/difficulty'
+import { buildWorldPulse } from './engine/world-pulse'
+import type { NarrativeMode } from './engine/narrative-mode'
+import type { Faction } from '@/types/faction'
+import type { EconomyState } from '@/types/economy'
+import type { WorldState } from '@/types/goap'
+import type { GenesisFaction, WorldPulse } from '@/types'
+
+/**
+ * World Sandbox — a hands-on, non-narrative playground for a world's
+ * deterministic systems (factions, economy, tension, custom world facts).
+ * Nothing here is persisted server-side, costs credits, or touches any real
+ * story: it's the SAME pure simulation engine the real narrative path uses
+ * (FactionManager, EconomyManager, DifficultyManager, buildWorldPulse — no
+ * AI, no randomness beyond a seeded RNG), driven by direct user control
+ * instead of reader choices. See WorldSandbox.tsx for the UI.
+ */
+
+export const MAX_EVENT_LOG = 40
+
+export interface SandboxState {
+  factions: Record<string, Faction>
+  economy: EconomyState
+  /** Freeform world facts (the same GOAP WorldState shape) — a generic,
+   * world-agnostic control surface for whatever the author imagines. */
+  worldState: WorldState
+  /** 0..1, directly user-controlled (not derived) — this is a toy, not a sim of the Director. */
+  tension: number
+  /** Recent tick narration, most recent last, capped. */
+  eventLog: string[]
+}
+
+/** Fresh sandbox state for a world: its genesis factions if it has them, else
+ * seeded defaults from the world's own procedural seed. */
+export function initSandboxState(worldSeed: number, genesisFactions?: GenesisFaction[]): SandboxState {
+  const factions = genesisFactions?.length
+    ? FactionManager.fromGenesis(genesisFactions, worldSeed)
+    : FactionManager.generateDefaultFactions(worldSeed)
+  return { factions, economy: createDefaultEconomy(), worldState: {}, tension: 0.2, eventLog: [] }
+}
+
+/**
+ * Advance the simulation `ticks` turns. `gentle` genuinely excludes hostile
+ * faction actions (see FactionManager.tick) rather than merely hiding their
+ * narration — a sandbox shows its work, so "no bad happens here" must hold
+ * at the mechanical level, not just in the prose.
+ */
+export function advanceTicks(
+  state: SandboxState,
+  ticks: number,
+  gentle: boolean,
+  factionManager: FactionManager,
+  economyManager: EconomyManager,
+): SandboxState {
+  // FactionManager/EconomyManager.tick() mutate their faction/market objects IN
+  // PLACE (by design — see their own docs), so a shallow copy of the top-level
+  // maps isn't enough to protect the caller's state: the nested Faction and
+  // MarketState objects would still be the SAME references. Deep-clone each one.
+  const factions = Object.fromEntries(
+    Object.entries(state.factions).map(([id, f]) => [
+      id,
+      { ...f, relationships: f.relationships.map((r) => ({ ...r })), resources: f.resources.map((r) => ({ ...r })) },
+    ]),
+  )
+  const economy: EconomyState = {
+    globalWealth: state.economy.globalWealth,
+    markets: Object.fromEntries(Object.entries(state.economy.markets).map(([id, m]) => [id, { ...m }])),
+  }
+  const eventLog = [...state.eventLog]
+
+  for (let i = 0; i < Math.max(0, ticks); i++) {
+    const factionResult = factionManager.tick(factions, economy, gentle)
+    const economyResult = economyManager.tick(economy)
+    eventLog.push(...factionResult.narrativeEvents, ...economyResult.significantChanges)
+  }
+
+  return { ...state, factions, economy, eventLog: eventLog.slice(-MAX_EVENT_LOG) }
+}
+
+/** Directly nudge a faction's wealth or influence, clamped to its normal 0-100(-200) range. */
+export function nudgeFactionStat(
+  state: SandboxState,
+  factionId: string,
+  stat: 'wealth' | 'influence',
+  delta: number,
+): SandboxState {
+  const faction = state.factions[factionId]
+  if (!faction) return state
+  const max = stat === 'wealth' ? 200 : 100
+  const next = Math.max(0, Math.min(max, faction[stat] + delta))
+  return { ...state, factions: { ...state.factions, [factionId]: { ...faction, [stat]: next } } }
+}
+
+/** Directly set how `factionId` feels about `towardId` (-100..100). One-directional by design. */
+export function setFactionSentiment(
+  state: SandboxState,
+  factionId: string,
+  towardId: string,
+  sentiment: number,
+): SandboxState {
+  const faction = state.factions[factionId]
+  if (!faction) return state
+  const clamped = Math.max(-100, Math.min(100, sentiment))
+  const relationships = faction.relationships.some((r) => r.factionId === towardId)
+    ? faction.relationships.map((r) => (r.factionId === towardId ? { ...r, sentiment: clamped } : r))
+    : [...faction.relationships, { factionId: towardId, sentiment: clamped }]
+  return { ...state, factions: { ...state.factions, [factionId]: { ...faction, relationships } } }
+}
+
+/** Directly set a commodity's supply/demand; price is recomputed from the same formula `tick` uses. */
+export function setMarket(state: SandboxState, commodityId: string, updates: { supply?: number; demand?: number }): SandboxState {
+  const economy: EconomyState = { globalWealth: state.economy.globalWealth, markets: { ...state.economy.markets } }
+  const market = economy.markets[commodityId]
+  if (!market) return state
+  economy.markets[commodityId] = { ...market }
+  setMarketLevels(economy, commodityId, updates)
+  return { ...state, economy }
+}
+
+export function setTension(state: SandboxState, tension: number): SandboxState {
+  return { ...state, tension: Math.max(0, Math.min(1, tension)) }
+}
+
+/** Add or overwrite one freeform world fact (the GOAP WorldState shape). */
+export function setWorldFact(state: SandboxState, key: string, value: string | number | boolean): SandboxState {
+  if (!key.trim()) return state
+  return { ...state, worldState: { ...state.worldState, [key]: value } }
+}
+
+export function removeWorldFact(state: SandboxState, key: string): SandboxState {
+  const worldState = { ...state.worldState }
+  delete worldState[key]
+  return { ...state, worldState }
+}
+
+/** The same reader-facing "Living World" panel shape, so tinkering shows exactly what a real reader would see. */
+export function sandboxPulse(state: SandboxState, mode: NarrativeMode): WorldPulse {
+  return buildWorldPulse(
+    { factionStatus: FactionManager.getSummary(state.factions), economySummary: EconomyManager.getSummary(state.economy) },
+    { director: { tension: state.tension } },
+    mode,
+  )
+}
+
+/** The Director's own stakes-flavor line for the current tension dial position. */
+export function sandboxStakesLine(state: SandboxState, mode: NarrativeMode): string {
+  return DifficultyManager.directive(state.tension, mode)
+}
+
+export { DEFAULT_COMMODITIES }

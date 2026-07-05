@@ -28,6 +28,23 @@ function recalculatePrices(economy: EconomyState): void {
   }
 }
 
+/**
+ * Directly set a market's supply/demand (clamped 0-100) and recompute its
+ * price from the same formula `tick` uses — for callers that manually drive
+ * the economy (e.g. a sandbox) rather than letting it drift turn by turn.
+ */
+export function setMarketLevels(
+  economy: EconomyState,
+  commodityId: string,
+  updates: { supply?: number; demand?: number },
+): void {
+  const market = economy.markets[commodityId];
+  if (!market) return;
+  if (updates.supply !== undefined) market.supply = Math.max(0, Math.min(100, updates.supply));
+  if (updates.demand !== undefined) market.demand = Math.max(0, Math.min(100, updates.demand));
+  recalculatePrices(economy);
+}
+
 export interface EconomyTickResult {
   significantChanges: string[];
 }

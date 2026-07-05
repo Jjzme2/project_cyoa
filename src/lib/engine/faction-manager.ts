@@ -258,16 +258,27 @@ export class FactionManager {
     return factions;
   }
 
-  /** Runs one simulation tick for all factions, mutating state in place. */
-  public tick(factions: Record<string, Faction>, economy: EconomyState): FactionTickResult {
+  /**
+   * Runs one simulation tick for all factions, mutating state in place.
+   *
+   * `excludeHostile` genuinely REMOVES hostile actions (raids) from
+   * consideration — factions can never choose one, not merely go unnarrated.
+   * This differs from how the real per-chapter narrative path handles a
+   * gentle world (it lets raids run backstage but never narrates them, so an
+   * unseen reader is none the wiser); a sandbox exposes the raw tick log and
+   * faction stats directly, so "no bad happens here" must be true at the
+   * mechanical level too, not just the narration.
+   */
+  public tick(factions: Record<string, Faction>, economy: EconomyState, excludeHostile = false): FactionTickResult {
     const narrativeEvents: string[] = [];
     const state: FactionActionContext = { factions, economy, pickVariant: (arr) => this.rng.pick(arr) };
+    const actions = excludeHostile ? FACTION_ACTIONS.filter((a) => a.id !== 'raid_neighbor') : FACTION_ACTIONS;
 
     for (const faction of Object.values(factions)) {
       let bestAction: FactionAction | null = null;
       let bestScore = -Infinity;
 
-      for (const action of FACTION_ACTIONS) {
+      for (const action of actions) {
         const score = action.evaluateUtility(faction, state);
         if (score > bestScore) {
           bestScore = score;
