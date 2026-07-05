@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { Pencil, Check, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/components/Providers'
-import { achievementsToNextStage, speciesPreviewEmoji, PET_SPECIES, type PetStage, type PetMood, type PetSpecies } from '@/lib/pet'
+import { achievementsToNextStage, speciesPreviewEmoji, stageFor, PET_SPECIES, type PetStage, type PetMood, type PetSpecies } from '@/lib/pet'
+import { fetchProfileState, invalidateProfileState } from '@/lib/profile-state-client'
 
 interface PetData {
   name: string
@@ -29,10 +30,11 @@ export function ReaderPal() {
 
   useEffect(() => {
     if (!user) return
-    user.getIdToken().then(async (token) => {
-      const res = await fetch('/api/profile/pet', { headers: { Authorization: `Bearer ${token}` } })
-      if (res.ok) setPet(await res.json())
-    })
+    let alive = true
+    fetchProfileState(user.uid, () => user.getIdToken())
+      .then((state) => { if (alive) setPet(state.pet) })
+      .catch(() => {})
+    return () => { alive = false }
   }, [user])
 
   async function saveRename() {
@@ -47,6 +49,7 @@ export function ReaderPal() {
       })
       if (!res.ok) throw new Error()
       setPet({ ...pet, name: draftName.trim() })
+      invalidateProfileState() // name changed — next read should be fresh
       setRenaming(false)
     } catch {
       toast.error('Could not rename — try again.')
@@ -68,9 +71,10 @@ export function ReaderPal() {
         body: JSON.stringify({ species }),
       })
       if (!res.ok) throw new Error()
-      // Re-fetch so the stage/emoji reflect the new species at the current level.
-      const fresh = await fetch('/api/profile/pet', { headers: { Authorization: `Bearer ${token}` } })
-      if (fresh.ok) setPet(await fresh.json())
+      // The stage/emoji depend only on species + the (unchanged) achievement
+      // count, so recompute locally instead of a round-trip.
+      setPet({ ...prev, species, stage: stageFor(species, prev.achievementsEarned) })
+      invalidateProfileState()
     } catch {
       setPet(prev)
       toast.error('Could not reskin your pal — try again.')

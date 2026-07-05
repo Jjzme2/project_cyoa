@@ -15,19 +15,8 @@ async function resolveUser(req: NextRequest): Promise<string | null> {
   }
 }
 
-/** The reader's equipped avatar frame, plus which frames they've unlocked. */
-export async function GET(req: NextRequest) {
-  const uid = await resolveUser(req)
-  if (!uid) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const [settingsDoc, achievements] = await Promise.all([
-    adminDb.collection('userSettings').doc(uid).get(),
-    getUserAchievements(uid),
-  ])
-  const equipped = (settingsDoc.data()?.equippedFrame as string | undefined) ?? 'default'
-
-  return NextResponse.json({ equipped, earned: achievements.earned })
-}
+// The reader's equipped frame + unlocked frames are served by the consolidated
+// GET /api/profile/state; this route keeps only the equip mutation.
 
 const FrameSchema = z.object({ frameId: z.string().min(1) })
 
