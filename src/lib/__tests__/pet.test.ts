@@ -8,6 +8,9 @@ import {
   xpProgress,
   LEVEL_XP,
   MAX_LEVEL,
+  LIFE_STAGES,
+  STAGE_LEVELS,
+  PAL_ADOPTION_COST,
   stageFor,
   levelsToNextStage,
   speciesPreviewEmoji,
@@ -78,27 +81,38 @@ describe('bond XP & levels', () => {
   })
 })
 
-describe('evolution stages', () => {
-  it('every species starts at its first form and reaches Legendary at level 10', () => {
+describe('life stages', () => {
+  it('every species walks the same universal arc, hatching into Baby', () => {
+    expect(LIFE_STAGES).toEqual(['Egg', 'Baby', 'Juvenile', 'Adolescent', 'Adult', 'Elder', 'Legendary'])
     for (const s of PET_SPECIES) {
-      expect(stageFor(s.id, 1).minLevel).toBe(1)
+      expect(stageFor(s.id, 1).name).toBe('Egg')
+      expect(stageFor(s.id, 2).name).toBe('Baby')
       expect(stageFor(s.id, MAX_LEVEL).name).toBe('Legendary')
     }
   })
 
-  it('stages advance at levels 2, 4, 6, 8, 10 (bird ladder)', () => {
+  it('stages advance at levels 1, 2, 3, 5, 7, 9, 10', () => {
     expect(stageFor('bird', 1).name).toBe('Egg')
-    expect(stageFor('bird', 2).name).toBe('Hatchling')
-    expect(stageFor('bird', 3).name).toBe('Hatchling')
-    expect(stageFor('bird', 4).name).toBe('Fledgling')
-    expect(stageFor('bird', 6).name).toBe('Songbird')
-    expect(stageFor('bird', 8).name).toBe('Skyborne')
+    expect(stageFor('bird', 2).name).toBe('Baby')
+    expect(stageFor('bird', 3).name).toBe('Juvenile')
+    expect(stageFor('bird', 4).name).toBe('Juvenile')
+    expect(stageFor('bird', 5).name).toBe('Adolescent')
+    expect(stageFor('bird', 7).name).toBe('Adult')
+    expect(stageFor('bird', 9).name).toBe('Elder')
     expect(stageFor('bird', 10).name).toBe('Legendary')
+  })
+
+  it('every species has a distinct look at every life stage', () => {
+    for (const s of PET_SPECIES) {
+      const ladder = STAGE_LEVELS.map((l) => stageFor(s.id, l).emoji)
+      expect(new Set(ladder).size).toBe(LIFE_STAGES.length)
+    }
   })
 
   it('levelsToNextStage counts down to the next band and 0 at final form', () => {
     expect(levelsToNextStage('bird', 1)).toBe(1)
-    expect(levelsToNextStage('bird', 2)).toBe(2)
+    expect(levelsToNextStage('bird', 2)).toBe(1)
+    expect(levelsToNextStage('bird', 3)).toBe(2)
     expect(levelsToNextStage('bird', 9)).toBe(1)
     expect(levelsToNextStage('bird', 10)).toBe(0)
   })
@@ -106,6 +120,12 @@ describe('evolution stages', () => {
   it('species are visually distinct in the picker (no all-identical eggs)', () => {
     const emojis = PET_SPECIES.map((s) => speciesPreviewEmoji(s.id))
     expect(new Set(emojis).size).toBe(emojis.length)
+  })
+})
+
+describe('adoption pricing', () => {
+  it('a new pal has a positive purchased-credit price', () => {
+    expect(PAL_ADOPTION_COST).toBeGreaterThan(0)
   })
 })
 

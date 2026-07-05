@@ -26,16 +26,17 @@ describe('sheet convention', () => {
 
 describe('spriteSheetCandidates — drop-in art lookup', () => {
   it('tries the current stage, earlier stages (closest first), then the base sheet', () => {
-    expect(spriteSheetCandidates('cat', 6)).toEqual([
-      '/pals/cat-l6.png',
-      '/pals/cat-l4.png',
+    expect(spriteSheetCandidates('cat', 7)).toEqual([
+      '/pals/cat-l7.png',
+      '/pals/cat-l5.png',
+      '/pals/cat-l3.png',
       '/pals/cat-l2.png',
       '/pals/cat-l1.png',
       '/pals/cat.png',
     ])
   })
 
-  it('a hatchling only looks for its own art and the base sheet', () => {
+  it('an egg only looks for its own art and the base sheet', () => {
     expect(spriteSheetCandidates('bird', 1)).toEqual(['/pals/bird-l1.png', '/pals/bird.png'])
   })
 

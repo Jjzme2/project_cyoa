@@ -22,7 +22,12 @@ export interface ProfilePetState {
   mood: PetMood
   quip: string
   achievementsEarned: number
+  /** Species the reader's achievements QUALIFY them for (gate, not ownership). */
   unlockedSpecies: PetSpecies[]
+  /** Pals the reader actually owns — switching between these is free. */
+  ownedSpecies: PetSpecies[]
+  /** Purchased-credit price to adopt a species they don't own yet. */
+  adoptionCost: number
   stats: PalStats
 }
 

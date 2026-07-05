@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Pencil, Check, X, Lock, BookOpen } from 'lucide-react'
+import { Pencil, Check, X, Lock, BookOpen, Coins } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/components/Providers'
 import {
@@ -46,6 +46,7 @@ export function ReaderPal() {
   const [saving, setSaving] = useState(false)
   const [companionOn, setCompanionOn] = useState(true)
   const [chaptersSide, setChaptersSide] = useState(0)
+  const [pendingAdopt, setPendingAdopt] = useState<PetSpecies | null>(null)
 
   useEffect(() => {
     // Hydration-safe localStorage reads (same justified pattern as PalCompanion).
@@ -101,26 +102,59 @@ export function ReaderPal() {
     }
   }
 
-  async function reskin(species: PetSpecies) {
+  async function postSpecies(species: PetSpecies): Promise<{ ok: boolean; error?: string }> {
+    if (!user) return { ok: false }
+    const token = await user.getIdToken()
+    const res = await fetch('/api/profile/pet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ species }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      return { ok: false, error: data.error }
+    }
+    return { ok: true }
+  }
+
+  /** Bring an OWNED pal along — free, optimistic. */
+  async function switchPal(species: PetSpecies) {
     if (!user || !pet || species === pet.species) return
-    // Locked swatches are disabled in the UI; the server-provided unlocked list
-    // is the belt-and-suspenders check (the API enforces it again regardless).
-    if (!pet.unlockedSpecies.includes(species)) return
     const prev = pet
-    // Optimistic — the bond level doesn't change, just the species/stage skin.
     setPet({ ...pet, species, stage: stageFor(species, pet.level) })
-    try {
-      const token = await user.getIdToken()
-      const res = await fetch('/api/profile/pet', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ species }),
-      })
-      if (!res.ok) throw new Error()
+    const res = await postSpecies(species)
+    if (res.ok) {
       invalidateProfileState()
-    } catch {
+    } else {
       setPet(prev)
-      toast.error('Could not reskin your pal — try again.')
+      toast.error(res.error ?? 'Could not switch pals — try again.')
+    }
+  }
+
+  /** Adopt a NEW pal — costs credits, so it's confirmed first and never optimistic. */
+  async function adoptPal(species: PetSpecies) {
+    if (!user || !pet) return
+    setSaving(true)
+    try {
+      const res = await postSpecies(species)
+      if (!res.ok) {
+        toast.error(res.error ?? 'Could not adopt — try again.')
+        return
+      }
+      const def = PET_SPECIES.find((s) => s.id === species)
+      setPet({
+        ...pet,
+        species,
+        stage: stageFor(species, pet.level),
+        ownedSpecies: [...pet.ownedSpecies, species],
+      })
+      invalidateProfileState()
+      toast.success(`You adopted a ${def?.label ?? species}!`, {
+        description: 'A new companion joins your shelf — your bond carries over.',
+      })
+    } finally {
+      setSaving(false)
+      setPendingAdopt(null)
     }
   }
 
@@ -228,32 +262,47 @@ export function ReaderPal() {
         ))}
       </div>
 
-      {/* Species picker — three free, three earned through achievements */}
+      {/* Your pals — owned ones switch freely; new ones are adopted for credits
+          (gated species also need their achievement first). */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex gap-1.5">
           {PET_SPECIES.map((s) => {
             const unlocked = pet.unlockedSpecies.includes(s.id)
-            const label = unlocked
-              ? `Reskin as ${s.label}`
-              : `${s.label} — locked. ${s.requires?.hint ?? ''}`.trim()
+            const owned = pet.ownedSpecies.includes(s.id)
+            const label = !unlocked
+              ? `${s.label} — locked. ${s.requires?.hint ?? ''}`.trim()
+              : owned
+                ? `Bring your ${s.label} along`
+                : `Adopt a ${s.label} — ${pet.adoptionCost} credits`
             return (
               <button
                 key={s.id}
-                onClick={() => unlocked && reskin(s.id)}
-                disabled={!unlocked}
+                onClick={() => {
+                  if (!unlocked) return
+                  if (owned) switchPal(s.id)
+                  else setPendingAdopt((p) => (p === s.id ? null : s.id))
+                }}
+                disabled={!unlocked || saving}
                 title={label}
                 aria-label={label}
                 aria-pressed={pet.species === s.id}
                 className={`relative h-7 w-7 rounded-full flex items-center justify-center text-sm transition-all ${
                   pet.species === s.id
                     ? 'bg-amber-500/20 ring-1 ring-amber-400/50'
-                    : unlocked
-                      ? 'opacity-60 hover:opacity-100'
-                      : 'opacity-25 grayscale cursor-not-allowed'
+                    : pendingAdopt === s.id
+                      ? 'ring-1 ring-amber-400/70 opacity-100'
+                      : owned
+                        ? 'opacity-60 hover:opacity-100'
+                        : unlocked
+                          ? 'opacity-45 hover:opacity-90'
+                          : 'opacity-25 grayscale cursor-not-allowed'
                 }`}
               >
                 {speciesPreviewEmoji(s.id)}
                 {!unlocked && <Lock className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 text-white/70" />}
+                {unlocked && !owned && (
+                  <Coins className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 text-amber-400/90" />
+                )}
               </button>
             )
           })}
@@ -272,6 +321,33 @@ export function ReaderPal() {
           {companionOn ? 'Reads with you' : 'Stays home'}
         </button>
       </div>
+
+      {/* Adoption confirm — spending credits is never one accidental tap */}
+      {pendingAdopt && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2">
+          <p className="text-[11px] text-amber-200/80">
+            Adopt a {PET_SPECIES.find((s) => s.id === pendingAdopt)?.label} for{' '}
+            <span className="font-mono font-semibold">{pet.adoptionCost} credits</span>? Your bond and level
+            carry over.
+          </p>
+          <div className="flex gap-1.5 shrink-0">
+            <button
+              onClick={() => adoptPal(pendingAdopt)}
+              disabled={saving}
+              className="text-[11px] font-sans px-2 py-1 rounded-md border border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 transition-colors"
+            >
+              {saving ? 'Adopting…' : 'Adopt'}
+            </button>
+            <button
+              onClick={() => setPendingAdopt(null)}
+              disabled={saving}
+              className="text-[11px] font-sans px-2 py-1 rounded-md border border-white/10 text-muted-foreground/60 hover:text-foreground/80 transition-colors"
+            >
+              Not yet
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   )
 }

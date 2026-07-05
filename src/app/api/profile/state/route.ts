@@ -11,9 +11,11 @@ import {
   palStats,
   unlockedSpecies,
   isSpeciesUnlocked,
+  PAL_ADOPTION_COST,
   PET_SPECIES,
   type PetSpecies,
 } from '@/lib/pet'
+import { ownedSpeciesFrom } from '@/lib/pal-adoption'
 import { ACHIEVEMENT_DEFS } from '@/types'
 
 function normalizeSpecies(value: unknown, earned: string[]): PetSpecies {
@@ -64,6 +66,8 @@ export async function GET(req: NextRequest) {
     quip: quipFor(mood, daySeed()),
     achievementsEarned: achievements.earned.length,
     unlockedSpecies: unlockedSpecies(achievements.earned),
+    ownedSpecies: ownedSpeciesFrom(settings, species),
+    adoptionCost: PAL_ADOPTION_COST,
     stats: palStats(achievements.counts),
   }
 

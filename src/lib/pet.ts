@@ -39,6 +39,14 @@ export function unlockedSpecies(earnedAchievements: string[]): PetSpecies[] {
   return PET_SPECIES.filter((s) => isSpeciesUnlocked(s.id, earnedAchievements)).map((s) => s.id)
 }
 
+/**
+ * Adopting a NEW pal costs purchased credits (the kind achievements reward) —
+ * your first pal is free, pals you already own are freely switchable, and
+ * gated species additionally require their achievement. A pal is a companion,
+ * not a costume.
+ */
+export const PAL_ADOPTION_COST = 20
+
 // ─── Bond XP & levels ─────────────────────────────────────────────────────────
 
 /** The already-tracked counts the pal grows from (subset of UserAchievements.counts). */
@@ -111,7 +119,11 @@ export function xpProgress(xp: number): XpProgress {
   return { level, into: xp - base, needed: LEVEL_XP[level] - xp, total: xp }
 }
 
-// ─── Evolution stages ─────────────────────────────────────────────────────────
+// ─── Life stages ──────────────────────────────────────────────────────────────
+//
+// Every species grows through the SAME seven life stages — it hatches, then
+// grows up from Baby — so art direction and sprite-sheet naming stay uniform
+// across species (a per-stage sheet is `{species}-l{minLevel}.png`).
 
 export interface PetStage {
   name: string
@@ -120,64 +132,26 @@ export interface PetStage {
   minLevel: number
 }
 
-/** Six visual stages per species, unlocking at levels 1 / 2 / 4 / 6 / 8 / 10.
- * Exported for the sprite system: per-stage sheets are named by these levels. */
-export const STAGE_LEVELS = [1, 2, 4, 6, 8, 10] as const
+/** The universal life arc, in order. Shared by all species, present and future. */
+export const LIFE_STAGES = ['Egg', 'Baby', 'Juvenile', 'Adolescent', 'Adult', 'Elder', 'Legendary'] as const
 
-const STAGES: Record<PetSpecies, { name: string; emoji: string }[]> = {
-  bird: [
-    { name: 'Egg', emoji: '🥚' },
-    { name: 'Hatchling', emoji: '🐣' },
-    { name: 'Fledgling', emoji: '🐥' },
-    { name: 'Songbird', emoji: '🐦' },
-    { name: 'Skyborne', emoji: '🕊️' },
-    { name: 'Legendary', emoji: '🦅' },
-  ],
-  dragon: [
-    { name: 'Egg', emoji: '🥚' },
-    { name: 'Hatchling', emoji: '🦎' },
-    { name: 'Wyrmling', emoji: '🐊' },
-    { name: 'Drake', emoji: '🦖' },
-    { name: 'Dragon', emoji: '🐲' },
-    { name: 'Legendary', emoji: '🐉' },
-  ],
-  sprout: [
-    { name: 'Seed', emoji: '🌰' },
-    { name: 'Sprout', emoji: '🌱' },
-    { name: 'Budding', emoji: '🌿' },
-    { name: 'Rooted', emoji: '🪴' },
-    { name: 'Blooming', emoji: '🌸' },
-    { name: 'Legendary', emoji: '🌳' },
-  ],
-  cat: [
-    { name: 'Pawstep', emoji: '🐾' },
-    { name: 'Kitten', emoji: '🐱' },
-    { name: 'Cat', emoji: '🐈' },
-    { name: 'Shadowcat', emoji: '🐈‍⬛' },
-    { name: 'Prowler', emoji: '🐯' },
-    { name: 'Legendary', emoji: '🦁' },
-  ],
-  wisp: [
-    { name: 'Spark', emoji: '✨' },
-    { name: 'Glimmer', emoji: '💫' },
-    { name: 'Wisp', emoji: '🔮' },
-    { name: 'Radiant', emoji: '🌟' },
-    { name: 'Comet', emoji: '☄️' },
-    { name: 'Legendary', emoji: '🌠' },
-  ],
-  leviathan: [
-    { name: 'Bubble', emoji: '🫧' },
-    { name: 'Fry', emoji: '🐟' },
-    { name: 'Swift', emoji: '🐬' },
-    { name: 'Spouter', emoji: '🐳' },
-    { name: 'Leviathan', emoji: '🐋' },
-    { name: 'Legendary', emoji: '🌊' },
-  ],
+/** The bond level each life stage begins at (index-aligned with LIFE_STAGES).
+ * Exported for the sprite system: per-stage sheets are named by these levels. */
+export const STAGE_LEVELS = [1, 2, 3, 5, 7, 9, 10] as const
+
+/** Each species' look at every life stage (index-aligned with LIFE_STAGES). */
+const STAGE_EMOJI: Record<PetSpecies, string[]> = {
+  bird: ['🥚', '🐣', '🐥', '🐦', '🕊️', '🦉', '🦅'],
+  dragon: ['🥚', '🦎', '🐊', '🦖', '🐲', '🐉', '🔥'],
+  sprout: ['🌰', '🌱', '🌿', '🪴', '🌷', '🌸', '🌳'],
+  cat: ['🐾', '🐱', '🐈', '🐈‍⬛', '🐆', '🐯', '🦁'],
+  wisp: ['✨', '💫', '🔮', '🌟', '☄️', '🌠', '🌌'],
+  leviathan: ['🫧', '🐟', '🐠', '🐬', '🐳', '🐋', '🌊'],
 }
 
 function stageBands(species: PetSpecies): PetStage[] {
-  const defs = STAGES[species] ?? STAGES.bird
-  return defs.map((d, i) => ({ ...d, minLevel: STAGE_LEVELS[i] }))
+  const emoji = STAGE_EMOJI[species] ?? STAGE_EMOJI.bird
+  return LIFE_STAGES.map((name, i) => ({ name, emoji: emoji[i], minLevel: STAGE_LEVELS[i] }))
 }
 
 /** The highest evolution stage this bond level qualifies for, in the chosen species. */

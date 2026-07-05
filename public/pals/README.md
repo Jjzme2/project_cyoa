@@ -8,7 +8,19 @@ for existing species and any you add later.
 | File                        | Meaning                                                        |
 | --------------------------- | -------------------------------------------------------------- |
 | `{species}.png`             | Base sheet for a species (e.g. `bird.png`, `cat.png`)          |
-| `{species}-l{level}.png`    | Optional per-evolution sheet; `level` ∈ `1, 2, 4, 6, 8, 10`    |
+| `{species}-l{level}.png`    | Optional per-life-stage sheet; `level` ∈ `1, 2, 3, 5, 7, 9, 10` |
+
+Life stages (same arc for every species — it hatches, then grows up):
+
+| Level | Stage       |
+| ----- | ----------- |
+| 1     | Egg         |
+| 2     | Baby        |
+| 3     | Juvenile    |
+| 5     | Adolescent  |
+| 7     | Adult       |
+| 9     | Elder       |
+| 10    | Legendary   |
 
 Species ids today: `bird`, `dragon`, `sprout`, `cat`, `wisp`, `leviathan`
 (see `src/lib/pet.ts` — a new species there + a PNG here is all it takes).
