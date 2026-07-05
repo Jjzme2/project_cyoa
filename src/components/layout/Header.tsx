@@ -1,16 +1,14 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
 import { signOut } from 'firebase/auth'
 import { toast } from 'sonner'
-import { BookOpen, Plus, LogOut, Sparkles, Menu, Wand2, KeyRound, Globe, LayoutDashboard, ShieldAlert, Library, User, Users, MessageSquare, DoorOpen, Coins } from 'lucide-react'
+import { BookOpen, Plus, LogOut, Sparkles, Menu, Wand2, Globe, LayoutDashboard, ShieldAlert, Library, User, Users, MessageSquare, DoorOpen, Coins } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { useAuth } from '@/components/Providers'
-import { ApiKeyModal } from '@/components/auth/ApiKeyModal'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
 
 async function getFirebaseAuth() {
@@ -20,7 +18,6 @@ async function getFirebaseAuth() {
 
 export function Header() {
   const { user, loading, tier, isAdmin, openAuthModal, aiUsesRemaining } = useAuth()
-  const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false)
 
   async function handleSignOut() {
     const auth = await getFirebaseAuth()
@@ -152,14 +149,6 @@ export function Header() {
                       <div className="hidden sm:flex">
                         <NotificationBell />
                       </div>
-                      <button
-                        onClick={() => setApiKeyModalOpen(true)}
-                        className="hidden sm:flex items-center justify-center h-8 w-8 rounded-full text-amber-400/40 hover:text-amber-400/80 transition-colors"
-                        title="Your Gemini API key"
-                        aria-label="Your Gemini API key"
-                      >
-                        <KeyRound className="h-3.5 w-3.5" />
-                      </button>
                       <Link
                         href="/profile"
                         className="flex items-center gap-1.5 group"
@@ -233,8 +222,6 @@ export function Header() {
           </div>
         </div>
       </header>
-
-      <ApiKeyModal open={apiKeyModalOpen} onOpenChange={setApiKeyModalOpen} />
     </>
   )
 }
