@@ -24,6 +24,8 @@ const NarrateSchema = z
     hero: z
       .object({ name: z.string().trim().min(1).max(60), description: z.string().trim().max(300).optional() })
       .optional(),
+    // Only meaningful in 'god' mode — see the framing text below.
+    godAwareness: z.enum(['hidden', 'known']).default('hidden'),
     action: z.string().trim().min(1).max(300),
     storyPath: z.array(SceneSchema).max(MAX_SCENES).default([]),
     // Client-computed "Living World" pulse/stakes text (same pure functions the
@@ -52,7 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const parsed = await parseJson(req, NarrateSchema)
   if (!parsed.ok) return parsed.response
-  const { playerMode, hero, action, storyPath, sandboxBriefing } = parsed.data
+  const { playerMode, hero, godAwareness, action, storyPath, sandboxBriefing } = parsed.data
 
   const world = await getWorld(id).catch(() => null)
   if (!world) return NextResponse.json({ error: 'World not found' }, { status: 404 })
@@ -70,9 +72,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // God mode has no personal protagonist — the reader is an unseen hand
     // shaping the world, not a character in the scene, so the framing has to
     // say so explicitly or the model will default to a close personal POV.
+    // `godAwareness` further decides whether the world's own people ever
+    // notice: 'hidden' narrates the same event as ordinary happenstance,
+    // 'known' lets characters address, question, resist, or revere the god.
     const godFraming =
       playerMode === 'god'
-        ? "The reader is an unseen god shaping this world from beyond — there is no protagonist and no personal point of view. Narrate in sweeping, omniscient third person: the consequence of the god's intervention rippling across the world, its factions, and its people."
+        ? "The reader is an unseen god shaping this world from beyond — there is no protagonist and no personal point of view. Narrate in sweeping, omniscient third person: the consequence of the god's intervention rippling across the world, its factions, and its people. " +
+          (godAwareness === 'known'
+            ? 'The people of this world CAN perceive the god — let at least one character address, question, resist, plead with, or revere the god directly, as a real presence acting on them.'
+            : 'The people of this world have NO idea a god exists or is shaping anything — narrate every consequence as if it arose naturally from the world itself; no character may sense, suspect, or acknowledge a god.')
         : ''
     const systemNarrativeEvents = [godFraming, sandboxBriefing].filter(Boolean).join('\n\n')
 

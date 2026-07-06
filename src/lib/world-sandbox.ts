@@ -25,6 +25,14 @@ export const MAX_SCENE_LOG = 20
 export type PlayerMode = 'hero' | 'god'
 
 /**
+ * Only meaningful in 'god' mode: whether the world's own people perceive the
+ * player's hand at all. `hidden` narrates events as if they arose naturally
+ * from the world itself — no one suspects a god; `known` lets characters
+ * address, question, resist, or revere the god directly.
+ */
+export type GodAwareness = 'hidden' | 'known'
+
+/**
  * Sandbox v2's narrative layer: entirely session-local, like the rest of
  * SandboxState — a hero exists only for this sandbox session, never touches
  * the real character registry, and `scenes` is resent to the narrate route
@@ -34,6 +42,8 @@ export interface NarrativeState {
   playerMode: PlayerMode | null
   /** Only set (and only used) in 'hero' mode — a sandbox-only protagonist. */
   hero?: Protagonist
+  /** Only used in 'god' mode. Defaults to 'hidden'. */
+  godAwareness: GodAwareness
   /** Accumulated AI-narrated turns, oldest first, capped at MAX_SCENE_LOG. */
   scenes: StoryPathSegment[]
 }
@@ -63,23 +73,31 @@ export function initSandboxState(worldSeed: number, genesisFactions?: GenesisFac
     worldState: {},
     tension: 0.2,
     eventLog: [],
-    narrative: { playerMode: null, scenes: [] },
+    narrative: { playerMode: null, godAwareness: 'hidden', scenes: [] },
   }
 }
 
 /**
- * Advance the simulation `ticks` turns. `gentle` genuinely excludes hostile
- * faction actions (see FactionManager.tick) rather than merely hiding their
- * narration — a sandbox shows its work, so "no bad happens here" must hold
- * at the mechanical level, not just in the prose.
+ * Advance the simulation `ticks` turns, returning both the new state AND the
+ * events THIS call generated (uncapped — distinct from the state's own
+ * `eventLog`, which is capped at MAX_EVENT_LOG and may have dropped older
+ * lines). The narrate route folds `newEvents` into what the AI is told
+ * happened this turn — see Sandbox v3's hero/god play loop in
+ * WorldSandbox.tsx, which ticks the world every turn instead of leaving
+ * "Play it out" and "Advance time" as two disconnected toys.
+ *
+ * `gentle` genuinely excludes hostile faction actions (see
+ * FactionManager.tick) rather than merely hiding their narration — a
+ * sandbox shows its work, so "no bad happens here" must hold at the
+ * mechanical level, not just in the prose.
  */
-export function advanceTicks(
+export function advanceTicksWithEvents(
   state: SandboxState,
   ticks: number,
   gentle: boolean,
   factionManager: FactionManager,
   economyManager: EconomyManager,
-): SandboxState {
+): { state: SandboxState; newEvents: string[] } {
   // FactionManager/EconomyManager.tick() mutate their faction/market objects IN
   // PLACE (by design — see their own docs), so a shallow copy of the top-level
   // maps isn't enough to protect the caller's state: the nested Faction and
@@ -94,15 +112,27 @@ export function advanceTicks(
     globalWealth: state.economy.globalWealth,
     markets: Object.fromEntries(Object.entries(state.economy.markets).map(([id, m]) => [id, { ...m }])),
   }
-  const eventLog = [...state.eventLog]
+  const newEvents: string[] = []
 
   for (let i = 0; i < Math.max(0, ticks); i++) {
     const factionResult = factionManager.tick(factions, economy, gentle)
     const economyResult = economyManager.tick(economy)
-    eventLog.push(...factionResult.narrativeEvents, ...economyResult.significantChanges)
+    newEvents.push(...factionResult.narrativeEvents, ...economyResult.significantChanges)
   }
 
-  return { ...state, factions, economy, eventLog: eventLog.slice(-MAX_EVENT_LOG) }
+  const eventLog = [...state.eventLog, ...newEvents].slice(-MAX_EVENT_LOG)
+  return { state: { ...state, factions, economy, eventLog }, newEvents }
+}
+
+/** Convenience wrapper over {@link advanceTicksWithEvents} for callers that only need the new state. */
+export function advanceTicks(
+  state: SandboxState,
+  ticks: number,
+  gentle: boolean,
+  factionManager: FactionManager,
+  economyManager: EconomyManager,
+): SandboxState {
+  return advanceTicksWithEvents(state, ticks, gentle, factionManager, economyManager).state
 }
 
 /** Directly nudge a faction's wealth or influence, clamped to its normal 0-100(-200) range. */
@@ -166,6 +196,11 @@ export function removeWorldFact(state: SandboxState, key: string): SandboxState 
  * toggling back to a mode picks up where it left off. */
 export function setPlayerMode(state: SandboxState, mode: PlayerMode | null): SandboxState {
   return { ...state, narrative: { ...state.narrative, playerMode: mode } }
+}
+
+/** Set whether the world's people perceive the player's hand in 'god' mode. */
+export function setGodAwareness(state: SandboxState, awareness: GodAwareness): SandboxState {
+  return { ...state, narrative: { ...state.narrative, godAwareness: awareness } }
 }
 
 /** Set the sandbox-only hero for 'hero' mode. A blank name is a no-op — every

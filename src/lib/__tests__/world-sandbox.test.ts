@@ -4,6 +4,7 @@ import { EconomyManager } from '@/lib/engine/economy-manager'
 import {
   initSandboxState,
   advanceTicks,
+  advanceTicksWithEvents,
   nudgeFactionStat,
   setFactionSentiment,
   setMarket,
@@ -14,6 +15,7 @@ import {
   sandboxStakesLine,
   setPlayerMode,
   setHero,
+  setGodAwareness,
   appendScene,
   resetNarrative,
   MAX_EVENT_LOG,
@@ -78,6 +80,37 @@ describe('advanceTicks', () => {
       state = advanceTicks(state, 5, true, new FactionManager(i), new EconomyManager())
     }
     expect(state.eventLog.some((l) => /raid|burn|bleeds/i.test(l))).toBe(false)
+  })
+})
+
+describe('advanceTicksWithEvents', () => {
+  it('advanceTicks is equivalent to taking just the .state half', () => {
+    const state = initSandboxState(42)
+    const { state: viaEvents } = advanceTicksWithEvents(state, 5, false, new FactionManager(1), new EconomyManager())
+    const viaPlain = advanceTicks(state, 5, false, new FactionManager(1), new EconomyManager())
+    expect(viaEvents).toEqual(viaPlain)
+  })
+
+  it('newEvents reflects only THIS call, not the whole (possibly capped) eventLog', () => {
+    let state = initSandboxState(1)
+    // Prime a long history so eventLog is near/at MAX_EVENT_LOG already.
+    for (let i = 0; i < 20; i++) {
+      state = advanceTicks(state, 5, false, new FactionManager(i), new EconomyManager())
+    }
+    const { newEvents } = advanceTicksWithEvents(state, 1, false, new FactionManager(999), new EconomyManager())
+    // One tick's worth of events is always far smaller than the capped log.
+    expect(newEvents.length).toBeLessThan(MAX_EVENT_LOG)
+  })
+
+  it('gentle=true excludes raid narration from newEvents too', () => {
+    const state = initSandboxState(1)
+    for (const id of Object.keys(state.factions)) {
+      for (const rel of state.factions[id].relationships) rel.sentiment = -90
+    }
+    for (let seed = 0; seed < 20; seed++) {
+      const { newEvents } = advanceTicksWithEvents(state, 5, true, new FactionManager(seed), new EconomyManager())
+      expect(newEvents.some((l) => /raid|burn|bleeds/i.test(l))).toBe(false)
+    }
   })
 })
 
@@ -150,9 +183,15 @@ describe('world facts', () => {
 })
 
 describe('narrative controls', () => {
-  it('initSandboxState starts with no player mode and an empty scene log', () => {
+  it('initSandboxState starts with no player mode, hidden god awareness, and an empty scene log', () => {
     const state = initSandboxState(42)
-    expect(state.narrative).toEqual({ playerMode: null, scenes: [] })
+    expect(state.narrative).toEqual({ playerMode: null, godAwareness: 'hidden', scenes: [] })
+  })
+
+  it('setGodAwareness toggles between hidden and known', () => {
+    const state = initSandboxState(42)
+    expect(setGodAwareness(state, 'known').narrative.godAwareness).toBe('known')
+    expect(setGodAwareness(state, 'hidden').narrative.godAwareness).toBe('hidden')
   })
 
   it('setPlayerMode switches mode without touching hero or scenes', () => {

@@ -10,6 +10,7 @@ import { EconomyManager } from '@/lib/engine/economy-manager'
 import {
   initSandboxState,
   advanceTicks,
+  advanceTicksWithEvents,
   nudgeFactionStat,
   setFactionSentiment,
   setMarket,
@@ -18,6 +19,7 @@ import {
   removeWorldFact,
   setPlayerMode,
   setHero,
+  setGodAwareness,
   appendScene,
   resetNarrative,
   sandboxPulse,
@@ -25,9 +27,10 @@ import {
   DEFAULT_COMMODITIES,
   type SandboxState,
   type PlayerMode,
+  type GodAwareness,
 } from '@/lib/world-sandbox'
 import type { NarrativeMode } from '@/lib/engine/narrative-mode'
-import type { GenesisFaction } from '@/types'
+import type { GenesisFaction, GenesisCharacter } from '@/types'
 
 function storageKey(worldId: string) {
   return `world_sandbox_${worldId}`
@@ -47,12 +50,14 @@ export function WorldSandbox({
   worldName,
   worldSeed,
   genesisFactions,
+  genesisCharacters,
   mode,
 }: {
   worldId: string
   worldName: string
   worldSeed: number
   genesisFactions: GenesisFaction[]
+  genesisCharacters: GenesisCharacter[]
   mode: NarrativeMode
 }) {
   const gentle = mode === 'gentle'
@@ -76,6 +81,7 @@ export function WorldSandbox({
   const [choices, setChoices] = useState<string[]>([])
   const [narrating, setNarrating] = useState(false)
   const [narrateError, setNarrateError] = useState<string | null>(null)
+  const [worldStirred, setWorldStirred] = useState<string[]>([])
 
   useEffect(() => {
     // Hydration-safe localStorage read: SSR/first paint uses the fresh init
@@ -124,13 +130,29 @@ export function WorldSandbox({
     setHeroDescDraft('')
   }
 
+  /** Quick-pick one of the world's own established figures instead of inventing a stranger. */
+  function fillHeroFromCast(character: GenesisCharacter) {
+    setHeroNameDraft(character.name)
+    setHeroDescDraft([character.role, character.bio].filter(Boolean).join(' — '))
+  }
+
   function restartStory() {
     setState((s) => resetNarrative(s))
     setChoices([])
     setActionText('')
     setNarrateError(null)
+    setWorldStirred([])
   }
 
+  /**
+   * Every hero/god turn actually ticks the deterministic engine first — a
+   * god's decree ripples further than one hero's personal choice, so it gets
+   * more ticks — and the resulting faction/economy events are what the AI is
+   * told happened, exactly like the real per-chapter path feeds its own
+   * engine ticks into the prompt. This is what makes "Play it out" and
+   * "Advance time" the SAME world instead of two disconnected toys: the tick
+   * is only committed once the AI turn actually succeeds.
+   */
   async function narrate(action: string) {
     if (!action.trim() || narrating) return
     if (!user) {
@@ -139,15 +161,21 @@ export function WorldSandbox({
     }
     setNarrating(true)
     setNarrateError(null)
+    const ticksThisTurn = state.narrative.playerMode === 'god' ? 2 : 1
+    const { state: ticked, newEvents } = advanceTicksWithEvents(state, ticksThisTurn, gentle, factionManager, economyManager)
     try {
       const token = await user.getIdToken()
-      const briefing = [stakesLine, pulse.factions, pulse.economy].filter(Boolean).join(' ')
+      const tickedPulse = sandboxPulse(ticked, mode)
+      const briefing = [sandboxStakesLine(ticked, mode), tickedPulse.factions, tickedPulse.economy, ...newEvents]
+        .filter(Boolean)
+        .join(' ')
       const res = await fetch(`/api/worlds/${worldId}/sandbox/narrate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           playerMode: state.narrative.playerMode,
           hero: state.narrative.hero,
+          godAwareness: state.narrative.godAwareness,
           action,
           storyPath: state.narrative.scenes,
           sandboxBriefing: briefing,
@@ -156,8 +184,9 @@ export function WorldSandbox({
       const data = await res.json()
       if (typeof data.remaining === 'number') updateAiUses(data.remaining)
       if (!res.ok) throw new Error(data.error ?? 'Narration failed.')
-      setState((s) => appendScene(s, data.content, action))
+      setState(() => appendScene(ticked, data.content, action))
       setChoices(Array.isArray(data.choices) ? data.choices : [])
+      setWorldStirred(newEvents)
       setActionText('')
     } catch (err) {
       setNarrateError(err instanceof Error ? err.message : 'Narration failed.')
@@ -241,15 +270,60 @@ export function WorldSandbox({
 
         {state.narrative.playerMode && (
           <p className="text-[11px] text-muted-foreground/45">
-            Each turn is a real AI-written scene (1 credit) — but nothing here is ever saved as a story.
+            Each turn is a real AI-written scene (1 credit) that actually ticks the factions and economy below — this
+            is the same world, not a separate story. Nothing here is ever saved.
             {state.narrative.playerMode === 'god' &&
-              " You're an unseen god shaping events — no personal protagonist, just the world reacting to your will."}
+              " You're an unseen god shaping events — no personal protagonist, just the world reacting to your will, and your decrees ripple further than one hero's choice."}
           </p>
+        )}
+
+        {state.narrative.playerMode === 'god' && (
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground/40 font-sans">The world</span>
+            {(
+              [
+                { value: 'hidden' as const, label: "doesn't know you exist" },
+                { value: 'known' as const, label: 'knows you as their god' },
+              ]
+            ).map(({ value, label }) => {
+              const active = state.narrative.godAwareness === value
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setState((s) => setGodAwareness(s, value as GodAwareness))}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-sans border transition-all ${
+                    active
+                      ? 'bg-amber-500/20 border-amber-500/30 text-amber-300'
+                      : 'border-white/10 text-muted-foreground/45 hover:border-white/20 hover:text-muted-foreground/70'
+                  }`}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
         )}
 
         {state.narrative.playerMode === 'hero' && !state.narrative.hero && (
           <div className="space-y-2 rounded-lg border border-white/[0.07] bg-white/[0.02] p-3">
             <p className="text-xs text-muted-foreground/60">Who do you play as?</p>
+            {genesisCharacters.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {genesisCharacters.map((c) => (
+                  <button
+                    key={c.name}
+                    type="button"
+                    onClick={() => fillHeroFromCast(c)}
+                    title={c.bio}
+                    className="px-2 py-0.5 rounded-full text-[11px] font-sans border border-white/10 text-muted-foreground/55 hover:border-amber-500/30 hover:text-amber-300 transition-all"
+                  >
+                    {c.name}
+                  </button>
+                ))}
+                <span className="text-[10px] text-muted-foreground/35 self-center">or invent your own below</span>
+              </div>
+            )}
             <div className="flex gap-2">
               <Input
                 value={heroNameDraft}
@@ -304,6 +378,16 @@ export function WorldSandbox({
                     )}
                     <p className="text-[13px] text-foreground/80 leading-relaxed whitespace-pre-wrap">{scene.content}</p>
                   </div>
+                ))}
+              </div>
+            )}
+
+            {worldStirred.length > 0 && (
+              <div className="space-y-0.5 border-l-2 border-amber-500/20 pl-2.5">
+                {worldStirred.map((line, i) => (
+                  <p key={i} className="text-[11px] text-amber-400/50 italic">
+                    Meanwhile: {line}
+                  </p>
                 ))}
               </div>
             )}
