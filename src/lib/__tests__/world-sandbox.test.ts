@@ -12,7 +12,12 @@ import {
   removeWorldFact,
   sandboxPulse,
   sandboxStakesLine,
+  setPlayerMode,
+  setHero,
+  appendScene,
+  resetNarrative,
   MAX_EVENT_LOG,
+  MAX_SCENE_LOG,
 } from '@/lib/world-sandbox'
 import type { GenesisFaction } from '@/types'
 
@@ -141,6 +146,58 @@ describe('world facts', () => {
     const state = setWorldFact(setWorldFact(initSandboxState(42), 'a', 1), 'b', 2)
     const next = removeWorldFact(state, 'a')
     expect(next.worldState).toEqual({ b: 2 })
+  })
+})
+
+describe('narrative controls', () => {
+  it('initSandboxState starts with no player mode and an empty scene log', () => {
+    const state = initSandboxState(42)
+    expect(state.narrative).toEqual({ playerMode: null, scenes: [] })
+  })
+
+  it('setPlayerMode switches mode without touching hero or scenes', () => {
+    const withHero = setHero(initSandboxState(42), { name: 'Vael', description: 'a wandering smith' })
+    const withScene = appendScene(withHero, 'Vael steps into the forge.', null)
+    const next = setPlayerMode(withScene, 'hero')
+    expect(next.narrative.playerMode).toBe('hero')
+    expect(next.narrative.hero).toEqual(withScene.narrative.hero)
+    expect(next.narrative.scenes).toEqual(withScene.narrative.scenes)
+  })
+
+  it('setHero trims the name/description and is a no-op for a blank name', () => {
+    const state = initSandboxState(42)
+    const next = setHero(state, { name: '  Vael  ', description: '  a wandering smith  ' })
+    expect(next.narrative.hero).toEqual({ name: 'Vael', description: 'a wandering smith' })
+    expect(setHero(state, { name: '   ' })).toBe(state)
+  })
+
+  it('appendScene accumulates turns with incrementing depth', () => {
+    let state = initSandboxState(42)
+    state = appendScene(state, 'The forge glows.', null)
+    state = appendScene(state, 'Vael strikes the iron.', 'Strike the iron')
+    expect(state.narrative.scenes).toEqual([
+      { id: 'scene-0', content: 'The forge glows.', choiceText: null, depth: 0 },
+      { id: 'scene-1', content: 'Vael strikes the iron.', choiceText: 'Strike the iron', depth: 1 },
+    ])
+  })
+
+  it('appendScene caps the log at MAX_SCENE_LOG, keeping the most recent', () => {
+    let state = initSandboxState(42)
+    for (let i = 0; i < MAX_SCENE_LOG + 10; i++) {
+      state = appendScene(state, `Turn ${i}`, null)
+    }
+    expect(state.narrative.scenes.length).toBe(MAX_SCENE_LOG)
+    expect(state.narrative.scenes[state.narrative.scenes.length - 1].content).toBe(`Turn ${MAX_SCENE_LOG + 9}`)
+  })
+
+  it('resetNarrative clears scenes but keeps player mode and hero', () => {
+    let state = setHero(initSandboxState(42), { name: 'Vael' })
+    state = setPlayerMode(state, 'hero')
+    state = appendScene(state, 'The forge glows.', null)
+    const next = resetNarrative(state)
+    expect(next.narrative.scenes).toEqual([])
+    expect(next.narrative.playerMode).toBe('hero')
+    expect(next.narrative.hero).toEqual({ name: 'Vael' })
   })
 })
 

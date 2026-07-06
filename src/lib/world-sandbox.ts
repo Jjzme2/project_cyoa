@@ -6,7 +6,7 @@ import type { NarrativeMode } from './engine/narrative-mode'
 import type { Faction } from '@/types/faction'
 import type { EconomyState } from '@/types/economy'
 import type { WorldState } from '@/types/goap'
-import type { GenesisFaction, WorldPulse } from '@/types'
+import type { GenesisFaction, WorldPulse, Protagonist, StoryPathSegment } from '@/types'
 
 /**
  * World Sandbox — a hands-on, non-narrative playground for a world's
@@ -19,6 +19,24 @@ import type { GenesisFaction, WorldPulse } from '@/types'
  */
 
 export const MAX_EVENT_LOG = 40
+export const MAX_SCENE_LOG = 20
+
+/** Who the reader plays as in an AI-narrated sandbox turn — see NarrateOptions. */
+export type PlayerMode = 'hero' | 'god'
+
+/**
+ * Sandbox v2's narrative layer: entirely session-local, like the rest of
+ * SandboxState — a hero exists only for this sandbox session, never touches
+ * the real character registry, and `scenes` is resent to the narrate route
+ * each turn instead of being persisted as real Story/StoryNode documents.
+ */
+export interface NarrativeState {
+  playerMode: PlayerMode | null
+  /** Only set (and only used) in 'hero' mode — a sandbox-only protagonist. */
+  hero?: Protagonist
+  /** Accumulated AI-narrated turns, oldest first, capped at MAX_SCENE_LOG. */
+  scenes: StoryPathSegment[]
+}
 
 export interface SandboxState {
   factions: Record<string, Faction>
@@ -30,6 +48,7 @@ export interface SandboxState {
   tension: number
   /** Recent tick narration, most recent last, capped. */
   eventLog: string[]
+  narrative: NarrativeState
 }
 
 /** Fresh sandbox state for a world: its genesis factions if it has them, else
@@ -38,7 +57,14 @@ export function initSandboxState(worldSeed: number, genesisFactions?: GenesisFac
   const factions = genesisFactions?.length
     ? FactionManager.fromGenesis(genesisFactions, worldSeed)
     : FactionManager.generateDefaultFactions(worldSeed)
-  return { factions, economy: createDefaultEconomy(), worldState: {}, tension: 0.2, eventLog: [] }
+  return {
+    factions,
+    economy: createDefaultEconomy(),
+    worldState: {},
+    tension: 0.2,
+    eventLog: [],
+    narrative: { playerMode: null, scenes: [] },
+  }
 }
 
 /**
@@ -133,6 +159,32 @@ export function removeWorldFact(state: SandboxState, key: string): SandboxState 
   const worldState = { ...state.worldState }
   delete worldState[key]
   return { ...state, worldState }
+}
+
+/** Switch between free-form tinkering (`null`), playing a sandbox-only hero, or
+ * playing the world's god. Leaves any existing hero/scenes untouched, so
+ * toggling back to a mode picks up where it left off. */
+export function setPlayerMode(state: SandboxState, mode: PlayerMode | null): SandboxState {
+  return { ...state, narrative: { ...state.narrative, playerMode: mode } }
+}
+
+/** Set the sandbox-only hero for 'hero' mode. A blank name is a no-op — every
+ * scene turn needs a named protagonist to hand the AI. */
+export function setHero(state: SandboxState, hero: Protagonist): SandboxState {
+  if (!hero.name.trim()) return state
+  return { ...state, narrative: { ...state.narrative, hero: { name: hero.name.trim(), description: hero.description?.trim() } } }
+}
+
+/** Append one AI-narrated turn to the scene log, capped at MAX_SCENE_LOG (oldest dropped first). */
+export function appendScene(state: SandboxState, content: string, choiceText: string | null): SandboxState {
+  const depth = state.narrative.scenes.length
+  const scenes = [...state.narrative.scenes, { id: `scene-${depth}`, content, choiceText, depth }].slice(-MAX_SCENE_LOG)
+  return { ...state, narrative: { ...state.narrative, scenes } }
+}
+
+/** Clear the scene log to restart the narrative from scratch — keeps the player mode and hero. */
+export function resetNarrative(state: SandboxState): SandboxState {
+  return { ...state, narrative: { ...state.narrative, scenes: [] } }
 }
 
 /** The same reader-facing "Living World" panel shape, so tinkering shows exactly what a real reader would see. */
