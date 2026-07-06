@@ -16,11 +16,18 @@ import {
   setPlayerMode,
   setHero,
   setGodAwareness,
+  setDirectorAxis,
+  setDirectorVision,
+  setDirectorPersona,
+  clearDirectorPersona,
   appendScene,
   resetNarrative,
+  rewindTo,
+  renderTranscript,
   MAX_EVENT_LOG,
   MAX_SCENE_LOG,
 } from '@/lib/world-sandbox'
+import { emptyDirector } from '@/lib/director'
 import type { GenesisFaction } from '@/types'
 
 describe('initSandboxState', () => {
@@ -185,7 +192,7 @@ describe('world facts', () => {
 describe('narrative controls', () => {
   it('initSandboxState starts with no player mode, hidden god awareness, and an empty scene log', () => {
     const state = initSandboxState(42)
-    expect(state.narrative).toEqual({ playerMode: null, godAwareness: 'hidden', scenes: [] })
+    expect(state.narrative).toEqual({ playerMode: null, godAwareness: 'hidden', scenes: [], snapshots: [] })
   })
 
   it('setGodAwareness toggles between hidden and known', () => {
@@ -237,6 +244,86 @@ describe('narrative controls', () => {
     expect(next.narrative.scenes).toEqual([])
     expect(next.narrative.playerMode).toBe('hero')
     expect(next.narrative.hero).toEqual({ name: 'Vael' })
+  })
+})
+
+describe('rewindTo', () => {
+  it('restores both the scene log and the world state from that turn\'s snapshot', () => {
+    let state = initSandboxState(42)
+    const id = Object.keys(state.factions)[0]
+    state = appendScene(nudgeFactionStat(state, id, 'wealth', 20), 'Turn one.', null)
+    const firstSceneId = state.narrative.scenes[0].id
+    const wealthAfterFirst = state.factions[id].wealth
+
+    state = appendScene(nudgeFactionStat(state, id, 'wealth', 50), 'Turn two.', 'Push harder')
+    expect(state.factions[id].wealth).not.toBe(wealthAfterFirst) // sanity: it actually moved on
+
+    const rewound = rewindTo(state, firstSceneId)
+    expect(rewound.narrative.scenes).toEqual([state.narrative.scenes[0]])
+    expect(rewound.factions[id].wealth).toBe(wealthAfterFirst)
+  })
+
+  it('is a no-op for an unknown scene id', () => {
+    const state = appendScene(initSandboxState(42), 'Turn one.', null)
+    expect(rewindTo(state, 'nope')).toBe(state)
+  })
+})
+
+describe('director tone dials', () => {
+  it('setDirectorAxis starts from a centered persona and clamps to [-1,1]', () => {
+    const state = initSandboxState(42)
+    const next = setDirectorAxis(state, 'darkness', 5)
+    expect(next.narrative.directorPersona).toEqual({ ...emptyDirector(), darkness: 1 })
+    expect(setDirectorAxis(state, 'darkness', -5).narrative.directorPersona?.darkness).toBe(-1)
+  })
+
+  it('setDirectorAxis preserves other axes already set', () => {
+    let state = setDirectorAxis(initSandboxState(42), 'darkness', 0.5)
+    state = setDirectorAxis(state, 'pace', 0.8)
+    expect(state.narrative.directorPersona).toMatchObject({ darkness: 0.5, pace: 0.8 })
+  })
+
+  it('setDirectorVision trims and caps length, preserving axes', () => {
+    const state = setDirectorAxis(initSandboxState(42), 'darkness', 0.5)
+    const next = setDirectorVision(state, 'a quiet horror')
+    expect(next.narrative.directorPersona).toMatchObject({ darkness: 0.5, vision: 'a quiet horror' })
+  })
+
+  it('setDirectorPersona replaces the whole persona at once (e.g. an archetype)', () => {
+    const state = setDirectorAxis(initSandboxState(42), 'darkness', 0.5)
+    const persona = { ...emptyDirector(), levity: 0.9, vision: 'a witty caper' }
+    expect(setDirectorPersona(state, persona).narrative.directorPersona).toEqual(persona)
+  })
+
+  it('clearDirectorPersona removes the override entirely', () => {
+    const state = setDirectorAxis(initSandboxState(42), 'darkness', 0.5)
+    expect(clearDirectorPersona(state).narrative.directorPersona).toBeUndefined()
+  })
+})
+
+describe('renderTranscript', () => {
+  it('returns empty string when nothing has been played', () => {
+    expect(renderTranscript(initSandboxState(42), 'Alderath')).toBe('')
+  })
+
+  it('includes the world name, hero, and every scene in order', () => {
+    let state = setHero(initSandboxState(42), { name: 'Vael' })
+    state = setPlayerMode(state, 'hero')
+    state = appendScene(state, 'The forge glows.', null)
+    state = appendScene(state, 'Vael strikes the iron.', 'Strike the iron')
+    const text = renderTranscript(state, 'Alderath')
+    expect(text).toContain('Alderath')
+    expect(text).toContain('Vael')
+    expect(text).toContain('The forge glows.')
+    expect(text).toContain('Strike the iron')
+    expect(text).toContain('Vael strikes the iron.')
+    expect(text.indexOf('The forge glows.')).toBeLessThan(text.indexOf('Vael strikes the iron.'))
+  })
+
+  it('frames god-mode runs without a hero name', () => {
+    let state = setPlayerMode(initSandboxState(42), 'god')
+    state = appendScene(state, 'The rivers change course.', null)
+    expect(renderTranscript(state, 'Alderath')).toMatch(/god/i)
   })
 })
 

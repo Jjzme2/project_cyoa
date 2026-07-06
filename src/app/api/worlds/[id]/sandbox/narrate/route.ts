@@ -8,6 +8,7 @@ import { getWorld } from '@/lib/firestore-helpers'
 import { resolveNarrativeMode } from '@/lib/engine/narrative-mode'
 import { generateStoryNode, buildWorldContext } from '@/lib/ai'
 import { trackGenerationCompleted, trackGenerationFailed } from '@/lib/generation-telemetry'
+import { sanitizeDirector } from '@/lib/director'
 import type { StoryPathSegment } from '@/types'
 
 const MAX_SCENES = 24
@@ -33,6 +34,9 @@ const NarrateSchema = z
     // rather than re-derived server-side, since the sandbox's live state never
     // touches Firestore.
     sandboxBriefing: z.string().max(2000).optional(),
+    // Only meaningful in 'god' mode — an optional directorial tone override.
+    // Untrusted; clamped by sanitizeDirector below (same as the authoring UI).
+    director: z.unknown().optional(),
   })
   .refine((v) => v.playerMode !== 'hero' || !!v.hero?.name, {
     message: 'A hero needs a name first.',
@@ -54,7 +58,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const parsed = await parseJson(req, NarrateSchema)
   if (!parsed.ok) return parsed.response
-  const { playerMode, hero, godAwareness, action, storyPath, sandboxBriefing } = parsed.data
+  const { playerMode, hero, godAwareness, action, storyPath, sandboxBriefing, director } = parsed.data
 
   const world = await getWorld(id).catch(() => null)
   if (!world) return NextResponse.json({ error: 'World not found' }, { status: 404 })
@@ -64,9 +68,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   try {
     const narrativeMode = resolveNarrativeMode(world)
+    const sanitizedDirector = playerMode === 'god' ? sanitizeDirector(director) : null
     const worldCtx = buildWorldContext(world, {
       narrativeMode,
       ...(playerMode === 'hero' && hero ? { protagonist: { name: hero.name, description: hero.description } } : {}),
+      ...(sanitizedDirector ? { director: sanitizedDirector } : {}),
     })
 
     // God mode has no personal protagonist — the reader is an unseen hand

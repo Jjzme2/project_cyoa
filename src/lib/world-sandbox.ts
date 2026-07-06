@@ -6,7 +6,8 @@ import type { NarrativeMode } from './engine/narrative-mode'
 import type { Faction } from '@/types/faction'
 import type { EconomyState } from '@/types/economy'
 import type { WorldState } from '@/types/goap'
-import type { GenesisFaction, WorldPulse, Protagonist, StoryPathSegment } from '@/types'
+import type { GenesisFaction, WorldPulse, Protagonist, StoryPathSegment, DirectorPersona } from '@/types'
+import { emptyDirector, type DirectorAxisKey } from './director'
 
 /**
  * World Sandbox — a hands-on, non-narrative playground for a world's
@@ -33,6 +34,17 @@ export type PlayerMode = 'hero' | 'god'
 export type GodAwareness = 'hidden' | 'known'
 
 /**
+ * A snapshot of everything a turn could have changed, taken right after that
+ * turn's tick+narration committed — index-aligned with `scenes`, so rewinding
+ * to scene N restores the world exactly as it was, not just the scene text.
+ */
+export interface NarrativeSnapshot {
+  factions: Record<string, Faction>
+  economy: EconomyState
+  tension: number
+}
+
+/**
  * Sandbox v2's narrative layer: entirely session-local, like the rest of
  * SandboxState — a hero exists only for this sandbox session, never touches
  * the real character registry, and `scenes` is resent to the narrate route
@@ -44,8 +56,12 @@ export interface NarrativeState {
   hero?: Protagonist
   /** Only used in 'god' mode. Defaults to 'hidden'. */
   godAwareness: GodAwareness
+  /** Only used in 'god' mode — a directorial tone override for AI turns; unset means "no override". */
+  directorPersona?: DirectorPersona
   /** Accumulated AI-narrated turns, oldest first, capped at MAX_SCENE_LOG. */
   scenes: StoryPathSegment[]
+  /** One entry per scene, same order/length — see NarrativeSnapshot. */
+  snapshots: NarrativeSnapshot[]
 }
 
 export interface SandboxState {
@@ -73,7 +89,7 @@ export function initSandboxState(worldSeed: number, genesisFactions?: GenesisFac
     worldState: {},
     tension: 0.2,
     eventLog: [],
-    narrative: { playerMode: null, godAwareness: 'hidden', scenes: [] },
+    narrative: { playerMode: null, godAwareness: 'hidden', scenes: [], snapshots: [] },
   }
 }
 
@@ -210,16 +226,73 @@ export function setHero(state: SandboxState, hero: Protagonist): SandboxState {
   return { ...state, narrative: { ...state.narrative, hero: { name: hero.name.trim(), description: hero.description?.trim() } } }
 }
 
-/** Append one AI-narrated turn to the scene log, capped at MAX_SCENE_LOG (oldest dropped first). */
+/**
+ * Append one AI-narrated turn to the scene log, capped at MAX_SCENE_LOG
+ * (oldest dropped first) — and snapshot the world (factions/economy/tension)
+ * exactly as `state` has them right now, so a later `rewindTo` this scene
+ * restores the world, not just the text. Call this with the ALREADY-ticked
+ * state (see WorldSandbox.tsx's narrate()), so the snapshot reflects what
+ * this turn actually did.
+ */
 export function appendScene(state: SandboxState, content: string, choiceText: string | null): SandboxState {
   const depth = state.narrative.scenes.length
   const scenes = [...state.narrative.scenes, { id: `scene-${depth}`, content, choiceText, depth }].slice(-MAX_SCENE_LOG)
-  return { ...state, narrative: { ...state.narrative, scenes } }
+  const snapshot: NarrativeSnapshot = { factions: state.factions, economy: state.economy, tension: state.tension }
+  const snapshots = [...state.narrative.snapshots, snapshot].slice(-MAX_SCENE_LOG)
+  return { ...state, narrative: { ...state.narrative, scenes, snapshots } }
 }
 
 /** Clear the scene log to restart the narrative from scratch — keeps the player mode and hero. */
 export function resetNarrative(state: SandboxState): SandboxState {
-  return { ...state, narrative: { ...state.narrative, scenes: [] } }
+  return { ...state, narrative: { ...state.narrative, scenes: [], snapshots: [] } }
+}
+
+/**
+ * Rewind to right after `sceneId` — both the scene log (dropping everything
+ * after it) AND the world itself (factions/economy/tension restored to that
+ * turn's snapshot). A no-op if the scene isn't found. This is what makes
+ * "rewind" a genuine branch point: playing on from here explores a different
+ * path with the SAME world state that turn actually left behind, not a
+ * continuation still carrying later turns' consequences.
+ */
+export function rewindTo(state: SandboxState, sceneId: string): SandboxState {
+  const idx = state.narrative.scenes.findIndex((s) => s.id === sceneId)
+  const snapshot = idx === -1 ? undefined : state.narrative.snapshots[idx]
+  if (!snapshot) return state
+  return {
+    ...state,
+    factions: snapshot.factions,
+    economy: snapshot.economy,
+    tension: snapshot.tension,
+    narrative: {
+      ...state.narrative,
+      scenes: state.narrative.scenes.slice(0, idx + 1),
+      snapshots: state.narrative.snapshots.slice(0, idx + 1),
+    },
+  }
+}
+
+/** Set (or clear, passing a value back to 0) one axis of the god-mode directorial tone override. */
+export function setDirectorAxis(state: SandboxState, key: DirectorAxisKey, value: number): SandboxState {
+  const base = state.narrative.directorPersona ?? emptyDirector()
+  const clamped = Math.max(-1, Math.min(1, value))
+  return { ...state, narrative: { ...state.narrative, directorPersona: { ...base, [key]: clamped } } }
+}
+
+/** Set the god-mode directorial free-text vision note. */
+export function setDirectorVision(state: SandboxState, vision: string): SandboxState {
+  const base = state.narrative.directorPersona ?? emptyDirector()
+  return { ...state, narrative: { ...state.narrative, directorPersona: { ...base, vision: vision.slice(0, 300) } } }
+}
+
+/** Replace the whole god-mode directorial persona at once — e.g. an archetype preset. */
+export function setDirectorPersona(state: SandboxState, persona: DirectorPersona): SandboxState {
+  return { ...state, narrative: { ...state.narrative, directorPersona: persona } }
+}
+
+/** Clear the god-mode directorial override entirely (back to "no override"). */
+export function clearDirectorPersona(state: SandboxState): SandboxState {
+  return { ...state, narrative: { ...state.narrative, directorPersona: undefined } }
 }
 
 /** The same reader-facing "Living World" panel shape, so tinkering shows exactly what a real reader would see. */
@@ -234,6 +307,24 @@ export function sandboxPulse(state: SandboxState, mode: NarrativeMode): WorldPul
 /** The Director's own stakes-flavor line for the current tension dial position. */
 export function sandboxStakesLine(state: SandboxState, mode: NarrativeMode): string {
   return DifficultyManager.directive(state.tension, mode)
+}
+
+/**
+ * Render the played-out scene log as a shareable plain-text transcript — the
+ * "save & share a run" surface. Deliberately a local export, not a hosted
+ * link: nothing about this sandbox is persisted server-side, so a shareable
+ * URL would mean introducing new storage for a feature that's supposed to
+ * stay a consequence-free toy. Returns '' if there's nothing played yet.
+ */
+export function renderTranscript(state: SandboxState, worldName: string): string {
+  const { playerMode, hero, scenes } = state.narrative
+  if (scenes.length === 0) return ''
+  const who = playerMode === 'hero' && hero ? `played as ${hero.name}` : "played as the world's unseen god"
+  const header = `${worldName} — Sandbox (${who})`
+  const body = scenes
+    .map((s) => (s.choiceText ? `→ ${s.choiceText}\n\n${s.content}` : s.content))
+    .join('\n\n' + '─'.repeat(20) + '\n\n')
+  return `${header}\n${'═'.repeat(header.length)}\n\n${body}\n`
 }
 
 export { DEFAULT_COMMODITIES }

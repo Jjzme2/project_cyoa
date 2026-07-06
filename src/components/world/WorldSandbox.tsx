@@ -1,7 +1,11 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { FlaskConical, Sparkles, RotateCcw, Plus, X, Coins, Swords, Crown, UserRound, Loader2, Send } from 'lucide-react'
+import { toast } from 'sonner'
+import {
+  FlaskConical, Sparkles, RotateCcw, Plus, X, Coins, Swords, Crown, UserRound, Loader2, Send,
+  History, Download, Copy, Clapperboard,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/components/Providers'
@@ -20,8 +24,14 @@ import {
   setPlayerMode,
   setHero,
   setGodAwareness,
+  setDirectorAxis,
+  setDirectorVision,
+  setDirectorPersona,
+  clearDirectorPersona,
   appendScene,
   resetNarrative,
+  rewindTo,
+  renderTranscript,
   sandboxPulse,
   sandboxStakesLine,
   DEFAULT_COMMODITIES,
@@ -29,6 +39,7 @@ import {
   type PlayerMode,
   type GodAwareness,
 } from '@/lib/world-sandbox'
+import { DIRECTOR_AXES, DIRECTOR_ARCHETYPES, emptyDirector } from '@/lib/director'
 import type { NarrativeMode } from '@/lib/engine/narrative-mode'
 import type { GenesisFaction, GenesisCharacter } from '@/types'
 
@@ -144,6 +155,39 @@ export function WorldSandbox({
     setWorldStirred([])
   }
 
+  /** Jump back to right after this scene — both the text and the world's own
+   * dials at that point — so playing on from here is a genuine branch. */
+  function rewindToScene(sceneId: string) {
+    setState((s) => rewindTo(s, sceneId))
+    setChoices([])
+    setActionText('')
+    setNarrateError(null)
+    setWorldStirred([])
+  }
+
+  async function copyTranscript() {
+    const text = renderTranscript(state, worldName)
+    if (!text) return
+    try {
+      await navigator.clipboard.writeText(text)
+      toast('Transcript copied.')
+    } catch {
+      toast('Could not copy — try downloading instead.')
+    }
+  }
+
+  function downloadTranscript() {
+    const text = renderTranscript(state, worldName)
+    if (!text) return
+    const blob = new Blob([text], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${worldName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-sandbox-run.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   /**
    * Every hero/god turn actually ticks the deterministic engine first — a
    * god's decree ripples further than one hero's personal choice, so it gets
@@ -176,6 +220,7 @@ export function WorldSandbox({
           playerMode: state.narrative.playerMode,
           hero: state.narrative.hero,
           godAwareness: state.narrative.godAwareness,
+          director: state.narrative.playerMode === 'god' ? state.narrative.directorPersona : undefined,
           action,
           storyPath: state.narrative.scenes,
           sandboxBriefing: briefing,
@@ -305,6 +350,66 @@ export function WorldSandbox({
           </div>
         )}
 
+        {state.narrative.playerMode === 'god' && (
+          <div className="space-y-2.5 rounded-lg border border-white/[0.07] bg-white/[0.02] p-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
+                <Clapperboard className="h-3 w-3" /> Direct the telling
+              </p>
+              {state.narrative.directorPersona && (
+                <button
+                  type="button"
+                  onClick={() => setState((s) => clearDirectorPersona(s))}
+                  className="text-[10px] text-muted-foreground/40 hover:text-red-400/70 transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {DIRECTOR_ARCHETYPES.map((archetype) => (
+                <button
+                  key={archetype.id}
+                  type="button"
+                  title={archetype.tagline}
+                  onClick={() => setState((s) => setDirectorPersona(s, archetype.persona))}
+                  className="px-2 py-0.5 rounded-full text-[11px] font-sans border border-white/10 text-muted-foreground/55 hover:border-amber-500/30 hover:text-amber-300 transition-all"
+                >
+                  {archetype.emoji} {archetype.name}
+                </button>
+              ))}
+            </div>
+            <div className="space-y-1.5">
+              {DIRECTOR_AXES.map((axis) => {
+                const persona = state.narrative.directorPersona ?? emptyDirector()
+                const value = persona[axis.key] ?? 0
+                return (
+                  <div key={axis.key} className="flex items-center gap-2" title={axis.hint}>
+                    <span className="text-[10px] text-muted-foreground/40 w-16 text-right shrink-0">{axis.left}</span>
+                    <input
+                      type="range"
+                      min={-1}
+                      max={1}
+                      step={0.1}
+                      value={value}
+                      onChange={(e) => setState((s) => setDirectorAxis(s, axis.key, Number(e.target.value)))}
+                      className="flex-1 accent-amber-500 h-1"
+                      aria-label={`${axis.left} to ${axis.right}`}
+                    />
+                    <span className="text-[10px] text-muted-foreground/40 w-16 shrink-0">{axis.right}</span>
+                  </div>
+                )
+              })}
+            </div>
+            <Input
+              value={state.narrative.directorPersona?.vision ?? ''}
+              onChange={(e) => setState((s) => setDirectorVision(s, e.target.value))}
+              placeholder="A note on the vision you want (optional)…"
+              className="h-8 text-xs"
+            />
+          </div>
+        )}
+
         {state.narrative.playerMode === 'hero' && !state.narrative.hero && (
           <div className="space-y-2 rounded-lg border border-white/[0.07] bg-white/[0.02] p-3">
             <p className="text-xs text-muted-foreground/60">Who do you play as?</p>
@@ -357,26 +462,58 @@ export function WorldSandbox({
                 </p>
               )}
               {state.narrative.scenes.length > 0 && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={restartStory}
-                  className="h-6 gap-1 text-[11px] text-muted-foreground/50 ml-auto"
-                >
-                  <RotateCcw className="h-3 w-3" /> Restart story
-                </Button>
+                <div className="flex items-center gap-1 ml-auto">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={copyTranscript}
+                    title="Copy the run so far as text"
+                    className="h-6 gap-1 text-[11px] text-muted-foreground/50"
+                  >
+                    <Copy className="h-3 w-3" /> Copy
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={downloadTranscript}
+                    title="Download the run so far as a text file"
+                    className="h-6 gap-1 text-[11px] text-muted-foreground/50"
+                  >
+                    <Download className="h-3 w-3" /> Save
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={restartStory}
+                    className="h-6 gap-1 text-[11px] text-muted-foreground/50"
+                  >
+                    <RotateCcw className="h-3 w-3" /> Restart
+                  </Button>
+                </div>
               )}
             </div>
 
             {state.narrative.scenes.length > 0 && (
               <div className="max-h-64 overflow-y-auto space-y-3 rounded-lg border border-white/[0.07] bg-white/[0.02] p-3">
-                {state.narrative.scenes.map((scene) => (
-                  <div key={scene.id} className="space-y-1">
+                {state.narrative.scenes.map((scene, i) => (
+                  <div key={scene.id} className="space-y-1 group">
                     {scene.choiceText && (
                       <p className="text-[11px] text-amber-400/60 italic">→ {scene.choiceText}</p>
                     )}
                     <p className="text-[13px] text-foreground/80 leading-relaxed whitespace-pre-wrap">{scene.content}</p>
+                    {i < state.narrative.scenes.length - 1 && (
+                      <button
+                        type="button"
+                        onClick={() => rewindToScene(scene.id)}
+                        title="Jump back to right after this turn and try something else"
+                        className="text-[10px] text-muted-foreground/30 hover:text-amber-400/70 transition-colors flex items-center gap-1 opacity-0 group-hover:opacity-100"
+                      >
+                        <History className="h-2.5 w-2.5" /> Rewind here
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
