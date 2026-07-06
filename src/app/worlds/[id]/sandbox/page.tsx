@@ -47,7 +47,8 @@ export default async function WorldSandboxPage({ params }: Props) {
           {world.name} Sandbox
         </h1>
         <p className="text-sm text-muted-foreground/60 max-w-2xl">
-          Play with the world&apos;s systems directly — no story, no AI, no consequences.
+          Play with the world&apos;s systems directly, or step into it as a hero or its unseen god — nothing here is
+          ever saved to a real story.
         </p>
       </div>
 
@@ -56,6 +57,7 @@ export default async function WorldSandboxPage({ params }: Props) {
         worldName={world.name}
         worldSeed={worldSeed}
         genesisFactions={world.genesis?.factions ?? []}
+        genesisCharacters={world.genesis?.characters ?? []}
         mode={mode}
       />
     </main>

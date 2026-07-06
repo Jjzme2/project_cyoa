@@ -1,27 +1,36 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { FlaskConical, Sparkles, RotateCcw, Plus, X, Coins, Swords } from 'lucide-react'
+import { FlaskConical, Sparkles, RotateCcw, Plus, X, Coins, Swords, Crown, UserRound, Loader2, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useAuth } from '@/components/Providers'
 import { FactionManager } from '@/lib/engine/faction-manager'
 import { EconomyManager } from '@/lib/engine/economy-manager'
 import {
   initSandboxState,
   advanceTicks,
+  advanceTicksWithEvents,
   nudgeFactionStat,
   setFactionSentiment,
   setMarket,
   setTension,
   setWorldFact,
   removeWorldFact,
+  setPlayerMode,
+  setHero,
+  setGodAwareness,
+  appendScene,
+  resetNarrative,
   sandboxPulse,
   sandboxStakesLine,
   DEFAULT_COMMODITIES,
   type SandboxState,
+  type PlayerMode,
+  type GodAwareness,
 } from '@/lib/world-sandbox'
 import type { NarrativeMode } from '@/lib/engine/narrative-mode'
-import type { GenesisFaction } from '@/types'
+import type { GenesisFaction, GenesisCharacter } from '@/types'
 
 function storageKey(worldId: string) {
   return `world_sandbox_${worldId}`
@@ -41,12 +50,14 @@ export function WorldSandbox({
   worldName,
   worldSeed,
   genesisFactions,
+  genesisCharacters,
   mode,
 }: {
   worldId: string
   worldName: string
   worldSeed: number
   genesisFactions: GenesisFaction[]
+  genesisCharacters: GenesisCharacter[]
   mode: NarrativeMode
 }) {
   const gentle = mode === 'gentle'
@@ -62,6 +73,15 @@ export function WorldSandbox({
   const [loaded, setLoaded] = useState(false)
   const [factKey, setFactKey] = useState('')
   const [factValue, setFactValue] = useState('')
+
+  const { user, updateAiUses } = useAuth()
+  const [heroNameDraft, setHeroNameDraft] = useState('')
+  const [heroDescDraft, setHeroDescDraft] = useState('')
+  const [actionText, setActionText] = useState('')
+  const [choices, setChoices] = useState<string[]>([])
+  const [narrating, setNarrating] = useState(false)
+  const [narrateError, setNarrateError] = useState<string | null>(null)
+  const [worldStirred, setWorldStirred] = useState<string[]>([])
 
   useEffect(() => {
     // Hydration-safe localStorage read: SSR/first paint uses the fresh init
@@ -95,6 +115,84 @@ export function WorldSandbox({
     setState((s) => setWorldFact(s, factKey.trim(), value))
     setFactKey('')
     setFactValue('')
+  }
+
+  function choosePlayerMode(next: PlayerMode | null) {
+    setState((s) => setPlayerMode(s, next))
+    setChoices([])
+    setNarrateError(null)
+  }
+
+  function beginHero() {
+    if (!heroNameDraft.trim()) return
+    setState((s) => setHero(s, { name: heroNameDraft, description: heroDescDraft || undefined }))
+    setHeroNameDraft('')
+    setHeroDescDraft('')
+  }
+
+  /** Quick-pick one of the world's own established figures instead of inventing a stranger. */
+  function fillHeroFromCast(character: GenesisCharacter) {
+    setHeroNameDraft(character.name)
+    setHeroDescDraft([character.role, character.bio].filter(Boolean).join(' — '))
+  }
+
+  function restartStory() {
+    setState((s) => resetNarrative(s))
+    setChoices([])
+    setActionText('')
+    setNarrateError(null)
+    setWorldStirred([])
+  }
+
+  /**
+   * Every hero/god turn actually ticks the deterministic engine first — a
+   * god's decree ripples further than one hero's personal choice, so it gets
+   * more ticks — and the resulting faction/economy events are what the AI is
+   * told happened, exactly like the real per-chapter path feeds its own
+   * engine ticks into the prompt. This is what makes "Play it out" and
+   * "Advance time" the SAME world instead of two disconnected toys: the tick
+   * is only committed once the AI turn actually succeeds.
+   */
+  async function narrate(action: string) {
+    if (!action.trim() || narrating) return
+    if (!user) {
+      setNarrateError('Sign in to narrate the sandbox with AI.')
+      return
+    }
+    setNarrating(true)
+    setNarrateError(null)
+    const ticksThisTurn = state.narrative.playerMode === 'god' ? 2 : 1
+    const { state: ticked, newEvents } = advanceTicksWithEvents(state, ticksThisTurn, gentle, factionManager, economyManager)
+    try {
+      const token = await user.getIdToken()
+      const tickedPulse = sandboxPulse(ticked, mode)
+      const briefing = [sandboxStakesLine(ticked, mode), tickedPulse.factions, tickedPulse.economy, ...newEvents]
+        .filter(Boolean)
+        .join(' ')
+      const res = await fetch(`/api/worlds/${worldId}/sandbox/narrate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          playerMode: state.narrative.playerMode,
+          hero: state.narrative.hero,
+          godAwareness: state.narrative.godAwareness,
+          action,
+          storyPath: state.narrative.scenes,
+          sandboxBriefing: briefing,
+        }),
+      })
+      const data = await res.json()
+      if (typeof data.remaining === 'number') updateAiUses(data.remaining)
+      if (!res.ok) throw new Error(data.error ?? 'Narration failed.')
+      setState(() => appendScene(ticked, data.content, action))
+      setChoices(Array.isArray(data.choices) ? data.choices : [])
+      setWorldStirred(newEvents)
+      setActionText('')
+    } catch (err) {
+      setNarrateError(err instanceof Error ? err.message : 'Narration failed.')
+    } finally {
+      setNarrating(false)
+    }
   }
 
   return (
@@ -136,6 +234,211 @@ export function WorldSandbox({
           />
           <span className="text-[10px] font-mono text-muted-foreground/50 w-8 text-right">{Math.round(state.tension * 100)}%</span>
         </div>
+      </section>
+
+      {/* Narrative sandbox — AI-driven, credit-costed, still entirely ephemeral */}
+      <section className="glass-card rounded-xl p-5 space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h2 className="text-sm font-semibold text-amber-200/90">Play it out</h2>
+          <div className="flex gap-1.5">
+            {(
+              [
+                { mode: null, label: 'Off', icon: null },
+                { mode: 'hero' as const, label: 'Play a hero', icon: UserRound },
+                { mode: 'god' as const, label: "Play the world's god", icon: Crown },
+              ]
+            ).map(({ mode: m, label, icon: Icon }) => {
+              const active = state.narrative.playerMode === m
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => choosePlayerMode(m)}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-sans border transition-all flex items-center gap-1 ${
+                    active
+                      ? 'bg-amber-500/20 border-amber-500/30 text-amber-300'
+                      : 'border-white/10 text-muted-foreground/45 hover:border-white/20 hover:text-muted-foreground/70'
+                  }`}
+                >
+                  {Icon && <Icon className="h-3 w-3" />}
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {state.narrative.playerMode && (
+          <p className="text-[11px] text-muted-foreground/45">
+            Each turn is a real AI-written scene (1 credit) that actually ticks the factions and economy below — this
+            is the same world, not a separate story. Nothing here is ever saved.
+            {state.narrative.playerMode === 'god' &&
+              " You're an unseen god shaping events — no personal protagonist, just the world reacting to your will, and your decrees ripple further than one hero's choice."}
+          </p>
+        )}
+
+        {state.narrative.playerMode === 'god' && (
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground/40 font-sans">The world</span>
+            {(
+              [
+                { value: 'hidden' as const, label: "doesn't know you exist" },
+                { value: 'known' as const, label: 'knows you as their god' },
+              ]
+            ).map(({ value, label }) => {
+              const active = state.narrative.godAwareness === value
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setState((s) => setGodAwareness(s, value as GodAwareness))}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-sans border transition-all ${
+                    active
+                      ? 'bg-amber-500/20 border-amber-500/30 text-amber-300'
+                      : 'border-white/10 text-muted-foreground/45 hover:border-white/20 hover:text-muted-foreground/70'
+                  }`}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {state.narrative.playerMode === 'hero' && !state.narrative.hero && (
+          <div className="space-y-2 rounded-lg border border-white/[0.07] bg-white/[0.02] p-3">
+            <p className="text-xs text-muted-foreground/60">Who do you play as?</p>
+            {genesisCharacters.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {genesisCharacters.map((c) => (
+                  <button
+                    key={c.name}
+                    type="button"
+                    onClick={() => fillHeroFromCast(c)}
+                    title={c.bio}
+                    className="px-2 py-0.5 rounded-full text-[11px] font-sans border border-white/10 text-muted-foreground/55 hover:border-amber-500/30 hover:text-amber-300 transition-all"
+                  >
+                    {c.name}
+                  </button>
+                ))}
+                <span className="text-[10px] text-muted-foreground/35 self-center">or invent your own below</span>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Input
+                value={heroNameDraft}
+                onChange={(e) => setHeroNameDraft(e.target.value)}
+                placeholder="Hero name"
+                className="h-8 text-xs"
+              />
+              <Input
+                value={heroDescDraft}
+                onChange={(e) => setHeroDescDraft(e.target.value)}
+                placeholder="One-line description (optional)"
+                className="h-8 text-xs"
+                onKeyDown={(e) => e.key === 'Enter' && beginHero()}
+              />
+              <Button type="button" size="sm" onClick={beginHero} disabled={!heroNameDraft.trim()} className="h-8 shrink-0">
+                Begin
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground/40">
+              This hero exists only for this sandbox session — never saved as a real character.
+            </p>
+          </div>
+        )}
+
+        {state.narrative.playerMode && (state.narrative.playerMode === 'god' || state.narrative.hero) && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              {state.narrative.hero && (
+                <p className="text-xs text-amber-300/70">
+                  Playing as <span className="font-semibold">{state.narrative.hero.name}</span>
+                </p>
+              )}
+              {state.narrative.scenes.length > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={restartStory}
+                  className="h-6 gap-1 text-[11px] text-muted-foreground/50 ml-auto"
+                >
+                  <RotateCcw className="h-3 w-3" /> Restart story
+                </Button>
+              )}
+            </div>
+
+            {state.narrative.scenes.length > 0 && (
+              <div className="max-h-64 overflow-y-auto space-y-3 rounded-lg border border-white/[0.07] bg-white/[0.02] p-3">
+                {state.narrative.scenes.map((scene) => (
+                  <div key={scene.id} className="space-y-1">
+                    {scene.choiceText && (
+                      <p className="text-[11px] text-amber-400/60 italic">→ {scene.choiceText}</p>
+                    )}
+                    <p className="text-[13px] text-foreground/80 leading-relaxed whitespace-pre-wrap">{scene.content}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {worldStirred.length > 0 && (
+              <div className="space-y-0.5 border-l-2 border-amber-500/20 pl-2.5">
+                {worldStirred.map((line, i) => (
+                  <p key={i} className="text-[11px] text-amber-400/50 italic">
+                    Meanwhile: {line}
+                  </p>
+                ))}
+              </div>
+            )}
+
+            {choices.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {choices.map((c, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    disabled={narrating}
+                    onClick={() => narrate(c)}
+                    className="px-2.5 py-1 rounded-full text-[11px] font-sans border border-amber-500/25 text-amber-300/80 hover:bg-amber-500/10 disabled:opacity-50"
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Input
+                value={actionText}
+                onChange={(e) => setActionText(e.target.value)}
+                placeholder={
+                  state.narrative.scenes.length === 0
+                    ? state.narrative.playerMode === 'god'
+                      ? 'What do you set in motion first?'
+                      : `What does ${state.narrative.hero?.name} do first?`
+                    : state.narrative.playerMode === 'god'
+                      ? 'What do you set in motion next?'
+                      : 'What do they do next?'
+                }
+                disabled={narrating}
+                className="h-8 text-xs"
+                onKeyDown={(e) => e.key === 'Enter' && narrate(actionText)}
+              />
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => narrate(actionText)}
+                disabled={narrating || !actionText.trim()}
+                className="h-8 gap-1.5 shrink-0"
+              >
+                {narrating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                {state.narrative.scenes.length === 0 ? 'Begin' : 'Narrate'}
+              </Button>
+            </div>
+            {narrateError && <p className="text-[11px] text-red-400/80">{narrateError}</p>}
+          </div>
+        )}
       </section>
 
       {/* Advance ticks + event log */}
