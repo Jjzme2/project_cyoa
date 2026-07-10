@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import {
   FlaskConical, Sparkles, RotateCcw, Plus, X, Coins, Swords, Crown, UserRound, Loader2, Send,
-  History, Download, Copy, Clapperboard,
+  History, Download, Copy, Clapperboard, Wand2, Target, SlidersHorizontal,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,17 +28,21 @@ import {
   setDirectorVision,
   setDirectorPersona,
   clearDirectorPersona,
+  setAmbition,
   appendScene,
   resetNarrative,
   rewindTo,
   renderTranscript,
+  withSavedDefaults,
   sandboxPulse,
   sandboxStakesLine,
   DEFAULT_COMMODITIES,
+  MAX_FAITH,
   type SandboxState,
   type PlayerMode,
   type GodAwareness,
 } from '@/lib/world-sandbox'
+import { DIVINE_POWERS, HERO_DEEDS, AMBITIONS, availableActs, invokeAct, type SandboxAct } from '@/lib/sandbox-powers'
 import { DIRECTOR_AXES, DIRECTOR_ARCHETYPES, emptyDirector } from '@/lib/director'
 import type { NarrativeMode } from '@/lib/engine/narrative-mode'
 import type { GenesisFaction, GenesisCharacter } from '@/types'
@@ -50,7 +54,9 @@ function storageKey(worldId: string) {
 function loadSaved(worldId: string): SandboxState | null {
   try {
     const raw = localStorage.getItem(storageKey(worldId))
-    return raw ? (JSON.parse(raw) as SandboxState) : null
+    // Saves from older sandbox versions may lack newer fields (faith,
+    // snapshots…) — backfill instead of stranding returning players.
+    return raw ? withSavedDefaults(JSON.parse(raw) as SandboxState) : null
   } catch {
     return null
   }
@@ -93,6 +99,10 @@ export function WorldSandbox({
   const [narrating, setNarrating] = useState(false)
   const [narrateError, setNarrateError] = useState<string | null>(null)
   const [worldStirred, setWorldStirred] = useState<string[]>([])
+  // Divine acts / deeds cast since the last AI turn — folded into the next
+  // narration's briefing so the story acknowledges what the player just did.
+  const [recentActs, setRecentActs] = useState<string[]>([])
+  const [actTargets, setActTargets] = useState<Record<string, string[]>>({})
 
   useEffect(() => {
     // Hydration-safe localStorage read: SSR/first paint uses the fresh init
@@ -165,6 +175,29 @@ export function WorldSandbox({
     setWorldStirred([])
   }
 
+  /** Resolve one divine power / hero deed instantly — no AI call, no cost
+   * beyond faith. Time (and faith regen) comes from turns and ticks, not
+   * from casting, so acting is always snappy. */
+  function castAct(act: SandboxAct) {
+    const factionIds = Object.keys(state.factions)
+    const defaults =
+      act.target === 'faction'
+        ? [factionIds[0]]
+        : act.target === 'pair'
+          ? [factionIds[0], factionIds[1]]
+          : act.target === 'market'
+            ? [DEFAULT_COMMODITIES[0].id]
+            : []
+    const result = invokeAct(state, act, actTargets[act.id] ?? defaults)
+    if (!result) {
+      toast(state.faith < act.cost ? 'Not enough faith — let time pass, or narrate a turn.' : 'Pick a valid target first.')
+      return
+    }
+    setState(result.state)
+    setRecentActs((prev) => [...prev, result.line].slice(-6))
+    toast(result.line)
+  }
+
   async function copyTranscript() {
     const text = renderTranscript(state, worldName)
     if (!text) return
@@ -210,7 +243,7 @@ export function WorldSandbox({
     try {
       const token = await user.getIdToken()
       const tickedPulse = sandboxPulse(ticked, mode)
-      const briefing = [sandboxStakesLine(ticked, mode), tickedPulse.factions, tickedPulse.economy, ...newEvents]
+      const briefing = [sandboxStakesLine(ticked, mode), tickedPulse.factions, tickedPulse.economy, ...recentActs, ...newEvents]
         .filter(Boolean)
         .join(' ')
       const res = await fetch(`/api/worlds/${worldId}/sandbox/narrate`, {
@@ -232,6 +265,7 @@ export function WorldSandbox({
       setState(() => appendScene(ticked, data.content, action))
       setChoices(Array.isArray(data.choices) ? data.choices : [])
       setWorldStirred(newEvents)
+      setRecentActs([]) // the story has now acknowledged these acts
       setActionText('')
     } catch (err) {
       setNarrateError(err instanceof Error ? err.message : 'Narration failed.')
@@ -245,41 +279,13 @@ export function WorldSandbox({
       <div className="flex items-start gap-3 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] p-4">
         <FlaskConical className="h-4 w-4 text-amber-400 mt-0.5 shrink-0" />
         <p className="text-xs text-amber-200/80 leading-relaxed">
-          <strong className="font-semibold">Sandbox mode.</strong> Tinker with {worldName}&apos;s factions, economy,
-          and tension directly — no chapters are written, nothing here is saved to any story, and it never costs
-          credits or affects real readers. Purely for fun. Your tinkering is saved only in this browser.
-          {gentle && ' This world is gentle, so hostile faction actions (raids) are switched off here too.'}
+          <strong className="font-semibold">Sandbox mode.</strong> Play with {worldName} directly — bless harvests,
+          stir factions, step in as a hero or as its god. Acts are free and instant; only AI-narrated turns cost
+          credits. Nothing here is saved to any story or affects real readers — your sandbox lives only in this
+          browser. Purely for fun.
+          {gentle && ' This world is gentle, so harmful acts and hostile faction moves are genuinely switched off here.'}
         </p>
       </div>
-
-      {/* World Pulse preview — the same panel a real reader would see */}
-      <section className="glass-card rounded-xl p-5 space-y-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-amber-200/90 flex items-center gap-1.5">
-            <Sparkles className="h-3.5 w-3.5" /> Living World preview
-          </h2>
-          <Button type="button" variant="ghost" size="sm" onClick={reset} className="h-7 gap-1.5 text-[11px] text-muted-foreground/60">
-            <RotateCcw className="h-3 w-3" /> Reset sandbox
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground/70 italic">{stakesLine}</p>
-        {pulse.factions && <p className="text-xs text-muted-foreground/60">{pulse.factions}</p>}
-        {pulse.economy && <p className="text-xs text-muted-foreground/60">{pulse.economy}</p>}
-        <div className="flex items-center gap-3 pt-1">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground/40 font-sans w-16">Tension</span>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={state.tension}
-            onChange={(e) => setState((s) => setTension(s, Number(e.target.value)))}
-            className="flex-1 accent-amber-500"
-            aria-label="Tension"
-          />
-          <span className="text-[10px] font-mono text-muted-foreground/50 w-8 text-right">{Math.round(state.tension * 100)}%</span>
-        </div>
-      </section>
 
       {/* Narrative sandbox — AI-driven, credit-costed, still entirely ephemeral */}
       <section className="glass-card rounded-xl p-5 space-y-3">
@@ -313,12 +319,18 @@ export function WorldSandbox({
           </div>
         </div>
 
+        <div className="space-y-0.5">
+          <p className="text-xs text-muted-foreground/70 italic">{stakesLine}</p>
+          {pulse.factions && <p className="text-[11px] text-muted-foreground/55">{pulse.factions}</p>}
+          {pulse.economy && <p className="text-[11px] text-muted-foreground/55">{pulse.economy}</p>}
+        </div>
+
         {state.narrative.playerMode && (
           <p className="text-[11px] text-muted-foreground/45">
-            Each turn is a real AI-written scene (1 credit) that actually ticks the factions and economy below — this
-            is the same world, not a separate story. Nothing here is ever saved.
+            Acts below are free and resolve instantly through the world&apos;s own systems. Narrated turns are real
+            AI-written scenes (1 credit each) that also move time forward. Nothing here is ever saved.
             {state.narrative.playerMode === 'god' &&
-              " You're an unseen god shaping events — no personal protagonist, just the world reacting to your will, and your decrees ripple further than one hero's choice."}
+              " You're a god shaping events — no personal protagonist, just the world answering your will."}
           </p>
         )}
 
@@ -347,6 +359,85 @@ export function WorldSandbox({
                 </button>
               )
             })}
+          </div>
+        )}
+
+        {state.narrative.playerMode === 'god' && (
+          <div className="space-y-2.5 rounded-lg border border-amber-500/15 bg-amber-500/[0.03] p-3">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground/40 font-sans w-16 shrink-0">Faith</span>
+              <div className="h-1.5 flex-1 rounded-full bg-white/[0.06] overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-amber-400/70 transition-all"
+                  style={{ width: `${(state.faith / MAX_FAITH) * 100}%` }}
+                />
+              </div>
+              <span className="text-[10px] font-mono text-amber-300/80 w-12 text-right">✦ {state.faith}/{MAX_FAITH}</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground/40">
+              Divine acts spend faith. It returns as time passes — twice as fast when the world knows you and worships.
+            </p>
+            <div className="space-y-1.5">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground/40 font-sans flex items-center gap-1">
+                <Wand2 className="h-2.5 w-2.5" /> Divine acts
+              </p>
+              {availableActs(DIVINE_POWERS, gentle).map((act) => (
+                <ActRow
+                  key={act.id}
+                  act={act}
+                  state={state}
+                  targets={actTargets[act.id] ?? []}
+                  onTargetsChange={(t) => setActTargets((prev) => ({ ...prev, [act.id]: t }))}
+                  onCast={() => castAct(act)}
+                />
+              ))}
+            </div>
+            <div className="space-y-1.5 pt-1 border-t border-white/[0.05]">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground/40 font-sans flex items-center gap-1">
+                <Target className="h-2.5 w-2.5" /> Ambition — something to play toward (optional)
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {AMBITIONS.map((a) => {
+                  const active = state.narrative.ambitionId === a.id
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      title={a.description}
+                      onClick={() => setState((s) => setAmbition(s, active ? undefined : a.id))}
+                      className={`px-2 py-0.5 rounded-full text-[11px] font-sans border transition-all ${
+                        active
+                          ? 'bg-amber-500/20 border-amber-500/30 text-amber-300'
+                          : 'border-white/10 text-muted-foreground/55 hover:border-amber-500/30 hover:text-amber-300'
+                      }`}
+                    >
+                      {a.emoji} {a.name}
+                    </button>
+                  )
+                })}
+              </div>
+              {(() => {
+                const ambition = AMBITIONS.find((a) => a.id === state.narrative.ambitionId)
+                if (!ambition) return null
+                const progress = ambition.progress(state)
+                return (
+                  <div className="space-y-1">
+                    <p className="text-[10px] text-muted-foreground/45">{ambition.description}</p>
+                    <div className="flex items-center gap-2">
+                      <div className="h-1.5 flex-1 rounded-full bg-white/[0.06] overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${progress >= 1 ? 'bg-emerald-400/80' : 'bg-amber-500/60'}`}
+                          style={{ width: `${progress * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-mono text-muted-foreground/50 w-16 text-right">
+                        {progress >= 1 ? '✨ done!' : `${Math.round(progress * 100)}%`}
+                      </span>
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
           </div>
         )}
 
@@ -545,6 +636,24 @@ export function WorldSandbox({
               </div>
             )}
 
+            {state.narrative.playerMode === 'hero' && (
+              <div className="space-y-1.5 rounded-lg border border-white/[0.07] bg-white/[0.02] p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/40 font-sans">
+                  Small deeds — free, one pair of hands
+                </p>
+                {availableActs(HERO_DEEDS, gentle).map((act) => (
+                  <ActRow
+                    key={act.id}
+                    act={act}
+                    state={state}
+                    targets={actTargets[act.id] ?? []}
+                    onTargetsChange={(t) => setActTargets((prev) => ({ ...prev, [act.id]: t }))}
+                    onCast={() => castAct(act)}
+                  />
+                ))}
+              </div>
+            )}
+
             <div className="flex gap-2">
               <Input
                 value={actionText}
@@ -576,6 +685,43 @@ export function WorldSandbox({
             {narrateError && <p className="text-[11px] text-red-400/80">{narrateError}</p>}
           </div>
         )}
+      </section>
+
+      {/* The raw control panel — the play surface above is the main event now;
+          direct dials remain for tinkerers, tucked behind a disclosure. */}
+      <details className="rounded-xl border border-white/[0.07]">
+        <summary className="cursor-pointer select-none p-5 text-sm font-semibold text-amber-200/90 flex items-center gap-1.5 list-none [&::-webkit-details-marker]:hidden">
+          <SlidersHorizontal className="h-3.5 w-3.5" /> Advanced tinkering — raw dials, logs & time control
+        </summary>
+        <div className="px-5 pb-5 space-y-6">
+
+      {/* World Pulse preview — the same panel a real reader would see */}
+      <section className="glass-card rounded-xl p-5 space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-amber-200/90 flex items-center gap-1.5">
+            <Sparkles className="h-3.5 w-3.5" /> Living World preview
+          </h2>
+          <Button type="button" variant="ghost" size="sm" onClick={reset} className="h-7 gap-1.5 text-[11px] text-muted-foreground/60">
+            <RotateCcw className="h-3 w-3" /> Reset sandbox
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground/70 italic">{stakesLine}</p>
+        {pulse.factions && <p className="text-xs text-muted-foreground/60">{pulse.factions}</p>}
+        {pulse.economy && <p className="text-xs text-muted-foreground/60">{pulse.economy}</p>}
+        <div className="flex items-center gap-3 pt-1">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground/40 font-sans w-16">Tension</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={state.tension}
+            onChange={(e) => setState((s) => setTension(s, Number(e.target.value)))}
+            className="flex-1 accent-amber-500"
+            aria-label="Tension"
+          />
+          <span className="text-[10px] font-mono text-muted-foreground/50 w-8 text-right">{Math.round(state.tension * 100)}%</span>
+        </div>
       </section>
 
       {/* Advance ticks + event log */}
@@ -767,6 +913,96 @@ export function WorldSandbox({
           </div>
         </div>
       </section>
+
+        </div>
+      </details>
+    </div>
+  )
+}
+
+/** One castable act: name, target select(s) as its target type needs, and a
+ * cast button showing the faith cost. Shared by divine powers and hero deeds. */
+function ActRow({
+  act,
+  state,
+  targets,
+  onTargetsChange,
+  onCast,
+}: {
+  act: SandboxAct
+  state: SandboxState
+  targets: string[]
+  onTargetsChange: (targets: string[]) => void
+  onCast: () => void
+}) {
+  const factionIds = Object.keys(state.factions)
+  const canAfford = state.faith >= act.cost
+  const selectClass =
+    'h-6 rounded bg-white/[0.04] border border-white/10 text-[11px] text-foreground/70 px-1 font-sans max-w-32'
+
+  // Resolve what each slot currently means (selection or default), so a
+  // change to ONE slot always reports the FULL target list — never a sparse
+  // array with empty slots that invokeAct would reject.
+  const first = targets[0] || factionIds[0] || ''
+  const second = targets[1] || factionIds.find((id) => id !== first) || ''
+  const effective = act.target === 'pair' ? [first, second] : [first]
+
+  const factionSelect = (index: number, exclude?: string) => (
+    <select
+      className={selectClass}
+      value={effective[index]}
+      onChange={(e) => {
+        const next = [...effective]
+        next[index] = e.target.value
+        onTargetsChange(next)
+      }}
+      aria-label={`${act.name} target ${index + 1}`}
+    >
+      {factionIds
+        .filter((id) => id !== exclude)
+        .map((id) => (
+          <option key={id} value={id}>
+            {state.factions[id].name}
+          </option>
+        ))}
+    </select>
+  )
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap" title={act.description}>
+      <span className="text-[12px] text-foreground/80 w-44 shrink-0">
+        {act.emoji} {act.name}
+      </span>
+      {act.target === 'market' && (
+        <select
+          className={selectClass}
+          value={targets[0] ?? DEFAULT_COMMODITIES[0].id}
+          onChange={(e) => onTargetsChange([e.target.value])}
+          aria-label={`${act.name} target`}
+        >
+          {DEFAULT_COMMODITIES.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      )}
+      {act.target === 'faction' && factionSelect(0)}
+      {act.target === 'pair' && (
+        <>
+          {factionSelect(0)}
+          <span className="text-[10px] text-muted-foreground/40">&</span>
+          {factionSelect(1, first)}
+        </>
+      )}
+      <button
+        type="button"
+        onClick={onCast}
+        disabled={!canAfford}
+        className="ml-auto px-2.5 py-0.5 rounded-full text-[11px] font-sans border border-amber-500/25 text-amber-300/80 hover:bg-amber-500/10 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+      >
+        {act.cost > 0 ? `Cast · ${act.cost}✦` : 'Do it'}
+      </button>
     </div>
   )
 }

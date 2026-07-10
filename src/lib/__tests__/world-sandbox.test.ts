@@ -16,6 +16,11 @@ import {
   setPlayerMode,
   setHero,
   setGodAwareness,
+  withSavedDefaults,
+  START_FAITH,
+  MAX_FAITH,
+  FAITH_REGEN_HIDDEN,
+  FAITH_REGEN_KNOWN,
   setDirectorAxis,
   setDirectorVision,
   setDirectorPersona,
@@ -244,6 +249,54 @@ describe('narrative controls', () => {
     expect(next.narrative.scenes).toEqual([])
     expect(next.narrative.playerMode).toBe('hero')
     expect(next.narrative.hero).toEqual({ name: 'Vael' })
+  })
+})
+
+describe('faith', () => {
+  it('starts at START_FAITH', () => {
+    expect(initSandboxState(42).faith).toBe(START_FAITH)
+  })
+
+  it('regenerates per tick, twice as fast for a KNOWN god, capped at MAX_FAITH', () => {
+    const hidden = { ...initSandboxState(42), faith: 0 }
+    const afterHidden = advanceTicks(hidden, 3, false, new FactionManager(1), new EconomyManager())
+    expect(afterHidden.faith).toBe(3 * FAITH_REGEN_HIDDEN)
+
+    const known = setGodAwareness({ ...initSandboxState(42), faith: 0 }, 'known')
+    const afterKnown = advanceTicks(known, 3, false, new FactionManager(1), new EconomyManager())
+    expect(afterKnown.faith).toBe(3 * FAITH_REGEN_KNOWN)
+
+    const nearFull = { ...initSandboxState(42), faith: MAX_FAITH - 1 }
+    const capped = advanceTicks(nearFull, 10, false, new FactionManager(1), new EconomyManager())
+    expect(capped.faith).toBe(MAX_FAITH)
+  })
+
+  it('rewindTo restores the faith that turn left behind', () => {
+    let state = { ...initSandboxState(42), faith: 9 }
+    state = appendScene(state, 'Turn one.', null)
+    const firstSceneId = state.narrative.scenes[0].id
+    state = appendScene({ ...state, faith: 2 }, 'Turn two.', 'Spend it all')
+    expect(rewindTo(state, firstSceneId).faith).toBe(9)
+  })
+})
+
+describe('withSavedDefaults', () => {
+  it('backfills faith and snapshots on a pre-v5 save', () => {
+    const modern = appendScene(initSandboxState(42), 'A scene.', null)
+    // Simulate an older save: strip the fields newer versions added.
+    const legacy = JSON.parse(JSON.stringify(modern))
+    delete legacy.faith
+    delete legacy.narrative.snapshots
+    const restored = withSavedDefaults(legacy)
+    expect(restored.faith).toBe(START_FAITH)
+    expect(restored.narrative.snapshots).toHaveLength(restored.narrative.scenes.length)
+    expect(restored.narrative.godAwareness).toBe('hidden')
+  })
+
+  it('leaves a current save untouched in shape and clamps a corrupt faith value', () => {
+    const state = appendScene(initSandboxState(42), 'A scene.', null)
+    expect(withSavedDefaults(JSON.parse(JSON.stringify(state)))).toEqual(state)
+    expect(withSavedDefaults({ ...state, faith: 999 }).faith).toBe(MAX_FAITH)
   })
 })
 
