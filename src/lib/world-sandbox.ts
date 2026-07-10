@@ -22,6 +22,14 @@ import { emptyDirector, type DirectorAxisKey } from './director'
 export const MAX_EVENT_LOG = 40
 export const MAX_SCENE_LOG = 20
 
+/** Faith — the god-mode play resource. Starts partial so the first acts are
+ * affordable but choices bite immediately; regenerates as time ticks (see
+ * advanceTicksWithEvents), faster for a KNOWN god whose people worship them. */
+export const START_FAITH = 6
+export const MAX_FAITH = 12
+export const FAITH_REGEN_HIDDEN = 1
+export const FAITH_REGEN_KNOWN = 2
+
 /** Who the reader plays as in an AI-narrated sandbox turn — see NarrateOptions. */
 export type PlayerMode = 'hero' | 'god'
 
@@ -42,6 +50,7 @@ export interface NarrativeSnapshot {
   factions: Record<string, Faction>
   economy: EconomyState
   tension: number
+  faith: number
 }
 
 /**
@@ -58,6 +67,8 @@ export interface NarrativeState {
   godAwareness: GodAwareness
   /** Only used in 'god' mode — a directorial tone override for AI turns; unset means "no override". */
   directorPersona?: DirectorPersona
+  /** The ambition being played toward (see sandbox-powers.ts AMBITIONS); unset means free play. */
+  ambitionId?: string
   /** Accumulated AI-narrated turns, oldest first, capped at MAX_SCENE_LOG. */
   scenes: StoryPathSegment[]
   /** One entry per scene, same order/length — see NarrativeSnapshot. */
@@ -72,6 +83,8 @@ export interface SandboxState {
   worldState: WorldState
   /** 0..1, directly user-controlled (not derived) — this is a toy, not a sim of the Director. */
   tension: number
+  /** God-mode play resource, 0..MAX_FAITH — spent on divine acts, regained as time ticks. */
+  faith: number
   /** Recent tick narration, most recent last, capped. */
   eventLog: string[]
   narrative: NarrativeState
@@ -88,9 +101,44 @@ export function initSandboxState(worldSeed: number, genesisFactions?: GenesisFac
     economy: createDefaultEconomy(),
     worldState: {},
     tension: 0.2,
+    faith: START_FAITH,
     eventLog: [],
     narrative: { playerMode: null, godAwareness: 'hidden', scenes: [], snapshots: [] },
   }
+}
+
+/**
+ * Backfill fields a saved (localStorage) sandbox from an older version may
+ * lack, so shipping a new field never strands returning players on a broken
+ * save. If the per-scene snapshots ever disagree with the scene log (older
+ * saves predate them), rebuild them from the current world so rewind stays
+ * safe — it just lands on today's state instead of that turn's.
+ */
+export function withSavedDefaults(saved: SandboxState): SandboxState {
+  const faith = typeof saved.faith === 'number' ? Math.max(0, Math.min(MAX_FAITH, saved.faith)) : START_FAITH
+  const narrative: NarrativeState = {
+    playerMode: saved.narrative?.playerMode ?? null,
+    hero: saved.narrative?.hero,
+    godAwareness: saved.narrative?.godAwareness ?? 'hidden',
+    directorPersona: saved.narrative?.directorPersona,
+    ambitionId: saved.narrative?.ambitionId,
+    scenes: saved.narrative?.scenes ?? [],
+    snapshots: saved.narrative?.snapshots ?? [],
+  }
+  if (narrative.snapshots.length !== narrative.scenes.length) {
+    narrative.snapshots = narrative.scenes.map(() => ({
+      factions: saved.factions,
+      economy: saved.economy,
+      tension: saved.tension,
+      faith,
+    }))
+  } else {
+    narrative.snapshots = narrative.snapshots.map((s) => ({
+      ...s,
+      faith: typeof s.faith === 'number' ? s.faith : faith,
+    }))
+  }
+  return { ...saved, faith, narrative }
 }
 
 /**
@@ -137,7 +185,14 @@ export function advanceTicksWithEvents(
   }
 
   const eventLog = [...state.eventLog, ...newEvents].slice(-MAX_EVENT_LOG)
-  return { state: { ...state, factions, economy, eventLog }, newEvents }
+  // Faith returns with the passage of time — faster for a KNOWN god, whose
+  // people actively worship, than for a hidden hand no one prays to. This is
+  // what makes the awareness toggle a mechanical tradeoff, not just narration
+  // flavor. Regenerating outside god mode too is harmless (faith is only
+  // spendable there) and keeps this function ignorant of UI modes.
+  const regen = state.narrative.godAwareness === 'known' ? FAITH_REGEN_KNOWN : FAITH_REGEN_HIDDEN
+  const faith = Math.min(MAX_FAITH, state.faith + Math.max(0, ticks) * regen)
+  return { state: { ...state, factions, economy, eventLog, faith }, newEvents }
 }
 
 /** Convenience wrapper over {@link advanceTicksWithEvents} for callers that only need the new state. */
@@ -237,7 +292,7 @@ export function setHero(state: SandboxState, hero: Protagonist): SandboxState {
 export function appendScene(state: SandboxState, content: string, choiceText: string | null): SandboxState {
   const depth = state.narrative.scenes.length
   const scenes = [...state.narrative.scenes, { id: `scene-${depth}`, content, choiceText, depth }].slice(-MAX_SCENE_LOG)
-  const snapshot: NarrativeSnapshot = { factions: state.factions, economy: state.economy, tension: state.tension }
+  const snapshot: NarrativeSnapshot = { factions: state.factions, economy: state.economy, tension: state.tension, faith: state.faith }
   const snapshots = [...state.narrative.snapshots, snapshot].slice(-MAX_SCENE_LOG)
   return { ...state, narrative: { ...state.narrative, scenes, snapshots } }
 }
@@ -264,12 +319,18 @@ export function rewindTo(state: SandboxState, sceneId: string): SandboxState {
     factions: snapshot.factions,
     economy: snapshot.economy,
     tension: snapshot.tension,
+    faith: snapshot.faith,
     narrative: {
       ...state.narrative,
       scenes: state.narrative.scenes.slice(0, idx + 1),
       snapshots: state.narrative.snapshots.slice(0, idx + 1),
     },
   }
+}
+
+/** Pick (or clear, with undefined) the ambition being played toward. */
+export function setAmbition(state: SandboxState, ambitionId: string | undefined): SandboxState {
+  return { ...state, narrative: { ...state.narrative, ambitionId } }
 }
 
 /** Set (or clear, passing a value back to 0) one axis of the god-mode directorial tone override. */
