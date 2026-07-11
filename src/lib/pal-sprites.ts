@@ -13,7 +13,9 @@ import { STAGE_LEVELS, type PetMood, type PetSpecies } from './pet'
 //   idle · sleep · scared · excited · sad
 // Any frame count, any resolution — the renderer measures the image
 // (cell = height / 5, frames = width / cell), so no manifest is ever needed.
-// Missing art falls back down the chain: stage sheet → base sheet → emoji.
+// Sprite art is the pal's default look; missing art falls back down the chain
+// (stage sheet → base sheet), with emoji only as a last resort for a species
+// that has no sheets at all yet.
 
 export const PAL_ANIMATIONS = ['idle', 'sleep', 'scared', 'excited', 'sad'] as const
 export type PalAnimation = (typeof PAL_ANIMATIONS)[number]

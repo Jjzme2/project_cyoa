@@ -26,8 +26,11 @@ Species ids today: `bird`, `dragon`, `sprout`, `cat`, `wisp`, `leviathan`, `dog`
 (see `src/lib/pet.ts` — a new species there + a PNG here is all it takes).
 
 Lookup order at runtime: the current stage's sheet → each earlier stage's
-sheet (closest form wins) → the base sheet → the stage emoji. So you can ship
-one base sheet per species first, then add evolution sheets whenever.
+sheet (closest form wins) → the base sheet. So you can ship one base sheet per
+species first, then add evolution sheets whenever. Sprite art is the default
+look everywhere (including the species-picker swatches, which show the held
+first idle frame of the Juvenile form); the stage emoji appears only as a last
+resort for a species with no sheets at all, never as a loading placeholder.
 
 ## Sheet layout (the only hard rules)
 

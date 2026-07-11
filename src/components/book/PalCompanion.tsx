@@ -44,8 +44,9 @@ export function chaptersTogether(uid: string): number {
  * Purely rule-based (never AI): it greets you when you open a book, pipes up
  * every few chapters, gets scared when the Living World's tension runs high,
  * celebrates endings, nods off if you wander away, and can be patted for
- * courage. Art comes from drop-in sprite sheets (public/pals/README.md) with
- * an emoji fallback; state comes from the shared, deduped profile fetch.
+ * courage. Art comes from drop-in sprite sheets (public/pals/README.md), with
+ * emoji only as a last resort for artless species; state comes from the
+ * shared, deduped profile fetch.
  */
 export function PalCompanion({
   depth,

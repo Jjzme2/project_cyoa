@@ -57,8 +57,10 @@ export async function resolveSheet(species: PetSpecies, stageMinLevel: number): 
 
 /**
  * The pal itself: plays the requested animation from the species' sprite sheet
- * (see `public/pals/README.md` for the drop-in authoring spec), falling back to
- * the evolution-stage emoji when no art exists yet. Reduced motion holds the
+ * (see `public/pals/README.md` for the drop-in authoring spec). Sprite art is
+ * the default look — while a sheet resolves the box stays empty (never an
+ * emoji flash), and the stage emoji appears only as a last resort when a
+ * species has no art at all yet. Reduced motion (or `still`) holds the
  * animation's first frame instead of cycling.
  */
 export function PalSprite({
@@ -67,6 +69,7 @@ export function PalSprite({
   fallbackEmoji,
   animation,
   size,
+  still = false,
   className = '',
 }: {
   species: PetSpecies
@@ -74,6 +77,8 @@ export function PalSprite({
   fallbackEmoji: string
   animation: PalAnimation
   size: number
+  /** Hold the animation's first frame (static previews like picker swatches). */
+  still?: boolean
   className?: string
 }) {
   const reduceMotion = useReducedMotion()
@@ -95,28 +100,33 @@ export function PalSprite({
 
   const sheet = resolved && resolved.key === key ? resolved.info : undefined // undefined = loading
 
+  const holdFrame = reduceMotion || still
+
   useEffect(() => {
-    if (!sheet || reduceMotion || sheet.frames <= 1) return
+    if (!sheet || holdFrame || sheet.frames <= 1) return
     const interval = setInterval(
       () => setTick((t) => t + 1),
       Math.round(1000 / ANIMATION_FPS[animation]),
     )
     return () => clearInterval(interval)
-  }, [sheet, animation, reduceMotion])
+  }, [sheet, animation, holdFrame])
 
   if (!sheet) {
+    // undefined = still resolving: hold an empty box of the final size so the
+    // sprite pops in without an emoji flash or layout shift. null = resolution
+    // finished and this species truly has no art yet — only then show emoji.
     return (
       <span
         aria-hidden
         className={`inline-flex items-center justify-center leading-none ${className}`}
         style={{ width: size, height: size, fontSize: Math.round(size * 0.82) }}
       >
-        {fallbackEmoji}
+        {sheet === null ? fallbackEmoji : null}
       </span>
     )
   }
 
-  const frame = reduceMotion ? 0 : tick % sheet.frames
+  const frame = holdFrame ? 0 : tick % sheet.frames
 
   return (
     <span
