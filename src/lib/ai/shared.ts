@@ -1,4 +1,4 @@
-import { ENDING_TYPES, type EndingType, type StoryCharacter, type AmbientEffect } from '@/types'
+import { ENDING_TYPES, type EndingType, type StoryCharacter, type StoryCharacterUpdate, type AmbientEffect } from '@/types'
 
 /** Ambient effects the model may cite in an `AMBIENT:` cue — kept in sync
  * with the AmbientEffect union by hand (mirrors VALID_TONES/VALID_TAGS below). */
@@ -26,6 +26,8 @@ export function parseAIResponse(text: string): {
   content: string
   choices: string[]
   newCharacters: StoryCharacter[]
+  /** Changes to EXISTING canon characters (status shifts, growth notes). */
+  characterUpdates: StoryCharacterUpdate[]
   location?: string
   sceneAmbient?: AmbientEffect
   ending?: { title: string; type: EndingType }
@@ -68,6 +70,8 @@ export function parseAIResponse(text: string): {
   }
 
   // Emergent characters the model flagged as newly introduced this chapter.
+  // Depth segments (`wants:` / `voice:`) are optional — anything unlabeled
+  // stays part of the description, so the old plain format still parses.
   const newCharacters: StoryCharacter[] = []
   const charPattern = /NEW_CHARACTER:\s*(.+)/gi
   let cMatch
@@ -75,18 +79,51 @@ export function parseAIResponse(text: string): {
     const raw = cMatch[1].trim()
     const [name, ...rest] = raw.split(/\s+[—-]\s+/)
     if (name) {
+      const descParts: string[] = []
+      let want: string | undefined
+      let voice: string | undefined
+      for (const part of rest) {
+        const wantMatch = part.match(/^wants?:\s*(.+)/i)
+        const voiceMatch = part.match(/^voice:\s*(.+)/i)
+        if (wantMatch) want = wantMatch[1].trim().slice(0, 120)
+        else if (voiceMatch) voice = voiceMatch[1].trim().slice(0, 120)
+        else descParts.push(part)
+      }
       newCharacters.push({
         name: name.trim().slice(0, 60),
-        description: rest.join(' — ').trim().slice(0, 200) || undefined,
+        description: descParts.join(' — ').trim().slice(0, 200) || undefined,
         status: 'alive',
+        ...(want ? { want } : {}),
+        ...(voice ? { voice } : {}),
       })
     }
+  }
+
+  // Changes to EXISTING characters: `CHARACTER_UPDATE: name — status: x — now: y`
+  // (either segment may be omitted). This is what lets a death, disappearance,
+  // or hard-won change actually persist instead of being frozen at introduction.
+  const characterUpdates: StoryCharacterUpdate[] = []
+  const updatePattern = /CHARACTER_UPDATE:\s*(.+)/gi
+  let uMatch
+  while ((uMatch = updatePattern.exec(text)) !== null) {
+    const [name, ...rest] = uMatch[1].trim().split(/\s+[—-]\s+/)
+    if (!name) continue
+    let status: string | undefined
+    let note: string | undefined
+    for (const part of rest) {
+      const statusMatch = part.match(/^status:\s*(.+)/i)
+      const noteMatch = part.match(/^now:\s*(.+)/i)
+      if (statusMatch) status = statusMatch[1].trim().toLowerCase().slice(0, 30)
+      else if (noteMatch) note = noteMatch[1].trim().slice(0, 160)
+    }
+    if (status || note) characterUpdates.push({ name: name.trim().slice(0, 60), status, note })
   }
 
   const content = text
     .replace(/CHOICE_\d:.+/g, '')
     .replace(/^CHOICE_TEXT:.+/gim, '')
     .replace(/NEW_CHARACTER:.+/gi, '')
+    .replace(/CHARACTER_UPDATE:.+/gi, '')
     .replace(/^LOCATION:.+/gim, '')
     .replace(/^AMBIENT:.+/gim, '')
     .replace(/^ENDING:.+/gim, '')
@@ -98,6 +135,7 @@ export function parseAIResponse(text: string): {
     content,
     choices: ending ? [] : choices.slice(0, 3),
     newCharacters,
+    characterUpdates,
     location,
     ...(sceneAmbient ? { sceneAmbient } : {}),
     ...(ending ? { ending } : {}),

@@ -1,4 +1,4 @@
-import type { ContentRating, EndingType, StoryCharacter, StoryPathSegment, WorldBible, AmbientEffect } from '@/types'
+import type { ContentRating, EndingType, StoryCharacter, StoryCharacterUpdate, StoryPathSegment, WorldBible, AmbientEffect } from '@/types'
 import { VALID_TONES, VALID_TAGS, NAME_DIVERSITY_NOTE, parseAIResponse, tryParseJSON, pickStr } from './shared'
 import { runTextWaterfall, isBillingOrRateLimitError } from './waterfall'
 import { buildPrompt, buildSagaOpeningPrompt, userInputBlock, type WorldContext } from './prompts'
@@ -124,7 +124,7 @@ export async function generateStoryNode(
   includeImage: boolean,
   systemNarrativeEvents: string = '',
   endingDirective: string = '',
-): Promise<{ content: string; choices: string[]; model: string; newCharacters: StoryCharacter[]; location?: string; sceneAmbient?: AmbientEffect; ending?: { title: string; type: EndingType }; correctedChoiceText?: string }> {
+): Promise<{ content: string; choices: string[]; model: string; newCharacters: StoryCharacter[]; characterUpdates: StoryCharacterUpdate[]; location?: string; sceneAmbient?: AmbientEffect; ending?: { title: string; type: EndingType }; correctedChoiceText?: string }> {
   const prompt = buildPrompt(world, storyPath, choiceText, includeImage, systemNarrativeEvents, endingDirective)
 
   try {

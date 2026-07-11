@@ -7,12 +7,26 @@ export interface StoryCharacter {
   description?: string
   /** e.g. 'alive', 'deceased', 'missing' — the AI must respect this for continuity. */
   status?: string
+  /** What this character is after — the drive that makes their scenes theirs. */
+  want?: string
+  /** How they speak (cadence, register, verbal tics) — keeps dialogue distinct. */
+  voice?: string
+  /** The latest one-line evolution note (via CHARACTER_UPDATE) — how the story has changed them. */
+  arc?: string
   /** GOAP configuration for this character, if living characters are enabled */
   goapConfig?: {
     goals: GOAPGoal[]
     availableActions: string[]
     personality: PersonalityWeights
   }
+}
+
+/** A per-chapter change to an existing canon character (parsed from CHARACTER_UPDATE lines). */
+export interface StoryCharacterUpdate {
+  name: string
+  status?: string
+  /** One-line evolution note — becomes the character's `arc`. */
+  note?: string
 }
 
 export interface Protagonist {

@@ -18,6 +18,7 @@ import {
   createNotification,
   checkAndAwardAchievements,
   addStoryCharacters,
+  updateStoryCharacters,
   settleBountyOnFill,
   getWorldStanding,
   updateWorldStanding,
@@ -278,7 +279,7 @@ export async function POST(
     // REJECTED line to void an illegitimate choice, or a corrected CHOICE_TEXT
     // line before writing (see buildPrompt/parseAIResponse). This replaces what
     // used to be a separate "Editor" round-trip before generation ever started.
-    const { content, choices, model, newCharacters, location, sceneAmbient, ending, correctedChoiceText } =
+    const { content, choices, model, newCharacters, characterUpdates, location, sceneAmbient, ending, correctedChoiceText } =
       await generateStoryNode(
         worldCtx,
         storyPath,
@@ -423,6 +424,11 @@ export async function POST(
       // Record any new canon characters the AI introduced this chapter.
       if (newCharacters && newCharacters.length > 0) {
         ops.push(addStoryCharacters(storyId, newCharacters))
+      }
+      // And any changes to established ones (deaths, disappearances, growth) —
+      // without this, a character's fate is frozen at their introduction.
+      if (characterUpdates && characterUpdates.length > 0) {
+        ops.push(updateStoryCharacters(storyId, characterUpdates))
       }
       // "You" mode: carry the world's regard for this reader forward so it
       // persists into the next story here. Prefer the Content Judge's reading of
