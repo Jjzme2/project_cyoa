@@ -14,6 +14,7 @@ import {
   stageFor,
   levelsToNextStage,
   speciesPreviewEmoji,
+  speciesPreviewStage,
   moodFor,
   quipFor,
   quipForEvent,
@@ -133,6 +134,15 @@ describe('life stages', () => {
   it('species are visually distinct in the picker (no all-identical eggs)', () => {
     const emojis = PET_SPECIES.map((s) => speciesPreviewEmoji(s.id))
     expect(new Set(emojis).size).toBe(emojis.length)
+  })
+
+  it('picker swatches preview the Juvenile form, sprite and emoji fallback alike', () => {
+    for (const s of PET_SPECIES) {
+      const preview = speciesPreviewStage(s.id)
+      expect(preview.name).toBe('Juvenile')
+      expect(preview.minLevel).toBe(3)
+      expect(speciesPreviewEmoji(s.id)).toBe(preview.emoji)
+    }
   })
 })
 

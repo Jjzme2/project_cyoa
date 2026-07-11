@@ -178,9 +178,14 @@ export function levelsToNextStage(species: PetSpecies, level: number): number {
   return next ? next.minLevel - level : 0
 }
 
-/** A recognizable mid-evolution icon for species-picker swatches (eggs all look alike). */
+/** A recognizable mid-evolution form for species-picker swatches (eggs all look alike). */
+export function speciesPreviewStage(species: PetSpecies): PetStage {
+  return stageBands(species)[2]
+}
+
+/** The preview stage's emoji — the swatch's last-resort fallback when a species has no sprite art. */
 export function speciesPreviewEmoji(species: PetSpecies): string {
-  return stageBands(species)[2].emoji
+  return speciesPreviewStage(species).emoji
 }
 
 // ─── Moods ────────────────────────────────────────────────────────────────────

@@ -7,7 +7,7 @@ import { useAuth } from '@/components/Providers'
 import {
   stageFor,
   levelsToNextStage,
-  speciesPreviewEmoji,
+  speciesPreviewStage,
   quipForEvent,
   PET_SPECIES,
   MOOD_LABELS,
@@ -269,6 +269,7 @@ export function ReaderPal() {
           {PET_SPECIES.map((s) => {
             const unlocked = pet.unlockedSpecies.includes(s.id)
             const owned = pet.ownedSpecies.includes(s.id)
+            const preview = speciesPreviewStage(s.id)
             const label = !unlocked
               ? `${s.label} — locked. ${s.requires?.hint ?? ''}`.trim()
               : owned
@@ -298,7 +299,14 @@ export function ReaderPal() {
                           : 'opacity-25 grayscale cursor-not-allowed'
                 }`}
               >
-                {speciesPreviewEmoji(s.id)}
+                <PalSprite
+                  species={s.id}
+                  stageMinLevel={preview.minLevel}
+                  fallbackEmoji={preview.emoji}
+                  animation="idle"
+                  size={22}
+                  still
+                />
                 {!unlocked && <Lock className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 text-white/70" />}
                 {unlocked && !owned && (
                   <Coins className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 text-amber-400/90" />
