@@ -89,6 +89,15 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
     .filter((l): l is string => !!l)
   const [showInitialChoices, setShowInitialChoices] = useState(false)
   const [pendingChoices, setPendingChoices] = useState<Record<string, string>>({})
+  // Mobile split viewer: below md the spread can't fit side by side, so the
+  // reader sees ONE page at a time — story first, then a page turn to the
+  // choices. Keyed by node id so every new chapter derives back to 'story'
+  // without an effect; md+ ignores this entirely and shows both pages.
+  const [mobileView, setMobileView] = useState<{ nodeId: string; page: 'story' | 'choices' }>({
+    nodeId: initialNode.id,
+    page: 'story',
+  })
+  const mobilePage = mobileView.nodeId === node.id ? mobileView.page : 'story'
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const openedTrackedRef = useRef<string | null>(null)
   // Tracks the deepest chapter depth we've reported for the current story, so
@@ -479,6 +488,13 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
     toast.success(`Saved as "${name}"`)
   }
 
+  /** Flip the mobile viewer between the story page and the choices page. */
+  function turnMobilePage(page: 'story' | 'choices') {
+    if (page === mobilePage) return
+    if (soundOn) playPageTurn()
+    setMobileView({ nodeId: node.id, page })
+  }
+
   const pageNumber = history.length + 1
   const palette = PAGE_PALETTES[story.readingTheme?.pageStyle ?? 'parchment'] ?? PAGE_PALETTES.parchment
 
@@ -833,9 +849,11 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
             style={{ transformOrigin: 'center center', transformStyle: 'preserve-3d' }}
             className="grid grid-cols-1 md:grid-cols-[1fr_10px_1fr] rounded-2xl overflow-hidden shadow-[0_30px_100px_-18px_rgba(0,0,0,0.92),0_8px_32px_-8px_rgba(0,0,0,0.55)]"
           >
-            {/* Left page — story content + reactions */}
+            {/* Left page — story content + reactions (the only page below md while reading) */}
             <div
-              className="book-page page-texture p-8 lg:p-12 min-h-[560px] md:min-h-[640px] h-auto max-h-[850px] flex flex-col relative"
+              className={`book-page page-texture p-6 sm:p-8 lg:p-12 min-h-[480px] md:min-h-[640px] h-auto max-h-[850px] flex-col relative ${
+                mobilePage === 'story' ? 'flex' : 'hidden'
+              } md:flex`}
               style={{ '--page-bg': palette.bg, '--page-text': palette.text } as React.CSSProperties}
             >
               <div
@@ -849,6 +867,15 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
                 imageUrl={node.imageUrl}
               />
               <NodeReactions storyId={story.id} nodeId={node.id} />
+              {/* Mobile: the reading flow's natural next step — turn to the facing page */}
+              <button
+                type="button"
+                onClick={() => turnMobilePage('choices')}
+                className="md:hidden mt-5 w-full py-2.5 rounded-xl border text-sm font-medium opacity-70 hover:opacity-100 active:opacity-100 transition-opacity"
+                style={{ borderColor: 'color-mix(in oklab, var(--page-text) 30%, transparent)' }}
+              >
+                {node.isEnding ? 'Turn the page — the end awaits' : 'Turn the page — make your choice'}
+              </button>
               <p className="mt-2 text-center text-[10px] font-sans opacity-20 tracking-widest select-none">
                 — {pageNumber * 2 - 1} —
               </p>
@@ -856,9 +883,11 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
 
             <div className="book-spine hidden md:block" />
 
-            {/* Right page — choices */}
+            {/* Right page — choices (its own page below md, reached by a page turn) */}
             <div
-              className="book-page page-texture p-8 lg:p-12 min-h-[560px] md:min-h-[640px] h-auto max-h-[850px] flex flex-col relative"
+              className={`book-page page-texture p-6 sm:p-8 lg:p-12 min-h-[480px] md:min-h-[640px] h-auto max-h-[850px] flex-col relative ${
+                mobilePage === 'choices' ? 'flex' : 'hidden'
+              } md:flex`}
               style={{ '--page-bg': palette.bg, '--page-text': palette.text } as React.CSSProperties}
             >
               <div
@@ -897,6 +926,15 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
                   />
                 </>
               )}
+              {/* Mobile: flip back to reread before committing to a choice */}
+              <button
+                type="button"
+                onClick={() => turnMobilePage('story')}
+                className="md:hidden mt-5 mx-auto flex items-center gap-1 text-xs font-sans opacity-50 hover:opacity-80 active:opacity-80 transition-opacity"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                Back to the story
+              </button>
               <p className="mt-4 text-center text-[10px] font-sans opacity-20 tracking-widest select-none">
                 — {pageNumber * 2} —
               </p>
@@ -909,6 +947,29 @@ export function BookViewer({ story, initialNode, endingCount, worldGenesis, worl
             <div className="w-10 h-10 border-2 border-amber-900/25 border-t-amber-800/70 rounded-full animate-spin" />
           </div>
         )}
+      </div>
+
+      {/* Mobile page switcher — which side of the spread is open (md+ shows both) */}
+      <div className="md:hidden flex items-center gap-1 rounded-full border border-amber-500/25 bg-background/60 backdrop-blur p-1">
+        {(['story', 'choices'] as const).map((page) => (
+          <button
+            key={page}
+            type="button"
+            onClick={() => turnMobilePage(page)}
+            aria-pressed={mobilePage === page}
+            className={`px-4 py-1.5 rounded-full text-xs font-sans font-medium transition-colors ${
+              mobilePage === page
+                ? 'bg-amber-500/20 text-amber-300'
+                : 'text-muted-foreground/60 hover:text-foreground/80'
+            }`}
+          >
+            {page === 'story'
+              ? 'Story'
+              : node.isEnding
+                ? 'The End'
+                : `Choices${node.slots.length > 0 ? ` (${node.slots.length})` : ''}`}
+          </button>
+        ))}
       </div>
 
       <p className="text-[11px] text-muted-foreground/50 font-sans tracking-wide">
