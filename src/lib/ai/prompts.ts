@@ -216,8 +216,8 @@ export function buildPrompt(
     ? 'End at a moment of warm anticipation or an inviting choice'
     : 'End at a moment of decision or tension'
   const choiceGuidance = gentle
-    ? 'Make them GENUINELY DISTINCT — different delights to pursue (e.g. one curious, one social, one hands-on), each leading somewhere meaningfully different. No throwaway or near-duplicate options; every choice should feel like an invitation.'
-    : 'Make them GENUINELY DISTINCT — different approaches with different risks and consequences (e.g. one bold, one cautious, one cunning or unexpected), each leading somewhere meaningfully different. No throwaway or near-duplicate options; every choice should feel like it matters.'
+    ? 'Make them GENUINELY DISTINCT — different delights to pursue (e.g. one curious, one social, one hands-on), each leading somewhere meaningfully different. Each should still trade something real for something real — time, attention, whose company to keep, which small promise to honor first — never danger, but never weightless either. No throwaway or near-duplicate options; every choice should feel like an invitation worth lingering over.'
+    : 'Make them GENUINELY DISTINCT — different approaches with different risks and consequences (e.g. one bold, one cautious, one cunning or unexpected), each leading somewhere meaningfully different. Each choice must carry a VISIBLE COST or tradeoff the reader can feel before picking: what it risks, spends, or gives up should be inferable from its wording. At least one should quietly test what the protagonist values most, and there must never be one obviously correct answer — a choice the reader has to sit with is the goal.'
 
   // Set strict constraints on length to ensure it fits the book page layout
   // If there's an illustration, the vertical space is significantly reduced.
@@ -266,9 +266,14 @@ Then write the next chapter. It MUST follow these rules strictly:
 - Refer to the protagonist by name; keep every established character perfectly consistent with the facts above
 - Match the world's tone and rules exactly
 - Maintain complete continuity of characters, setting, and plot points established in the path
+- If an earlier choice in the path had a cost, let it still be felt here — consequences echo forward; the world does not forget what the reader decided
 - ${endBeatLine}
-- Be immersive and vivid
+- CRAFT — be concrete and specific: name the particular thing (the cracked bell, not "a sound"; the innkeeper's burned hands, not "signs of hardship")
+- CRAFT — vary sentence rhythm, and let ONE striking image carry the chapter rather than five competing ones; vivid is not ornate
+- CRAFT — dialogue does double duty: it moves the story while revealing who is speaking, and each cast member's voice stays distinct (honor any voice notes in CAST)
+- CRAFT — write in subtext: let characters say less than they mean and want more than they say
 - Never state how a character feels — reveal emotional and inner states through visible behavior, dialogue, body language, and consequences alone. The reader infers; the author does not declare.
+- End the final sentence on resonance — an image, a held breath, a truth landing — never on summary
 - ${wordLimitInstruction}
 - Do NOT truncate sentences. Every sentence must be complete.
 
@@ -278,7 +283,10 @@ CHOICE_2: [choice text]
 CHOICE_3: [choice text]
 ${endingBlock(endingDirective)}
 Then, ONLY if this chapter introduces a brand-new named character not already listed above, add one line per new character (omit entirely if none). When naming them, ${NAME_DIVERSITY_NOTE}:
-NEW_CHARACTER: [name] — [one-line description]
+NEW_CHARACTER: [name] — [one-line description] — wants: [the drive that makes their scenes theirs] — voice: [how they speak, in a few words]
+
+If this chapter MEANINGFULLY CHANGES an already-established character — they die, vanish, or are changed by what happened — record it (omit entirely if no one changed; status is one of alive/deceased/missing):
+CHARACTER_UPDATE: [established name] — status: [new status] — now: [one line on how the story has changed them]
 
 Name where this chapter takes place on its own line — prefer a Region from WORLD CANON above when the scene is there; otherwise a short place name (4 words max):
 LOCATION: [place]

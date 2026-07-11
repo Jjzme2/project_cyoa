@@ -1,7 +1,7 @@
 import { adminDb } from '../firebase-admin'
 import { FieldValue } from 'firebase-admin/firestore'
 import { cacheLife, cacheTag } from 'next/cache'
-import type { Story, StoryCharacter, ContentRating } from '@/types'
+import type { Story, StoryCharacter, StoryCharacterUpdate, ContentRating } from '@/types'
 import { storyRef, nodesRef, nodeRef, slotRef, slotTraverserRef } from './refs'
 
 // ─── Stories ─────────────────────────────────────────────────────────────────
@@ -89,6 +89,43 @@ export async function addStoryCharacters(
     // Cap the roster so a runaway story can't bloat the doc.
     const merged = [...existing, ...additions].slice(0, 40)
     txn.update(ref, { characters: merged })
+  })
+}
+
+const CHARACTER_STATUSES = new Set(['alive', 'deceased', 'missing'])
+
+/**
+ * Apply per-chapter changes to EXISTING canon characters (CHARACTER_UPDATE
+ * lines): a status shift (death, disappearance, return) and/or a fresh `arc`
+ * note describing how the story has changed them. Identity stays immutable —
+ * name and original description are never rewritten; unknown names and
+ * unrecognized statuses are ignored rather than trusted.
+ */
+export async function updateStoryCharacters(
+  storyId: string,
+  updates: StoryCharacterUpdate[],
+): Promise<void> {
+  if (!updates || updates.length === 0) return
+  const ref = storyRef(storyId)
+  await adminDb.runTransaction(async (txn) => {
+    const doc = await txn.get(ref)
+    if (!doc.exists) return
+    const existing: StoryCharacter[] = doc.data()?.characters ?? []
+    const byName = new Map(updates.filter((u) => u.name).map((u) => [u.name.toLowerCase(), u]))
+    let changed = false
+    const merged = existing.map((c) => {
+      const update = byName.get(c.name.toLowerCase())
+      if (!update) return c
+      const status = update.status && CHARACTER_STATUSES.has(update.status) ? update.status : undefined
+      if (!status && !update.note) return c
+      changed = true
+      return {
+        ...c,
+        ...(status ? { status } : {}),
+        ...(update.note ? { arc: update.note.slice(0, 160) } : {}),
+      }
+    })
+    if (changed) txn.update(ref, { characters: merged })
   })
 }
 

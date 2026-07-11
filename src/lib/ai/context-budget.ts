@@ -18,7 +18,9 @@ export interface CastBudgetOptions {
   descMax?: number
 }
 
-const DEFAULT_DETAIL_BUDGET = 1400
+// Raised from 1400 when depth fields (wants/voice/arc) joined each entry —
+// the same greedy fill still guarantees graceful overflow for huge casts.
+const DEFAULT_DETAIL_BUDGET = 1900
 const DEFAULT_DESC_MAX = 90
 
 /** Lower-priority statuses appear after the living, who are likelier to act. */
@@ -68,7 +70,16 @@ export function formatCast(
     const overflow: StoryCharacter[] = []
     let used = 0
     for (const c of ordered) {
-      const entry = c.description ? `${tag(c)}=${clip(c.description, descMax)}` : tag(c)
+      // Depth fields ride along compactly: `Name=desc [wants: …; voice: …; now: …]`
+      // — the drive that makes their scenes theirs, how they sound, and how the
+      // story has changed them (the CHARACTER_UPDATE arc).
+      const depth = [
+        c.want ? `wants: ${clip(c.want, 60)}` : '',
+        c.voice ? `voice: ${clip(c.voice, 50)}` : '',
+        c.arc ? `now: ${clip(c.arc, 80)}` : '',
+      ].filter(Boolean)
+      const depthSuffix = depth.length > 0 ? ` [${depth.join('; ')}]` : ''
+      const entry = c.description ? `${tag(c)}=${clip(c.description, descMax)}${depthSuffix}` : `${tag(c)}${depthSuffix}`
       if (used + entry.length + 2 <= detailBudget || detailed.length === 0) {
         detailed.push(entry)
         used += entry.length + 2

@@ -245,22 +245,24 @@ export class NarrativeBuilder {
     let relationships = priorState?.relationships;
     let affect = priorState?.affect;
     let belief = priorState?.belief;
+
+    const living = (this.story.characters ?? [])
+      .filter((c) => !(c.status && c.status.toLowerCase() === 'deceased'))
+      .map((c) => c.name);
+    // In "You" mode, the reader's standing in this world biases how
+    // not-yet-met characters first regard them. Where the reader has no
+    // personal name here yet, the world's collective regard for OUTSIDERS
+    // fills the gap — strangers lean on how outsiders-as-a-kind are seen.
+    const seedStanding = this.story.youMode
+      ? Math.max(-1, Math.min(1, readerStanding + (1 - Math.abs(readerStanding)) * outsiderRegard * 0.5))
+      : readerStanding;
+
     if (this.story.goapEnabled) {
       const baseline: WorldState = { 'player.inSight': true, 'player.underAttack': false };
       for (const k in baseline) {
         if (currentState[k] === undefined) currentState[k] = baseline[k];
       }
 
-      const living = (this.story.characters ?? [])
-        .filter((c) => !(c.status && c.status.toLowerCase() === 'deceased'))
-        .map((c) => c.name);
-      // In "You" mode, the reader's standing in this world biases how
-      // not-yet-met characters first regard them. Where the reader has no
-      // personal name here yet, the world's collective regard for OUTSIDERS
-      // fills the gap — strangers lean on how outsiders-as-a-kind are seen.
-      const seedStanding = this.story.youMode
-        ? Math.max(-1, Math.min(1, readerStanding + (1 - Math.abs(readerStanding)) * outsiderRegard * 0.5))
-        : readerStanding;
       relationships = RelationshipGraph.init(living, priorState?.relationships, seedStanding);
       // Characters act on PERCEIVED standing, which lags the truth — so gossip
       // changes behaviour gradually and the naive can be briefly deceived.
@@ -289,6 +291,17 @@ export class NarrativeBuilder {
         priorState?.affect,
       );
       context.demeanour = AgentAffect.summary(affect);
+    } else if (living.length > 0) {
+      // Emotional continuity is not a GOAP-only privilege: even without agent
+      // planning, the cast remembers how the protagonist has treated them.
+      // Maintaining the same relationship/belief/affect state here means the
+      // route's per-chapter conduct shifts (Content Judge) accumulate for
+      // EVERY story, and Standing/Demeanour reach the prompt for all of them.
+      relationships = RelationshipGraph.init(living, priorState?.relationships, seedStanding);
+      belief = BeliefModel.update(living, relationships.affinity, priorState?.belief);
+      context.relationshipSummary = RelationshipGraph.summary(relationships);
+      affect = AgentAffect.compute(living, belief.perceived, false, priorState?.affect);
+      context.demeanour = AgentAffect.summary(affect);
     }
 
     // 7. AI Director: fold this turn's events into the next tension level and
@@ -312,6 +325,17 @@ export class NarrativeBuilder {
       PlotPlanner.init(this.story.title, priorState?.plot, this.story.director, this.mode, this.story.customNarrativeShape),
     );
     context.plotDirective = PlotPlanner.directive(plot);
+
+    // At the arc's turning point, the coming decision should be the one the
+    // reader has to sit with — a true dilemma, not a menu. Gentle worlds get
+    // the same weight without manufactured peril: caring about two good
+    // things that cannot both come first.
+    if (plot.beatIndex === 2) {
+      context.plotDirective +=
+        this.mode === 'gentle'
+          ? ' This is the turning point — offer choices that pit two things worth caring about against each other (both good, only one can come first), so the decision is felt.'
+          : ' This is the turning point — make the coming choice a TRUE DILEMMA: options that pit the protagonist\'s values against each other, each defensible, each with a real cost, none obviously right.';
+    }
 
     const turnCount = (priorState?.turnCount ?? 0) + 1;
 
